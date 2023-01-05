@@ -28,3 +28,12 @@ sphinx-apidoc --full -o docs pythonimmediate
 cd docs
 make html
 ```
+
+To autobuild the documentation
+
+```
+cd docs
+sphinx-autobuild . /tmp/_build/ --watch ..
+```
+
+not that the output directory matters, just visit the documentation at `localhost:8000`.
