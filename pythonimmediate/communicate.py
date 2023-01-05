@@ -22,7 +22,7 @@ class Communicator(ABC):
 		TeX will forward that line to the other process to determine the communication method used.
 
 		another process should initialize a Communicator object with that line,
-		call .send() to send data to this process.
+		call `send()` to send data to this process.
 		this process will get all the data and print them to stdout.
 		"""
 		raise NotImplementedError

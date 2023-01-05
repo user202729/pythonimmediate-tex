@@ -248,7 +248,7 @@ class ChildProcessEngine(Engine):
 		this might be called from __del__ so do not import anything here.
 		"""
 		process=self.get_process()
-		textopy.run_none_finish(engine=self)
+		textopy.run_none_finish(self)
 		process.wait()
 		assert process.stdin is not None
 		assert process.stderr is not None

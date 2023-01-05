@@ -37,3 +37,9 @@ sphinx-autobuild . /tmp/_build/ --watch ..
 ```
 
 not that the output directory matters, just visit the documentation at `localhost:8000`.
+
+Looks like it's not easy to write the docstrings in Markdown, see https://stackoverflow.com/q/56062402/5267751
+
+There's some unresolved `$ is not defined` issue -- there's https://github.com/readthedocs/readthedocs.org/issues/9414 but it's unrelated
+
+Maybe take a look at mkdocs/mkdocstrings later
