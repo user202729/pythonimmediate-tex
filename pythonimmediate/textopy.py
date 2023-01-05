@@ -619,14 +619,20 @@ r"""
 """)
 
 
+enable_get_attribute=True
+
+if os.environ.get("SPHINX_BUILD"):
+	enable_get_attribute=False
+
 class ControlSequenceTokenMaker:
 	"""
 	shorthand to create control sequence objects in Python easier.
 	"""
 	def __init__(self, prefix: str)->None:
 		self.prefix=prefix
-	def __getattribute__(self, a: str)->"ControlSequenceToken":
-		return ControlSequenceToken(object.__getattribute__(self, "prefix")+a)
+	if enable_get_attribute:
+		def __getattribute__(self, a: str)->"ControlSequenceToken":
+			return ControlSequenceToken(object.__getattribute__(self, "prefix")+a)
 	def __getitem__(self, a: str)->"ControlSequenceToken":
 		return ControlSequenceToken(object.__getattribute__(self, "prefix")+a)
 

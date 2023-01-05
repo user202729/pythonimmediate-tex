@@ -7,8 +7,16 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'pythonimmediate'
-copyright = '2023, Author'
-author = 'Author'
+copyright = '2023, user202729'
+author = 'user202729'
+
+# -- set sys.path to allow Sphinx-apidoc to find the package
+import os
+import sys
+sys.path.insert(0, os.path.abspath('..'))
+
+# -- set special flag to signify Sphinx build
+os.environ['SPHINX_BUILD'] = '1'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
