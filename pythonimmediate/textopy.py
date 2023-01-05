@@ -103,7 +103,7 @@ def send_bootstrap_code(engine: Engine)->None:
 
 
 # as the name implies, this reads one "command" from Python side and execute it.
-# the command might do additional tasks e.g. read more \TeX\ code.
+# the command might do additional tasks e.g. read more [TeX]-code.
 #
 # e.g. if `block' is read from the communication channel, run |\__run_block:|.
 
@@ -177,15 +177,15 @@ r"""
 All exported functions can be accessed through the module as |import pythonimmediate|.
 
 The |_finish| functions are internal functions, which must be called \emph{at most} once in each
-|\pythonimmediate:n| call from \TeX\ to tell \TeX\ what to do.
+|\pythonimmediate:n| call from [TeX]-to tell [TeX]-what to do.
 
 The |_local| functions simply execute the code. These functions will only return when
-the \TeX\ code finishes executing; nevertheless, the \TeX\ code might recursively execute some Python code
+the [TeX]-code finishes executing; nevertheless, the [TeX]-code might recursively execute some Python code
 inside it.
 
 A simple example is |pythonimmediate.run_block_local('123')| which simply typesets |123|.
 
-The |_peek| functions is the same as above; however, the \TeX\ code must contain an explicit command
+The |_peek| functions is the same as above; however, the [TeX]-code must contain an explicit command
 |\pythonimmediatecontinue{...}|.
 
 The argument of |\pythonimmediatecontinue| will be |e|-expanded
@@ -226,7 +226,7 @@ block_delimiter: str="pythonimm?\"\"\"?'''?"
 
 def read_block(engine: Engine)->str:
 	r"""
-	Internal function to read one block sent from \TeX\ (including the final delimiter line,
+	Internal function to read one block sent from [TeX](including the final delimiter line,
 	but the delimiter line is not returned)
 	"""
 	lines: List[str]=[]
@@ -1411,12 +1411,12 @@ def get_random_identifier()->str:
 def define_TeX_call_Python(f: Callable[..., None], name: Optional[str]=None, argtypes: Optional[List[Type[TeXToPyData]]]=None, identifier: Optional[str]=None)->str:
 	r"""
 	This function setups some internal data structure, and
-	returns the \TeX\ code to be executed on the \TeX\ side to define the macro.
+	returns the [TeX]-code to be executed on the [TeX]-side to define the macro.
 
 	f: the Python function to be executed.
 	It should take some arguments plus a keyword argument `engine` and eventually (optionally) call one of the |_finish| functions.
 
-	name: the macro name on the \TeX\ side. This should only consist of letter characters in |expl3| catcode regime.
+	name: the macro name on the [TeX]-side. This should only consist of letter characters in |expl3| catcode regime.
 
 	argtypes: list of argument types. If it's None it will be automatically deduced from the function |f|'s signature.
 
@@ -1827,7 +1827,7 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 						   )->Tuple[str, PythonCallTeXFunctionType]:
 	r"""
 	|TeX_code| should be some expl3 code that defines a function with name |%name%| that when called should:
-		* run some \TeX\ code (which includes reading the arguments, if any)
+		* run some [TeX]-code (which includes reading the arguments, if any)
 		* do the following if |sync|:
 			* send |r| to Python (equivalently write %sync%)
 			* send whatever needed for the output (as in |ttp_argtypes|)
@@ -1865,7 +1865,7 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 
 	Possible optimizations:
 		* the |r| is not needed if not recursive and |ttp_argtypes| is nonempty
-			(the output itself tells Python when the \TeX\ code finished)
+			(the output itself tells Python when the [TeX]-code finished)
 		* the first line of the output may be on the same line as the |r| itself (done, use TTPEmbeddedLine type, although a bit hacky)
 	"""
 	if ttp_argtypes!=[]:

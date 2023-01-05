@@ -254,10 +254,8 @@ r"""
 @export_function_to_module
 def newcommand(x: Union[str, Callable, None]=None, f: Optional[Callable]=None, engine: Engine=  default_engine)->Callable:
 	r"""
-	Define a new \TeX\ command.
+	Define a new [TeX]-command.
 	If name is not provided, it's automatically deduced from the function.
-
-	this is a TeX logo in rst: :math:`\TeX`
 	"""
 	if f is not None: return newcommand(x, engine=engine)(f)
 	if x is None: return newcommand  # weird design but okay (allow |@newcommand()| as well as |@newcommand|)
@@ -267,7 +265,7 @@ def newcommand(x: Union[str, Callable, None]=None, f: Optional[Callable]=None, e
 @export_function_to_module
 def renewcommand(x: Union[str, Callable, None]=None, f: Optional[Callable]=None, engine: Engine=  default_engine)->Callable:
 	r"""
-	Redefine a \TeX\ command.
+	Redefine a [TeX]-command.
 	If name is not provided, it's automatically deduced from the function.
 	"""
 	if f is not None: return renewcommand(x, engine=engine)(f)
@@ -279,7 +277,7 @@ def renewcommand(x: Union[str, Callable, None]=None, f: Optional[Callable]=None,
 @export_function_to_module
 def execute(block: str, engine: Engine)->None:
 	r"""
-	Run a block of \TeX\ code (might consist of multiple lines).
+	Run a block of [TeX]-code (might consist of multiple lines).
 	Catcode-changing commands are allowed inside.
 
 	A simple example is |pythonimmediate.run_block_local('123')| which simply typesets |123|.

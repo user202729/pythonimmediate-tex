@@ -43,3 +43,22 @@ html_static_path = ['_static']
 # https://www.sphinx-doc.org/en/master/usage/extensions/todo.html#configuration
 
 todo_include_todos = True
+
+
+# it's also possible to define Sphinx custom roles but for just a macro something like :m:`TeX` is too long
+# plus I want to be able to output rst (like a real macro...)
+# written this way it only works in docstrings though
+macros = {
+		"[TeX]": r":math:`\TeX`",
+		}
+
+def process_line(line: str) -> str:
+	for macro, replacement in macros.items():
+		line = line.replace(macro, replacement)
+	return line
+
+def process_docstring(app, what, name, obj, options, lines):
+	lines[:] = [process_line(line) for line in lines]
+
+def setup(app):
+	app.connect('autodoc-process-docstring', process_docstring)

@@ -12,7 +12,8 @@ The package works both ways -- you can run Python code from TeX, or TeX code fro
 
 There are different sections of the documentation:
 
-- :doc:`pythonimmediate.simple` -- interface that "just works" for typical users who does
+
+- :mod:`pythonimmediate.simple` -- interface that "just works" for typical users who does
   not know TeX inner details such as category codes.
 - The rest: contain functions to control the precise category codes of the tokens.
 
