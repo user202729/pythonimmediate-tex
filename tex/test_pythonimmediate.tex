@@ -208,10 +208,7 @@ class Test(unittest.TestCase):
 		pythonimmediate.run_tokenized_line_local("789%")
 		pythonimmediate.run_tokenized_line_local("789%")
 
-		# TODO temporary skip
-		if default_engine.name!="xetex":
-			pythonimmediate.run_block_local(r'''\testc {ab} [cd]|ef|{gh}|ijk
-			lm|%''')
+		pythonimmediate.run_block_local(r"""\testc {ab} [cd]|ef|{gh}|ijk""" + "\n" + r"""lm|%""")
 
 		pythonimmediate.run_tokenized_line_local("789%")
 
