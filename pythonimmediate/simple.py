@@ -38,10 +38,6 @@ def peek_next_char(engine: Engine=  default_engine)->str:
 
 	Uses peek_next_meaning() under the hood to get the meaning of the following token. See peek_next_meaning() for a warning on undefined behavior.
 	"""
-
-	#return str(peek_next_char_()[0])
-	# too slow (marginally slower than peek_next_meaning)
-
 	r=parse_meaning_str(peek_next_meaning())
 	if r is None:
 		return ""
@@ -155,15 +151,15 @@ def get_arg_estr(engine: Engine=  default_engine)->str:
 
 	The behavior is similar to that of the ``\py`` command argument processing, refer to the [TeX] package documentation.
 	"""
-	return str(typing.cast(Callable[[Engine], Tuple[TTPEBlock]], Python_call_TeX_local(
-r"""
+	return typing.cast(Callable[[Engine], TTPEBlock], Python_call_TeX_local(
+		r"""
 
-\cs_new_protected:Npn %name% #1 {
-	%sync%
-	%send_arg0(#1)%
-	\__read_do_one_command:
-}
-""", recursive=False))(engine)[0])
+		\cs_new_protected:Npn %name% #1 {
+			%sync%
+			%send_arg0(#1)%
+			\__read_do_one_command:
+		}
+		""", recursive=False))(engine)
 
 
 @export_function_to_module
@@ -172,7 +168,7 @@ def get_optional_arg_str(engine: Engine=  default_engine)->Optional[str]:
 	"""
 	Get an optional argument. See also :ref:`str-tokenization`.
 	"""
-	[result]=typing.cast(Callable[[Engine], Tuple[TTPLine]], Python_call_TeX_local(
+	result=typing.cast(Callable[[Engine], TTPLine], Python_call_TeX_local(
 		r"""
 		\NewDocumentCommand %name% {o} {
 			\immediate\write \__write_file {
@@ -199,7 +195,7 @@ def get_optional_arg_estr(engine: Engine=  default_engine)->Optional[str]:
 	"""
 	Get an optional argument. See also :ref:`estr-expansion`.
 	"""
-	[result]=typing.cast(Callable[[Engine], Tuple[TTPEBlock]], Python_call_TeX_local(
+	result=typing.cast(Callable[[Engine], TTPEBlock], Python_call_TeX_local(
 		r"""
 		\NewDocumentCommand %name% {o} {
 			%sync%
@@ -240,7 +236,7 @@ def get_verb_arg(engine: Engine=  default_engine)->str:
 		Hard TAB character in the argument gives an error until the corresponding LaTeX3 bug is fixed,
 		see https://tex.stackexchange.com/q/508001/250119.
 	"""
-	return str(typing.cast(Callable[[Engine], Tuple[TTPLine]], Python_call_TeX_local(
+	return typing.cast(Callable[[Engine], TTPLine], Python_call_TeX_local(
 		r"""
 		\NewDocumentCommand %name% {v} {
 			\immediate\write\__write_file { \unexpanded {
@@ -249,7 +245,7 @@ def get_verb_arg(engine: Engine=  default_engine)->str:
 			}}
 			\__read_do_one_command:
 		}
-		""", recursive=False))(engine)[0])
+		""", recursive=False))(engine)
 
 @export_function_to_module
 @user_documentation
@@ -261,17 +257,17 @@ def get_multiline_verb_arg(engine: Engine=  default_engine)->str:
 	.. note::
 		in unusual category regime (such as that in ``\ExplSyntaxOn``), it may return wrong result.
 	"""
-	return str(typing.cast(Callable[[Engine], Tuple[TTPBlock]], Python_call_TeX_local(
-r"""
-\NewDocumentCommand %name% {+v} {
-	\immediate\write\__write_file { r }
-	\begingroup
-		\newlinechar=13~  % this is what +v argument type in xparse uses
-		\__send_block:n { #1 }
-	\endgroup
-	\__read_do_one_command:
-}
-""", recursive=False))(engine)[0])
+	return typing.cast(Callable[[Engine], TTPBlock], Python_call_TeX_local(
+		r"""
+		\NewDocumentCommand %name% {+v} {
+			\immediate\write\__write_file { r }
+			\begingroup
+				\newlinechar=13~  % this is what +v argument type in xparse uses
+				\__send_block:n { #1 }
+			\endgroup
+			\__read_do_one_command:
+		}
+		""", recursive=False))(engine)
 
 
 
