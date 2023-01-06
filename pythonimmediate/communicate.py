@@ -72,7 +72,8 @@ class UnnamedPipeCommunicator(Communicator):
 	character = 'u'
 	
 	def __init__(self, s: str)->None:
-		self.connection=open("/proc/" + str(s) + "/fd/0", "wb")
+		pid, w = map(int, s.split(","))
+		self.connection=open(f"/proc/{pid}/fd/{w}", "wb")
 
 	def send(self, data: bytes)->None:
 		self.connection.write(data)
@@ -81,12 +82,12 @@ class UnnamedPipeCommunicator(Communicator):
 	@staticmethod
 	def forward()->None:
 		import os
-		sys.stdout.write(f"{UnnamedPipeCommunicator.character}{os.getpid()}\n")
+		r, w = os.pipe()
+		sys.stdout.write(f"{UnnamedPipeCommunicator.character}{os.getpid()},{w}\n")
 		sys.stdout.flush()
-		for line in sys.stdin.buffer:
+		for line in os.fdopen(r, "rb"):
 			sys.stdout.buffer.write(line)
 			sys.stdout.buffer.flush()
-
 
 
 communicator_classes: List[Any] = [MultiprocessingNetworkCommunicator, UnnamedPipeCommunicator]
