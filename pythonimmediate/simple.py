@@ -34,9 +34,15 @@ def run_tokenized_line_local(line: str, *, check_braces: bool=True, check_newlin
 def peek_next_char(engine: Engine=  default_engine)->str:
 	"""
 	Get the character of the following token, or empty string if it's not a character.
-	Will also return nonempty if the next token is an implicit character token.
 
-	Uses peek_next_meaning() under the hood to get the meaning of the following token. See peek_next_meaning() for a warning on undefined behavior.
+	.. note::
+		For advanced users:
+
+		Uses :func:`~pythonimmediate.textopy.peek_next_meaning` under the hood to get the meaning of the following token.
+		See that function documentation for a warning on undefined behavior.
+
+		Will also return nonempty if the next token is an implicit character token. This case is not supported and
+		might give random error.
 	"""
 	r=parse_meaning_str(peek_next_meaning())
 	if r is None:
@@ -45,6 +51,9 @@ def peek_next_char(engine: Engine=  default_engine)->str:
 
 @export_function_to_module
 def get_next_char(engine: Engine=  default_engine)->str:
+	"""
+	Return the character of the following token as with :func:`peek_next_char`, but also removes it from the input stream.
+	"""
 	result=Token.get_next(engine=engine)
 	assert isinstance(result, CharacterToken), "Next token is not a character!"
 	return result.chr
@@ -364,7 +373,21 @@ def newcommand(x: Union[str, Callable, None]=None, f: Optional[Callable]=None, e
 
 	If name is not provided, it's automatically deduced from the Python function name.
 
-	The above is not by itself very useful. Read the documentation of :func:`get_arg_str` for a guide on how to define commands that take arguments.
+	The above is not by itself very useful.
+	Read the documentation of the following functions sequentially
+	for a guide on how to define commands that take arguments:
+
+	- :func:`get_arg_str`
+	- :func:`get_arg_estr`
+	- :func:`get_verb_arg`
+	- :func:`get_optional_arg_str`
+	- :func:`peek_next_char`
+	- :func:`get_next_char`
+
+	Then see also (as natural extensions of the above):
+
+	- :func:`get_multiline_verb_arg`
+	- :func:`get_optional_arg_estr`
 
 	.. _trailing-newline:
 

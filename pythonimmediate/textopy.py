@@ -244,7 +244,8 @@ class NToken(ABC):
 	Represent a possibly-notexpanded token.
 	For convenience, a notexpanded token is called a blue token.
 	It's not always possible to determine the notexpanded status of a following token in the input stream.
-	Remark: Token objects must be frozen.
+
+	Implementation note: Token objects must be frozen.
 	"""
 
 	@abstractmethod
@@ -253,88 +254,130 @@ class NToken(ABC):
 	@abstractmethod
 	def repr1(self)->str: ...
 
-	@property
-	@abstractmethod
-	def assignable(self)->bool: ...
-
-	def assign(self, other: "NToken", engine: Engine=default_engine)->None:
-		assert self.assignable
-		NTokenList([T.let, self, C.other("="), C.space(' '), other]).execute(engine=engine)
-
-	def assign_future(self, engine: Engine=  default_engine)->None:
-		assert self.assignable
-		typing.cast(Callable[[PTTBalancedTokenList, Engine], None], Python_call_TeX_local(
-r"""
-\cs_new_protected:Npn %name% {
-	%read_arg0(\__data)%
-	\expandafter \futurelet \__data \pythonimmediatecontinuenoarg
-}
-""" , sync=True))(PTTBalancedTokenList(BalancedTokenList([self.no_blue])), engine)
-
-	def assign_futurenext(self, engine: Engine=  default_engine)->None:
-		assert self.assignable
-		typing.cast(Callable[[PTTBalancedTokenList, Engine], None], Python_call_TeX_local(
-r"""
-\cs_new_protected:Npn %name% {
-	%read_arg0(\__data)%
-	\afterassignment \pythonimmediatecontinuenoarg \expandafter \futurelet \__data 
-}
-""" , sync=True))(PTTBalancedTokenList(BalancedTokenList([self.no_blue])), engine)
-
 	def meaning_str(self, engine: Engine=  default_engine)->str:
-		"""
+		r"""
 		get the meaning of this token as a string.
+
+		Note that all blue tokens have the meaning equal to ``\relax``
+		(or ``[unknown command code! (0, 1)]`` in a buggy LuaTeX implementation)
+		with the backslash replaced
+		by the current ``escapechar``.
 		"""
 		return NTokenList([T.meaning, self]).expand_x(engine=engine).str()
 
 	@property
 	@abstractmethod
-	def blue(self)->"BlueToken": ...
+	def blue(self)->"BlueToken":
+		r"""
+		Return the result of ``\noexpand`` applied on this token.
+		"""
+		...
 
 	@property
 	@abstractmethod
-	def no_blue(self)->"Token": ...
+	def no_blue(self)->"Token":
+		r"""
+		Return the result of this token after being "touched", which drops its blue status if any.
+		"""
+		...
 
 	def meaning_equal(self, other: "Token", engine: Engine=  default_engine)->bool:
+		"""
+		Whether this token is the same in meaning as the token specified in the parameter *other*.
+
+		Note that two tokens might have different meaning despite having equal :meth:`meaning_str`.
+		"""
 		return NTokenList([T.ifx, self, other, Catcode.other("1"), T["else"], Catcode.other("0"), T.fi]).expand_x(engine=engine).bool()
 
 	def str(self)->str:
 		"""
-		self must represent a character of a TeX string. (i.e. equal to itself when detokenized)
-		return the string content.
+		``self`` must represent a character of a [TeX] string. (i.e. equal to itself when detokenized)
 
-		default implementation below. Not necessarily correct.
+		:return: the string content.
 		"""
+		# default implementation, might not be correct. Subclass overrides as needed.
 		raise ValueError("Token does not represent a string!")
 
 	def degree(self)->int:
 		"""
-		return the imbalance degree for this token ({ -> 1, } -> -1, everything else -> 0)
-
-		default implementation below. Not necessarily correct.
+		return the imbalance degree for this token (``{`` -> 1, ``}`` -> -1, everything else -> 0)
 		"""
+		# default implementation, might not be correct. Subclass overrides as needed.
 		return 0
 
 
 @export_function_to_module
 class Token(NToken):
 	"""
-	Represent a TeX token, excluding the notexpanded possibility.
-	See also documentation of NToken.
+	Represent a [TeX] token, excluding the notexpanded possibility.
+	See also documentation of :class:`NToken`.
 	"""
 
 	@abstractmethod
-	def serialize(self)->str: ...
+	def serialize(self)->str:
+		"""
+		Internal function, serialize this token to be able to pass to [TeX].
+		"""
+		...
+
+	@property
+	@abstractmethod
+	def assignable(self)->bool:
+		"""
+		Whether this token can be assigned to i.e. it's control sequence or active character.
+		"""
+		...
+
+	def assign(self, other: "NToken", engine: Engine=default_engine)->None:
+		"""
+		Assign the meaning of this token to be equivalent to that of the other token.
+		"""
+		assert self.assignable
+		NTokenList([T.let, self, C.other("="), C.space(' '), other]).execute(engine=engine)
+
+	def assign_future(self, engine: Engine=  default_engine)->None:
+		r"""
+		Assign the meaning of this token to be equivalent to that of the second token in the input stream.
+
+		For example if this token is ``\a``, and the input stream starts with ``bcde``, then ``\a``'s meaning
+		will be assigned to that of the explicit character ``c``.
+
+		.. note::
+			Tokenizes one more token in the input stream, and remove its blue status if any.
+		"""
+		assert self.assignable
+		typing.cast(Callable[[PTTBalancedTokenList, Engine], None], Python_call_TeX_local(
+			r"""
+			\cs_new_protected:Npn %name% {
+				%read_arg0(\__data)%
+				\expandafter \futurelet \__data \pythonimmediatecontinuenoarg
+			}
+			""" , sync=True))(PTTBalancedTokenList(BalancedTokenList([self.no_blue])), engine)
+
+	def assign_futurenext(self, engine: Engine=  default_engine)->None:
+		"""
+		.. note::
+			Tokenizes two more tokens in the input stream, and remove their blue status if any.
+		"""
+		assert self.assignable
+		typing.cast(Callable[[PTTBalancedTokenList, Engine], None], Python_call_TeX_local(
+			r"""
+			\cs_new_protected:Npn %name% {
+				%read_arg0(\__data)%
+				\afterassignment \pythonimmediatecontinuenoarg \expandafter \futurelet \__data 
+			}
+			""" , sync=True))(PTTBalancedTokenList(BalancedTokenList([self.no_blue])), engine)
+
 
 	def value(self, engine: Engine=  default_engine)->"BalancedTokenList":
 		"""
-		given self is a TokenList variable, return the content.
+		given ``self`` is a expl3 ``tl``-variable, return the content.
 		"""
 		return BalancedTokenList([self]).expand_o(engine=engine)
 
 	def value_str(self, engine: Engine=  default_engine)->str:
 		"""
-		given self is a str variable, return the content.
+		given ``self`` is a expl3 ``str``-variable, return the content.
 		"""
 		return self.value(engine=engine).str()
 
@@ -349,6 +392,11 @@ class Token(NToken):
 
 	@staticmethod
 	def deserialize(s: str|bytes)->"Token":
+		"""
+		See documentation of :meth:`TokenList.deserialize`.
+
+		Always return a single token.
+		"""
 		t=TokenList.deserialize(s)
 		assert len(t)==1
 		return t[0]
@@ -356,7 +404,9 @@ class Token(NToken):
 	@staticmethod
 	def deserialize_bytes(data: bytes, engine: Engine)->"Token":
 		"""
-		See documentation of `TokenList.deserialize_bytes`.
+		See documentation of :meth:`TokenList.deserialize_bytes`.
+
+		Always return a single token.
 		"""
 		if engine.is_unicode:
 			return Token.deserialize(data.decode('u8'))
@@ -368,12 +418,14 @@ class Token(NToken):
 		r"""
 		Get the following token.
 
-		Note: in LaTeX3 versions without the commit |https://github.com/latex3/latex3/commit/24f7188904d6|
-		sometimes this may error out.
+		.. note::
+			in LaTeX3 versions without the commit https://github.com/latex3/latex3/commit/24f7188904d6
+			sometimes this may error out.
 
-		Note: because of the internal implementation of |\peek_analysis_map_inline:n|, this may
-		tokenize up to 2 tokens ahead (including the returned token),
-		as well as occasionally return the wrong token in unavoidable cases.
+		.. note::
+			because of the internal implementation of ``\peek_analysis_map_inline:n``, this may
+			tokenize up to 2 tokens ahead (including the returned token),
+			as well as occasionally return the wrong token in unavoidable cases.
 		"""
 		return Token.deserialize_bytes(
 			typing.cast(Callable[[Engine], TTPRawLine], Python_call_TeX_local(
@@ -393,13 +445,16 @@ class Token(NToken):
 		"""
 		Get the following token without removing it from the input stream.
 
-		Equivalent to get_next() then put_next() immediately. See documentation of get_next() for some notes.
+		Equivalent to :meth:`get_next` then :meth:`put_next` immediately. See documentation of :meth:`get_next` for some notes.
 		"""
 		t=Token.get_next(engine=engine)
 		t.put_next(engine=engine)
 		return t
 
 	def put_next(self, engine: Engine=  default_engine)->None:
+		"""
+		Put this token forward in the input stream.
+		"""
 		d=self.degree()
 		if d==0:
 			BalancedTokenList([self]).put_next(engine=engine)
@@ -407,28 +462,28 @@ class Token(NToken):
 			assert isinstance(self, CharacterToken)
 			if d==1:
 				typing.cast(Callable[[PTTInt, Engine], None], Python_call_TeX_local(
+					r"""
+					\cs_new_protected:Npn %name% {
+						%read_arg0(\__index)%
+						\expandafter \expandafter \expandafter \pythonimmediatecontinuenoarg
+							\char_generate:nn {\__index} {1}
+					}
+					""", recursive=False, sync=True))(PTTInt(self.index), engine)
+			else:
+				assert d==-1
+				typing.cast(Callable[[PTTInt, Engine], None], Python_call_TeX_local(
 r"""
 \cs_new_protected:Npn %name% {
 	%read_arg0(\__index)%
 	\expandafter \expandafter \expandafter \pythonimmediatecontinuenoarg
-		\char_generate:nn {\__index} {1}
+		\char_generate:nn {\__index} {2}
 }
 """, recursive=False, sync=True))(PTTInt(self.index), engine)
-			else:
-				assert d==-1
-				put_next_egroup(PTTInt(self.index), engine)
 
 
 
-
-
-
-"""
-TeX code for serializing and deserializing a token list.
-Convert a token list from/to a string.
-"""
-
-
+# TeX code for serializing and deserializing a token list.
+# Convert a token list from/to a string.
 mark_bootstrap(
 r"""
 \precattl_exec:n {
@@ -790,11 +845,18 @@ class BlueToken(NToken):
 
 	def repr1(self)->str: return "notexpanded:"+self.token.repr1()
 
-	@property
-	def assignable(self)->bool: return self.token.assignable
-
 	def put_next(self, engine: Engine=  default_engine)->None:
-		put_next_blue(PTTBalancedTokenList(BalancedTokenList([self.token])), engine)
+		typing.cast(Callable[[PTTBalancedTokenList, Engine], None], Python_call_TeX_local(
+			r"""
+			\cs_new_protected:Npn \__put_next_blue_tmp {
+				%optional_sync%
+				\expandafter \__read_do_one_command: \noexpand
+			}
+			\cs_new_protected:Npn %name% {
+				%read_arg0(\__target)%
+				\expandafter \__put_next_blue_tmp \__target
+			}
+			""", recursive=False))(PTTBalancedTokenList(BalancedTokenList([self.token])), engine)
 
 
 doc_catcode_table: Dict[int, Catcode]={}
@@ -828,6 +890,19 @@ else:  # Python 3.8 compatibility
 
 @export_function_to_module
 class TokenList(TokenListBaseClass):
+	"""
+	Represent a [TeX] token list, none of which can contain a blue token.
+
+	.. _token-list-construction:
+
+	Token list construction
+	-----------------------
+
+	There are some functions to quickly construct token lists, see :meth:`from_string`
+	and :meth:`__init__`.
+
+	"""
+
 	@staticmethod
 	def force_token_list(a: Iterable)->Iterable[Token]:
 		for x in a:
@@ -855,13 +930,17 @@ class TokenList(TokenListBaseClass):
 	def check_balanced(self)->None:
 		"""
 		ensure that this is balanced.
+
+		:raises ValueError: if this is not balanced.
 		"""
 		if not self.is_balanced():
 			raise ValueError("Token list is not balanced")
 
 	def balanced_parts(self)->"List[Union[BalancedTokenList, Token]]":
 		"""
-		split this TokenList into a list of balanced parts and unbalanced {/}tokens
+		Internal function, used for serialization and sending to [TeX].
+
+		Split this :class:`TokenList` into a list of balanced parts and unbalanced ``{``/``}`` tokens.
 		"""
 		degree=0
 		min_degree=0, 0
@@ -903,13 +982,17 @@ class TokenList(TokenListBaseClass):
 		return left_half+right_half[::-1]
 
 	def put_next(self, engine: Engine=  default_engine)->None:
+		"""
+		Put this token list forward in the input stream.
+		"""
 		for part in reversed(self.balanced_parts()): part.put_next(engine=engine)
 
 	@property
 	def balanced(self)->"BalancedTokenList":
 		"""
-		return a BalancedTokenList containing the content of this object.
-		it must be balanced.
+		``self`` must be balanced.
+
+		:return: a :class:`BalancedTokenList` containing the content of this object.
 		"""
 		return BalancedTokenList(self)
 
@@ -957,28 +1040,43 @@ class TokenList(TokenListBaseClass):
 	@classmethod
 	def from_string(cls: Type[TokenListType], s: str, get_catcode: Callable[[int], Catcode])->TokenListType:
 		"""
-		convert a string to a TokenList approximately.
-		The tokenization algorithm is slightly different from TeX's in the following respect:
+		Approximate tokenizer implemented in Python.
+
+		Convert a string to a :class:`TokenList` (or some subclass of it such as :class:`BalancedTokenList` approximately.
+
+		This is an internal function and should not be used directly. Use one of :meth:`e3` or :meth:`doc` instead.
+
+		These are used to allow constructing a :class:`TokenList` object in Python without being too verbose.
+		Refer to :ref:`token-list-construction` for alternatives.
+
+		The tokenization algorithm is slightly different from [TeX]'s in the following respect:
 
 		* multiple spaces are collapsed to one space, but only if it has character code space (32).
+		  i.e. in expl3 catcode, ``~~`` get tokenized to two spaces.
 		* spaces with character code different from space (32) after a control sequence is not ignored.
-		* ^^ syntax are not supported. Use Python's escape syntax as usual.
+		  i.e. in expl3 catcode, ``~`` always become a space.
+		* ``^^`` syntax are not supported. Use Python's escape syntax (e.g. ``\x01``) as usual
+		  (of course that does not work in raw Python strings ``r"..."``).
+
+		:param get_catcode: A function that given a character code, return its desired category code.
 		"""
 		return cls(TokenList.iterable_from_string(s, get_catcode))
 
 	@classmethod
 	def e3(cls: Type[TokenListType], s: str)->TokenListType:
-		"""
-		approximate tokenizer in expl3 catcode, implemented in Python.
-		refer to documentation of from_string() for details.
+		r"""
+		Approximate tokenizer in expl3 (``\ExplSyntaxOn``) catcode regime.
+
+		Refer to documentation of :meth:`from_string` for details.
 		"""
 		return cls.from_string(s, lambda x: e3_catcode_table.get(x, Catcode.other))
 
 	@classmethod
 	def doc(cls: Type[TokenListType], s: str)->TokenListType:
 		"""
-		approximate tokenizer in document catcode, implemented in Python.
-		refer to documentation of from_string() for details.
+		Approximate tokenizer in document (normal) catcode regime.
+
+		Refer to documentation of :meth:`from_string` for details.
 		"""
 		return cls.from_string(s, lambda x: doc_catcode_table.get(x, Catcode.other))
 
@@ -987,6 +1085,8 @@ class TokenList(TokenListBaseClass):
 
 	def serialize_bytes(self, engine: Engine)->bytes:
 		"""
+		Internal function.
+
 		Given an engine, serialize it in a form that is suitable for writing directly to the engine.
 		"""
 		if engine.is_unicode:
@@ -1041,6 +1141,8 @@ class TokenList(TokenListBaseClass):
 	@classmethod
 	def deserialize_bytes(cls: Type[TokenListType], data: bytes, engine: Engine)->TokenListType:
 		"""
+		Internal function.
+
 		Given a bytes object read directly from the engine, deserialize it.
 		"""
 		if engine.is_unicode:
@@ -1052,15 +1154,33 @@ class TokenList(TokenListBaseClass):
 		return '<' + type(self).__name__ + ': ' + ' '.join(t.repr1() for t in self) + '>'
 
 	def execute(self, engine: Engine=  default_engine)->None:
+		r"""
+		Execute this token list. It must not "peek ahead" in the input stream.
+
+		For example the token list ``\catcode1=2\relax`` can be executed safely
+		(and sets the corresponding category code),
+		but there's no guarantee what will be assigned to ``\tmp`` when ``\futurelet\tmp`` is executed.
+		"""
 		NTokenList(self).execute(engine=engine)
 
 	def expand_x(self, engine: Engine=  default_engine)->"BalancedTokenList":
+		"""
+		Return the ``x``-expansion of this token list.
+
+		The result must be balanced, otherwise the behavior is undefined.
+		"""
 		return NTokenList(self).expand_x(engine=engine)
 
 	def bool(self)->bool:
+		"""
+		See :meth:`NTokenList.bool`.
+		"""
 		return NTokenList(self).bool()
 
 	def str(self)->str:
+		"""
+		See :meth:`NTokenList.str`.
+		"""
 		return NTokenList(self).str()
 
 
@@ -1069,68 +1189,92 @@ class TokenList(TokenListBaseClass):
 class BalancedTokenList(TokenList):
 	"""
 	Represents a balanced token list.
-	Note that runtime checking is not strictly enforced,
-	use `is_balanced()` method explicitly if you need to check.
+
+	.. note::
+		Runtime checking is not strictly enforced,
+		use :meth:`~TokenList.is_balanced()` method explicitly if you need to check.
 	"""
 
 	def __init__(self, a: Iterable=())->None:
 		"""
-		constructor. This must check for balanced-ness as balanced() method depends on this.
+		Constructor.
+
+		:raises ValueError: if the token list is not balanced.
 		"""
 		super().__init__(a)
 		self.check_balanced()
 
 	def expand_o(self, engine: Engine=  default_engine)->"BalancedTokenList":
-		return BalancedTokenList(typing.cast(Callable[[PTTBalancedTokenList, Engine], Tuple[TTPBalancedTokenList]], Python_call_TeX_local(
-r"""
-\cs_new_protected:Npn %name% {
-	%read_arg0(\__data)%
-	\exp_args:NNV \tl_set:No \__data \__data
-	%sync%
-	%send_arg0_var(\__data)%
-	\__read_do_one_command:
-}
-""", recursive=expansion_only_can_call_Python))(PTTBalancedTokenList(self), engine)[0])
+		"""
+		Return the ``o``-expansion of this token list.
+
+		The result must be balanced, otherwise the behavior is undefined.
+		"""
+		return typing.cast(Callable[[PTTBalancedTokenList, Engine], TTPBalancedTokenList], Python_call_TeX_local(
+			r"""
+			\cs_new_protected:Npn %name% {
+				%read_arg0(\__data)%
+				\exp_args:NNV \tl_set:No \__data \__data
+				%sync%
+				%send_arg0_var(\__data)%
+				\__read_do_one_command:
+			}
+			""", recursive=expansion_only_can_call_Python))(PTTBalancedTokenList(self), engine)
+
 	def expand_x(self, engine: Engine=  default_engine)->"BalancedTokenList":
-		return BalancedTokenList(typing.cast(Callable[[PTTBalancedTokenList, Engine], Tuple[TTPBalancedTokenList]], Python_call_TeX_local(
-r"""
-\cs_new_protected:Npn %name% {
-	%read_arg0(\__data)%
-	\tl_set:Nx \__data {\__data}
-	%sync%
-	%send_arg0_var(\__data)%
-	\__read_do_one_command:
-}
-""", recursive=expansion_only_can_call_Python))(PTTBalancedTokenList(self), engine)[0])
+		return typing.cast(Callable[[PTTBalancedTokenList, Engine], TTPBalancedTokenList], Python_call_TeX_local(
+		r"""
+		\cs_new_protected:Npn %name% {
+			%read_arg0(\__data)%
+			\tl_set:Nx \__data {\__data}
+			%sync%
+			%send_arg0_var(\__data)%
+			\__read_do_one_command:
+		}
+		""", recursive=expansion_only_can_call_Python))(PTTBalancedTokenList(self), engine)
+
 	def execute(self, engine: Engine=  default_engine)->None:
 		typing.cast(Callable[[PTTBalancedTokenList, Engine], None], Python_call_TeX_local(
-r"""
-\cs_new_protected:Npn %name% {
-	%read_arg0(\__data)%
-	\__data
-	%optional_sync%
-	\__read_do_one_command:
-}
-""" , ))(PTTBalancedTokenList(self), engine)
+			r"""
+			\cs_new_protected:Npn %name% {
+				%read_arg0(\__data)%
+				\__data
+				%optional_sync%
+				\__read_do_one_command:
+			}
+			"""))(PTTBalancedTokenList(self), engine)
 
 	def put_next(self, engine: Engine=  default_engine)->None:
-		put_next_tokenlist(PTTBalancedTokenList(self), engine)
+		typing.cast(Callable[[PTTBalancedTokenList, Engine], None], Python_call_TeX_local(
+			r"""
+			\cs_new_protected:Npn \__put_next_tmp {
+				%optional_sync%
+				\__read_do_one_command:
+			}
+			\cs_new_protected:Npn %name% {
+				%read_arg0(\__target)%
+				\expandafter \__put_next_tmp \__target
+			}
+			""", recursive=False))(PTTBalancedTokenList(self), engine)
 
 	@staticmethod
 	def get_next(engine: Engine=  default_engine)->"BalancedTokenList":
 		"""
-		get an (undelimited) argument from the TeX input stream.
+		Get an (undelimited) argument from the [TeX] input stream.
 		"""
-		return BalancedTokenList(typing.cast(Callable[[Engine], Tuple[TTPBalancedTokenList]], Python_call_TeX_local(
-r"""
-\cs_new_protected:Npn %name% #1 {
-	%sync%
-	%send_arg0(#1)%
-	\__read_do_one_command:
-}
-""", recursive=False))(engine)[0])
+		return typing.cast(Callable[[Engine], TTPBalancedTokenList], Python_call_TeX_local(
+			r"""
+			\cs_new_protected:Npn %name% #1 {
+				%sync%
+				%send_arg0(#1)%
+				\__read_do_one_command:
+			}
+			""", recursive=False))(engine)
 
 	def detokenize(self, engine: Engine=  default_engine)->str:
+		r"""
+		:return: a string, equal to the result of ``\detokenize`` applied to this token list.
+		"""
 		return BalancedTokenList([T.detokenize, self]).expand_x(engine=engine).str()
 
 
@@ -1207,12 +1351,18 @@ class NTokenList(NTokenListBaseClass):
 
 	def str(self)->str:
 		"""
-		self must represent a TeX string. (i.e. equal to itself when detokenized)
-		return the string content.
+		``self`` must represent a [TeX] string. (i.e. equal to itself when detokenized)
+
+		:return: the string content.
 		"""
 		return "".join(t.str() for t in self)
 
 	def bool(self)->bool:
+		"""
+		Internal function. ``self`` must represent a [TeX] string either equal to "0" or "1".
+
+		:return: the string content.
+		"""
 		s=self.str()
 		return {"0": False, "1": True}[s]
 
@@ -1328,12 +1478,26 @@ class TTPBalancedTokenList(TeXToPyData, BalancedTokenList):
 
 
 class PyToTeXData(ABC):
+	"""
+	Internal class (for now). Represent a data type that can be sent from Python to [TeX].
+	"""
+
 	@staticmethod
 	@abstractmethod
 	def read_code(var: str)->str:
+		r"""
+		Takes an argument, the variable name (with backslash prefixed such as ``"\abc"``.)
+
+		:return: some [TeX] code that when executed in expl3 category code regime,
+		will read a value of the specified data type and assign it to the variable.
+		"""
 		...
 	@abstractmethod
 	def write(self, engine: Engine)->None:
+		"""
+		Write the value represented by ``self`` to the engine
+		in a form suitable for reading from [TeX].
+		"""
 		...
 
 @dataclass
@@ -1717,6 +1881,9 @@ class Python_call_TeX_extra:
 Python_call_TeX_defined: Dict[Python_call_TeX_data, Tuple[Python_call_TeX_extra, Callable]]={}
 
 def Python_call_TeX_local(TeX_code: str, *, recursive: bool=True, sync: Optional[bool]=None, finish: bool=False)->Callable:
+	"""
+	Internal function. See :func:`scan_Python_call_TeX`.
+	"""
 	data=Python_call_TeX_data(
 			TeX_code=TeX_code, recursive=recursive, sync=sync, finish=finish
 			)
@@ -1724,6 +1891,8 @@ def Python_call_TeX_local(TeX_code: str, *, recursive: bool=True, sync: Optional
 
 def build_Python_call_TeX(T: Type, TeX_code: str, *, recursive: bool=True, sync: Optional[bool]=None, finish: bool=False)->None:
 	"""
+	Internal function. See :func:`scan_Python_call_TeX`.
+
 	T has the form Callable[[T1, T2], Tuple[U1, U2]]
 	where the Tx are subclasses of PyToTeXData and the Ux are subclasses of TeXToPyData
 
@@ -1790,9 +1959,22 @@ def build_Python_call_TeX(T: Type, TeX_code: str, *, recursive: bool=True, sync:
 
 def scan_Python_call_TeX(sourcecode: str)->None:
 	"""
-	scan the file in filename for occurrences of typing.cast(T, Python_call_TeX_local(...)), then call build_Python_call_TeX(T, ...) for each occurrence.
+	Internal function.
 
-	Don't use on untrusted code.
+	Scan the file in filename for occurrences of ``typing.cast(T, Python_call_TeX_local(...))``,
+	then call ``build_Python_call_TeX(T, ...)`` for each occurrence.
+
+	The way the whole thing work is:
+
+	- In the Python code, some ``typing.cast(T, Python_call_TeX_local(...))`` are used.
+	- This function is called on all the library source codes to scan for those occurrences,
+	  build necessary data structures for the :meth:`Python_call_TeX_local` function calls to work correctly.
+	- When :meth:`Python_call_TeX_local` is actually called, it does some magic to return the correct function.
+
+	Done this way, the type checking works correctly and it's not necessary to define global
+	temporary variables.
+
+	Don't use this function on untrusted code.
 	"""
 	import ast
 	from copy import deepcopy
@@ -1826,6 +2008,8 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 						   finish: bool=False,
 						   )->Tuple[str, PythonCallTeXFunctionType]:
 	r"""
+	Internal function.
+
 	|TeX_code| should be some expl3 code that defines a function with name |%name%| that when called should:
 		* run some [TeX]-code (which includes reading the arguments, if any)
 		* do the following if |sync|:
@@ -1937,19 +2121,6 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 
 scan_Python_call_TeX(inspect.getsource(sys.modules[__name__]))
 
-def define_Python_call_TeX_local(*args, **kwargs)->PythonCallTeXFunctionType:
-	"""
-	used to define "local" handlers i.e. used by this library.
-	The code will be included in mark_bootstrap().
-	"""
-	code, result=define_Python_call_TeX(*args, **kwargs)
-	mark_bootstrap(code)
-	return result
-
-# essentially this is the same as the above, but just that the return type is guaranteed to be not None to satisfy type checkers
-def define_Python_call_TeX_local_sync(*args, **kwargs)->PythonCallTeXSyncFunctionType:
-	return define_Python_call_TeX_local(*args, **kwargs, sync=True)  # type: ignore
-
 run_none_finish=typing.cast(Callable[[Engine], None], Python_call_TeX_local(
 r"""
 \cs_new_eq:NN %name% \relax
@@ -1957,10 +2128,12 @@ r"""
 
 
 """
-|run_error_finish| is fatal to TeX, so we only run it when it's fatal to Python.
+Internal function.
+
+``run_error_finish`` is fatal to [TeX], so we only run it when it's fatal to Python.
 
 We want to make sure the Python traceback is printed strictly before run_error_finish() is called,
-so that the Python traceback is not interleaved with TeX error messages.
+so that the Python traceback is not interleaved with [TeX] error messages.
 """
 run_error_finish=typing.cast(Callable[[PTTBlock, Engine], None], Python_call_TeX_local(
 r"""
@@ -1971,44 +2144,6 @@ r"""
     \msg_error:nn {pythonimmediate} {python-error}
 }
 """, finish=True, sync=False))
-
-
-put_next_blue=typing.cast(Callable[[PTTBalancedTokenList, Engine], None], Python_call_TeX_local(
-r"""
-\cs_new_protected:Npn \__put_next_blue_tmp {
-	%optional_sync%
-	\expandafter \__read_do_one_command: \noexpand
-}
-\cs_new_protected:Npn %name% {
-	%read_arg0(\__target)%
-	\expandafter \__put_next_blue_tmp \__target
-}
-""", recursive=False))
-
-
-put_next_tokenlist=typing.cast(Callable[[PTTBalancedTokenList, Engine], None], Python_call_TeX_local(
-r"""
-\cs_new_protected:Npn \__put_next_tmp {
-	%optional_sync%
-	\__read_do_one_command:
-}
-\cs_new_protected:Npn %name% {
-	%read_arg0(\__target)%
-	\expandafter \__put_next_tmp \__target
-}
-""", recursive=False))
-
-
-
-put_next_egroup=typing.cast(Callable[[PTTInt, Engine], None], Python_call_TeX_local(
-r"""
-\cs_new_protected:Npn %name% {
-	%read_arg0(\__index)%
-	\expandafter \expandafter \expandafter \pythonimmediatecontinuenoarg
-		\char_generate:nn {\__index} {2}
-}
-""", recursive=False, sync=True))
-
 
 
 
@@ -2031,17 +2166,17 @@ def run_tokenized_line_peek(line: str, *, check_braces: bool=True, check_newline
 @export_function_to_module
 def run_block_local(block: str, engine: Engine=  default_engine)->None:
 	typing.cast(Callable[[PTTBlock, Engine], None], Python_call_TeX_local(
-r"""
-\cs_new_protected:Npn %name% {
-	%read_arg0(\__data)%
-	\begingroup \newlinechar=10~ \expandafter \endgroup
-	\scantokens \expandafter{\__data}
-	% trick described in https://tex.stackexchange.com/q/640274 to scantokens the code with \newlinechar=10
+		r"""
+		\cs_new_protected:Npn %name% {
+			%read_arg0(\__data)%
+			\begingroup \newlinechar=10~ \expandafter \endgroup
+			\scantokens \expandafter{\__data}
+			% trick described in https://tex.stackexchange.com/q/640274 to scantokens the code with \newlinechar=10
 
-	%optional_sync%
-	\__read_do_one_command:
-}
-""" , ))(PTTBlock(block), engine)
+			%optional_sync%
+			\__read_do_one_command:
+		}
+		"""))(PTTBlock(block), engine)
 
 
 @export_function_to_module
@@ -2054,10 +2189,10 @@ def continue_until_passed_back_str(engine: Engine=  default_engine)->str:
 
 	The function will only return when the |\pythonimmediatecontinue| is called.
 	"""
-	return str(typing.cast(Callable[[Engine], Tuple[TTPEmbeddedLine]], Python_call_TeX_local(
-r"""
-\cs_new_eq:NN %name% \relax
-""" , ))(engine)[0])
+	return typing.cast(Callable[[Engine], TTPEmbeddedLine], Python_call_TeX_local(
+		r"""
+		\cs_new_eq:NN %name% \relax
+		"""))(engine)
 
 @export_function_to_module
 def continue_until_passed_back(engine: Engine=  default_engine)->None:
@@ -2080,16 +2215,15 @@ def expand_once(engine: Engine=  default_engine)->None:
 # ========
 
 
-# TODO I wonder which one is faster. Need to benchmark...
 @export_function_to_module
 @user_documentation
 def peek_next_meaning(engine: Engine=  default_engine)->str:
 	r"""
-	Get the meaning of the following token, as a string, using the current |\escapechar|.
+	Get the meaning of the following token, as a string, using the current ``\escapechar``.
 	
-	This is recommended over |peek_next_token()| as it will not tokenize an extra token.
+	This is recommended over :func:`peek_next_token` as it will not tokenize an extra token.
 
-	It's undefined behavior if there's a newline (|\newlinechar| or |^^J|, the latter is OS-specific)
+	It's undefined behavior if there's a newline (``\newlinechar`` or ``^^J``, the latter is OS-specific)
 	in the meaning string.
 	"""
 	return typing.cast(Callable[[Engine], TTPEmbeddedLine], Python_call_TeX_local(

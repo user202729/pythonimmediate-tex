@@ -16,9 +16,8 @@ There are different sections of the documentation:
 - :mod:`pythonimmediate.simple` -- interface that "just works" for typical users who does
   not know TeX inner details such as category codes.
 - The rest: contain functions to control the precise category codes of the tokens.
-
-To create TeX subprocesses from Python,
-refer to the documentation of the class :class:`pythonimmediate.engine.ChildProcessEngine`.
+- See the documentation of :class:`pythonimmediate.engine.ChildProcessEngine` for ways to create a TeX engine from inside Python,
+  and explanation of the ``engine=`` optional argument for most functions.
 
 .. toctree::
    :maxdepth: 4
