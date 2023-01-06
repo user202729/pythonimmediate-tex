@@ -27,7 +27,7 @@ class Test:
 
 		with default_engine.set_engine(engine):
 			TokenList([T["def"], T.testa, TokenList.doc("123")]).execute()
-			assert TokenList([T.testa]).expand_x().str() == "123"
+			assert TokenList([T.testa]).expand_x().str_unicode() == "123"
 
 		assert default_engine.engine is None
 
@@ -36,8 +36,8 @@ class Test:
 
 		with ChildProcessEngine("pdftex") as new_engine:
 			TokenList([T["def"], T.testa, TokenList.doc("456")]).execute(engine=new_engine)
-			assert TokenList([T.testa]).expand_x(engine=engine).str() == "123"
-			assert TokenList([T.testa]).expand_x(engine=new_engine).str() == "456"
+			assert TokenList([T.testa]).expand_x(engine=engine).str_unicode() == "123"
+			assert TokenList([T.testa]).expand_x(engine=new_engine).str_unicode() == "456"
 
 
 	@pytest.mark.parametrize("engine_name", engine_names)

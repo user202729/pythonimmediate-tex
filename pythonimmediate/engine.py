@@ -174,19 +174,44 @@ class SetDefaultEngineContextManager:
 
 
 class DefaultEngine(Engine):
+	"""
+	A convenience class that can be used to avoid passing explicit ``engine`` argument to functions.
+
+	This is not thread-safe.
+
+	Users should not instantiate this class directly. Instead, use :const:`default_engine`.
+
+	Usage example::
+
+		default_engine.set_engine(engine)
+		execute("hello world")  # this is executed on engine=engine
+
+	.. seealso::
+		:meth:`set_engine`
+	"""
+
 	def __init__(self)->None:
 		super().__init__()
 		self.engine: Optional[Engine]=None
+		"""
+		Stores the engine being set internally.
+
+		Normally there's no reason to access the internal engine directly, as ``self`` can be used
+		like the engine inside.
+		"""
 
 	def set_engine(self, engine: Optional[Engine])->SetDefaultEngineContextManager:
 		"""
-		set to another engine. Can also be used as a context manager to revert to the original engine.
-		Example:
+		Set the default engine to another engine.
 
-		with default_engine.set_engine(...):
-			pass  # do something
-		# now the original engine is restored
+		Can also be used as a context manager to revert to the original engine.
+		Example::
+
+			with default_engine.set_engine(...):
+				pass  # do something
+			# now the original engine is restored
 		"""
+		assert engine is not self
 		result=SetDefaultEngineContextManager(self.engine)
 		self.engine=engine
 		return result
@@ -214,6 +239,14 @@ class DefaultEngine(Engine):
 
 
 default_engine=DefaultEngine()
+"""
+A constant that can be used to avoid passing explicit ``engine`` argument to functions.
+
+See documentation of :class:`DefaultEngine` for more details.
+
+For Python running inside a TeX process, useful attributes are :attr:`~Engine.name` and :attr:`~Engine.is_unicode`.
+"""
+
 
 
 from . import textopy
@@ -221,16 +254,23 @@ from . import textopy
 
 @dataclass
 class ChildProcessEngine(Engine):
-	"""
+	r"""
 	An object that represents an engine that runs as a subprocess of this process.
 
 	Can be used as a context manager to automatically close the subprocess when the context is exited.
 
-	Example:
+	Example::
 
-	with ChildProcessEngine(...) as engine:
-		# do something
-	# the subprocess is closed here
+		with ChildProcessEngine(...) as engine:
+			# do something with the engine, for example:
+			execute(r"\begin{document}", engine=engine)
+			execute("hello world", engine=engine)
+
+		# the subprocess is closed here
+
+	Note that explicit ``engine`` argument must be passed in most functions.
+
+	See :class:`DefaultEngine` for a way to bypass that.
 	"""
 
 	def __init__(self, engine_name: EngineName, args: Iterable[str]=())->None:

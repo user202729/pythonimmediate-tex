@@ -264,7 +264,7 @@ class NToken(ABC):
 		with the backslash replaced
 		by the current ``escapechar``.
 		"""
-		return NTokenList([T.meaning, self]).expand_x(engine=engine).str()
+		return NTokenList([T.meaning, self]).expand_x(engine=engine).str(engine=engine)
 
 
 	@property
@@ -291,11 +291,14 @@ class NToken(ABC):
 		"""
 		return NTokenList([T.ifx, self, other, Catcode.other("1"), T["else"], Catcode.other("0"), T.fi]).expand_x(engine=engine).bool()
 
-	def str(self)->str:
+	def str_unicode(self)->str:
 		"""
 		``self`` must represent a character of a [TeX] string. (i.e. equal to itself when detokenized)
 
 		:return: the string content.
+
+		.. note::
+			See :meth:`NTokenList.str_unicode`.
 		"""
 		# default implementation, might not be correct. Subclass overrides as needed.
 		raise ValueError("Token does not represent a string!")
@@ -409,7 +412,7 @@ class Token(NToken):
 		"""
 		given ``self`` is a expl3 ``str``-variable, return the content.
 		"""
-		return self.value(engine=engine).str()
+		return self.value(engine=engine).str(engine=engine)
 
 	@property
 	def no_blue(self)->"Token": return self
@@ -774,6 +777,19 @@ P=ControlSequenceTokenMaker("_pythonimmediate_")  # create private tokens
 
 @export_function_to_module
 class Catcode(enum.Enum):
+	"""
+	This class contains a shorthand to allow creating a token with little Python code.
+	The individual :class:`Catcode` objects
+	can be called with either a character or a character code to create the object::
+
+		Catcode.letter("a")  # creates a token with category code letter and character code "a"=chr(97)
+		Catcode.letter(97)  # same as above
+
+	Both of the above forms are equivalent to ``CharacterToken(index=97, catcode=Catcode.letter)``.
+
+	See also :ref:`token-list-construction` for more ways of constructing token lists.
+	"""
+
 	begin_group=bgroup=1
 	end_group=egroup=2
 	math_toggle=math=3
@@ -795,7 +811,7 @@ class Catcode(enum.Enum):
 	@property
 	def for_token(self)->bool:
 		"""
-		Return whether a token may have this catcode.
+		Return whether a :class:`CharacterToken`  may have this catcode.
 		"""
 		return self not in (Catcode.escape, Catcode.line, Catcode.ignored, Catcode.comment, Catcode.invalid)
 
@@ -813,6 +829,9 @@ C=Catcode
 @dataclass(repr=False, frozen=True)  # must be frozen because bgroup and egroup below are reused
 class CharacterToken(Token):
 	index: int
+	"""
+	The character code of this token. For example ``Catcode.letter("a").index==97``.
+	"""
 	catcode: Catcode
 
 	@property
@@ -821,6 +840,9 @@ class CharacterToken(Token):
 
 	@property
 	def chr(self)->str:
+		"""
+		The character of this token. For example ``Catcode.letter("a").chr=="a"``.
+		"""
 		return chr(self.index)
 	def __post_init__(self)->None:
 		assert isinstance(self.index, int)
@@ -846,7 +868,7 @@ class CharacterToken(Token):
 			return -1
 		else:
 			return 0
-	def str(self)->str:
+	def str_unicode(self)->str:
 		catcode=Catcode.space if self.index==32 else Catcode.other
 		if catcode!=self.catcode:
 			raise ValueError("this CharacterToken does not represent a string!")
@@ -934,8 +956,14 @@ else:  # Python 3.8 compatibility
 
 @export_function_to_module
 class TokenList(TokenListBaseClass):
-	"""
+	r"""
 	Represent a [TeX] token list, none of which can contain a blue token.
+
+	The class can be used identical to a Python list consist of :class:`Token` objects,
+	plus some additional methods to operate on token lists.
+
+	The list of tokens represented by this class does not need to be balanced.
+	Usually you would want to use :class:`BalancedTokenList` instead.
 
 	.. _token-list-construction:
 
@@ -944,6 +972,31 @@ class TokenList(TokenListBaseClass):
 
 	There are some functions to quickly construct token lists, see :meth:`from_string`
 	and :meth:`__init__`.
+
+	:meth:`__init__` is the constructor of the class, for a :class:`TokenList` it can be used as follows:
+
+	- Given an existing token list, construct a copy (this usage is identical to that of the Python list constructor)::
+
+		a=TokenList.doc("hello world")
+		b=TokenList(a)
+
+	- Construct a token list from a list of tokens::
+
+		a=TokenList([Catcode.letter("a"), Catcode.other("b"), T.test])
+
+	  The above will define ``a`` to be ``ab\test``, provided ``T`` is
+	  the object referred to in :class:`ControlSequenceTokenMaker`.
+
+	  See also :class:`Catcode` for the explanation of the ``Catcode.letter("a")`` form.
+
+	- Construct a token list, using lists to represent nesting levels::
+
+		a=TokenList([T.edef, T.a, [T.x, T.y]])
+
+	  The above creates a token list with content ``\edef\a{\x\y}``.
+
+	The constructor of other classes such as :class:`BalancedTokenList` and :class:`NTokenList`
+	works the same way.
 
 	"""
 
@@ -1041,6 +1094,9 @@ class TokenList(TokenListBaseClass):
 		return BalancedTokenList(self)
 
 	def __init__(self, a: Iterable=())->None:
+		"""
+		Refer to :class:`TokenList` on how to use this function.
+		"""
 		super().__init__(TokenList.force_token_list(a))
 
 	@staticmethod
@@ -1112,15 +1168,26 @@ class TokenList(TokenListBaseClass):
 		Approximate tokenizer in expl3 (``\ExplSyntaxOn``) catcode regime.
 
 		Refer to documentation of :meth:`from_string` for details.
+
+		Usage example::
+
+			BalancedTokenList.e3(r'\cs_new_protected:Npn \__mymodule_myfunction:n #1 { #1 #1 }')
+			# returns an instance of BalancedTokenList with the expected content
 		"""
 		return cls.from_string(s, lambda x: e3_catcode_table.get(x, Catcode.other))
 
 	@classmethod
 	def doc(cls: Type[TokenListType], s: str)->TokenListType:
-		"""
+		r"""
 		Approximate tokenizer in document (normal) catcode regime.
 
 		Refer to documentation of :meth:`from_string` for details.
+
+		Usage example::
+
+			BalancedTokenList.doc(r'\def\a{b}')  # returns an instance of BalancedTokenList with the expected content
+			BalancedTokenList.doc('}')  # raises an error
+			TokenList.doc('}')  # returns an instance of TokenList with the expected content
 		"""
 		return cls.from_string(s, lambda x: doc_catcode_table.get(x, Catcode.other))
 
@@ -1221,18 +1288,29 @@ class TokenList(TokenListBaseClass):
 		"""
 		return NTokenList(self).bool()
 
-	def str(self)->str:
+	def str_unicode(self)->str:
+		"""
+		See :meth:`NTokenList.str_unicode`.
+		"""
+		return NTokenList(self).str_unicode()
+
+	def str(self, engine: Engine)->str:
 		"""
 		See :meth:`NTokenList.str`.
 		"""
-		return NTokenList(self).str()
-
+		return NTokenList(self).str(engine)
 
 
 @export_function_to_module
 class BalancedTokenList(TokenList):
 	"""
 	Represents a balanced token list.
+
+	Some useful methods to interact with [TeX]
+	include :meth:`expand_o`, :meth:`expand_x`, :meth:`get_next` and :meth:`put_next`.
+	See the corresponding methods' documentation for usage examples.
+
+	See also :ref:`token-list-construction` for shorthands to construct token lists in Python code.
 
 	.. note::
 		Runtime checking is not strictly enforced,
@@ -1319,7 +1397,7 @@ class BalancedTokenList(TokenList):
 		r"""
 		:return: a string, equal to the result of ``\detokenize`` applied to this token list.
 		"""
-		return BalancedTokenList([T.detokenize, self]).expand_x(engine=engine).str()
+		return BalancedTokenList([T.detokenize, self]).expand_x(engine=engine).str(engine=engine)
 
 
 if typing.TYPE_CHECKING:
@@ -1329,6 +1407,15 @@ else:  # Python 3.8 compatibility
 
 @export_function_to_module
 class NTokenList(NTokenListBaseClass):
+	"""
+	Similar to :class:`TokenList`, but can contain blue tokens.
+
+	The class can be used identical to a Python list consist of :class:`NToken` objects,
+	plus some additional methods to operate on token lists.
+
+	Refer to the documentation of :class:`TokenList` for some usage example.
+	"""
+
 	@staticmethod
 	def force_token_list(a: Iterable)->Iterable[NToken]:
 		for x in a:
@@ -1351,7 +1438,10 @@ class NTokenList(NTokenListBaseClass):
 
 	def simple_parts(self)->List[Union[BalancedTokenList, Token, BlueToken]]:
 		"""
-		Split this NTokenList into a list of balanced non-blue parts, unbalanced {/} tokens, and blue tokens.
+		Internal function.
+
+		Split this :class:`NTokenList` into a list of balanced non-blue parts,
+		unbalanced ``{``/``}`` tokens, and blue tokens.
 		"""
 		parts: List[Union[TokenList, BlueToken]]=[TokenList()]
 		for i in self:
@@ -1371,11 +1461,14 @@ class NTokenList(NTokenListBaseClass):
 		return result
 
 	def put_next(self, engine: Engine=  default_engine)->None:
+		"""
+		See :meth:`BalancedTokenList.put_next`.
+		"""
 		for part in reversed(self.simple_parts()): part.put_next(engine=engine)
 		
 	def execute(self, engine: Engine=  default_engine)->None:
 		"""
-		Execute self.
+		See :meth:`BalancedTokenList.execute`.
 		"""
 		parts=self.simple_parts()
 		if len(parts)==1:
@@ -1388,26 +1481,43 @@ class NTokenList(NTokenListBaseClass):
 
 	def expand_x(self, engine: Engine=  default_engine)->BalancedTokenList:
 		"""
-		x-expand self. The result must be balanced.
+		See :meth:`BalancedTokenList.expand_x`.
 		"""
 		NTokenList([T.edef, P.tmp, bgroup, *self, egroup]).execute(engine=engine)
 		return BalancedTokenList([P.tmp]).expand_o(engine=engine)
 
-	def str(self)->str:
+	def str_unicode(self)->str:
+		"""
+		``self`` must represent a [TeX] string. (i.e. equal to itself when detokenized)
+
+		:return: the string content.
+
+		.. note::
+			In non-Unicode engines, each token will be replaced with a character
+			with character code equal to the character code of that token.
+			UTF-8 characters with character code ``>=0x80`` will be represented by multiple
+			characters in the returned string.
+		"""
+		return "".join(t.str_unicode() for t in self)
+
+	def str(self, engine: Engine)->str:
 		"""
 		``self`` must represent a [TeX] string. (i.e. equal to itself when detokenized)
 
 		:return: the string content.
 		"""
-		return "".join(t.str() for t in self)
+		if engine.is_unicode:
+			return self.str_unicode()
+		else:
+			return bytes(ord(ch) for ch in self.str_unicode()).decode('u8')
 
 	def bool(self)->bool:
 		"""
 		Internal function. ``self`` must represent a [TeX] string either equal to "0" or "1".
 
-		:return: the string content.
+		:return: the boolean represented by the string.
 		"""
-		s=self.str()
+		s=self.str_unicode()
 		return {"0": False, "1": True}[s]
 
 
@@ -1415,14 +1525,24 @@ class TeXToPyData(ABC):
 	@staticmethod
 	@abstractmethod
 	def read(engine: Engine)->"TeXToPyData":
+		"""
+		Given that [TeX] has just sent the data, read into a Python object.
+		"""
 		...
 	@staticmethod
 	@abstractmethod
 	def send_code(arg: str)->str:
+		"""
+		Return some [TeX] code that sends the argument to Python, where *arg* represents a token list or equivalent (such as ``#1``).
+		"""
 		pass
 	@staticmethod
 	@abstractmethod
 	def send_code_var(var: str)->str:
+		r"""
+		Return some [TeX] code that sends the argument to Python, where *var* represents a token list variable
+		(such as ``\l__my_var_tl``) that contains the content to be sent.
+		"""
 		pass
 
 # tried and failed
@@ -2251,6 +2371,12 @@ def continue_until_passed_back(engine: Engine=  default_engine)->None:
 
 @export_function_to_module
 def expand_once(engine: Engine=  default_engine)->None:
+	r"""
+	Expand the following content in the input stream once.
+
+	For example, if the following tokens in the input stream are ``\iffalse 1 \else 2 \fi``,
+	then after ``expand_once()`` being called once, the tokens in the input stream will be ``2 \fi``.
+	"""
 	typing.cast(Callable[[Engine], None], Python_call_TeX_local(
 		r"""
 		\cs_new_protected:Npn %name% { \expandafter \pythonimmediatecontinuenoarg }
