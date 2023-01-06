@@ -165,6 +165,11 @@ class Test(unittest.TestCase):
 		pythonimmediate.put_next('{' + s + '}')
 		self.assertEqual(pythonimmediate.get_arg_estr(), s)
 
+		pythonimmediate.put_next(r'\expandafter{\detokenize{' + s + '}}')
+		pythonimmediate.expand_once()
+		t=BalancedTokenList.get_next()
+		assert t.str(engine=default_engine)==s
+
 	def test_hash(self):
 		for put, get in [
 				("#", None),

@@ -7,7 +7,7 @@ import pytest
 import pythonimmediate
 import pythonimmediate.textopy
 from pythonimmediate.engine import ChildProcessEngine, default_engine, engine_names, engine_name_to_latex_executable, EngineName
-from pythonimmediate import TokenList, ControlSequenceToken
+from pythonimmediate import TokenList, ControlSequenceToken, BalancedTokenList
 from pythonimmediate import Catcode as C
 
 T=ControlSequenceToken.make
@@ -26,6 +26,10 @@ class Test:
 		engine=ChildProcessEngine(engine_name)
 
 		with default_engine.set_engine(engine):
+			s='Æ²×⁴ℝ𝕏'
+			pythonimmediate.simple.execute(r'\edef\testa{\detokenize{' + s + '}}')
+			assert BalancedTokenList([T.testa]).expand_o().str(engine=engine) == s
+
 			TokenList([T["def"], T.testa, TokenList.doc("123")]).execute()
 			assert TokenList([T.testa]).expand_x().str_unicode() == "123"
 
