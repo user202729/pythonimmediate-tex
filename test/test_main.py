@@ -6,7 +6,7 @@ import pytest
 
 import pythonimmediate
 import pythonimmediate.textopy
-from pythonimmediate.engine import ChildProcessEngine, default_engine, engine_names
+from pythonimmediate.engine import ChildProcessEngine, default_engine, engine_names, engine_name_to_latex_executable, EngineName
 from pythonimmediate import TokenList, ControlSequenceToken
 from pythonimmediate import Catcode as C
 
@@ -22,7 +22,7 @@ for name in ["test_pythonimmediate.tex", "test_pythonimmediate_file.py"]:
 
 class Test:
 	@pytest.mark.parametrize("engine_name", engine_names)
-	def test_child_process_engine(self, engine_name: str)->None:
+	def test_child_process_engine(self, engine_name: EngineName)->None:
 		engine=ChildProcessEngine(engine_name)
 
 		with default_engine.set_engine(engine):
@@ -34,7 +34,7 @@ class Test:
 		with pytest.raises(RuntimeError):
 			TokenList([T["def"], T.testa, TokenList.doc("789")]).execute()
 
-		with ChildProcessEngine("pdflatex") as new_engine:
+		with ChildProcessEngine("pdftex") as new_engine:
 			TokenList([T["def"], T.testa, TokenList.doc("456")]).execute(engine=new_engine)
 			assert TokenList([T.testa]).expand_x(engine=engine).str() == "123"
 			assert TokenList([T.testa]).expand_x(engine=new_engine).str() == "456"
@@ -43,9 +43,9 @@ class Test:
 	@pytest.mark.parametrize("engine_name", engine_names)
 	@pytest.mark.parametrize("communication_method", ["unnamed-pipe", "multiprocessing-network"])
 	@pytest.mark.parametrize("use_8bit", [True, False])
-	def test_subprocess(self, engine_name: str, communication_method: str, use_8bit: bool)->None:
+	def test_subprocess(self, engine_name: EngineName, communication_method: str, use_8bit: bool)->None:
 		subprocess.run(
-				[engine_name, "-shell-escape", *(
+				[engine_name_to_latex_executable[engine_name], "-shell-escape", *(
 					["-8bit"] if use_8bit else []
 					), r"\def\specifymode{"+communication_method+r"}\input{/tmp/test_pythonimmediate.tex}"],
 				check=True,

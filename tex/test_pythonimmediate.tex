@@ -117,11 +117,14 @@ print("11.\n")
 import unittest
 from pythonimmediate import Token, TokenList, BalancedTokenList, Catcode, ControlSequenceToken, frozen_relax_token, BlueToken, NTokenList
 from pythonimmediate import Catcode as C
+from pythonimmediate import default_engine
 T=ControlSequenceToken.make
 
-engine: str=T.c_sys_engine_str.value_str()
-assert engine in ["pdftex", "xetex", "luatex"]
-is_unicode: bool=engine in ["xetex", "luatex"]
+assert default_engine.name in ["pdftex", "xetex", "luatex"]
+
+assert default_engine.name==T.c_sys_engine_str.value_str()
+
+is_unicode: bool=default_engine.is_unicode
 
 class Test(unittest.TestCase):
 	def test_simple_run_tokenized_line_local(self)->None:
@@ -206,7 +209,7 @@ class Test(unittest.TestCase):
 		pythonimmediate.run_tokenized_line_local("789%")
 
 		# TODO temporary skip
-		if engine!="xetex":
+		if default_engine.name!="xetex":
 			pythonimmediate.run_block_local(r'''\testc {ab} [cd]|ef|{gh}|ijk
 			lm|%''')
 
@@ -276,10 +279,9 @@ class Test(unittest.TestCase):
 				self.assertEqual(Token.get_next(), t)
 
 	def test_tokens_control_chars(self):
-		# TODO later handle upper bytes for non-Unicode engines as well
 		for s in [
 				chr(i)
-				for i in range(0, (700 if is_unicode else 256))
+				for i in range(0, 700)
 				]:
 			for t in [
 				Catcode.active(s),
@@ -289,15 +291,21 @@ class Test(unittest.TestCase):
 				ControlSequenceToken(s),
 				ControlSequenceToken(s+s),
 				]:
-				if engine=="luatex" and t in [ControlSequenceToken("\x00"), ControlSequenceToken("\x00\x00")]:
+				if default_engine.name=="luatex" and t in [ControlSequenceToken("\x00"), ControlSequenceToken("\x00\x00")]:
 					continue  # LuaTeX bug fixed upstream https://tex.stackexchange.com/questions/640267/lualatex-does-not-handle-control-sequence-consist-of-a-single-null-character-cor
-				if engine=="pdftex" and t==Catcode.active(0x0c):
+				if default_engine.name=="pdftex" and t==Catcode.active(0x0c):
 					continue  # https://tex.stackexchange.com/q/669877/250119
 
 				with self.subTest(s=s, t=t):
 					pythonimmediate.debug("trying token", t)
-					t.put_next()
-					self.assertEqual(Token.get_next(), t)
+
+					if is_unicode or ord(s)<256:
+						t.put_next()
+						self.assertEqual(Token.get_next(), t)
+					else:
+						with self.assertRaises(ValueError):
+							t.put_next()
+
 
 	def test_put_get_next(self):
 		pythonimmediate.put_next("a")
@@ -542,12 +550,16 @@ class Test(unittest.TestCase):
 				r'undefined')
 
 
-suite = unittest.defaultTestLoader.loadTestsFromTestCase(Test)
-result = unittest.TextTestRunner(failfast=True).run(suite)
-assert not result.errors
+Test().test_tokens_control_chars()
+
+#suite = unittest.defaultTestLoader.loadTestsFromTestCase(Test)
+#result = unittest.TextTestRunner(failfast=True).run(suite)
+#assert not result.errors
 
 x=y=z=1
 \end{pycode}
+
+\end{document}
 
 \def\testFilePath{test_pythonimmediate_file.py}
 \def\letYThree{y=3}

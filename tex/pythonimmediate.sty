@@ -94,16 +94,15 @@
 		\msg_error:nn {pythonimmediate} {cannot-read-line}
 	}
 
-	% specify whether the engine support Unicode
-	\str_const:Nn \_pythonimmediate_engine_unicode_indicator_pdftex {a}
-	\str_const:Nn \_pythonimmediate_engine_unicode_indicator_ptex   {a}
-	\str_const:Nn \_pythonimmediate_engine_unicode_indicator_uptex  {a}
+	\str_const:Nn \_pythonimmediate_engine_mark_pdftex {p}
+	\str_const:Nn \_pythonimmediate_engine_mark_ptex   {P}
+	\str_const:Nn \_pythonimmediate_engine_mark_uptex  {u}
 
-	\str_const:Nn \_pythonimmediate_engine_unicode_indicator_xetex  {u}
-	\str_const:Nn \_pythonimmediate_engine_unicode_indicator_luatex {u}
+	\str_const:Nn \_pythonimmediate_engine_mark_xetex  {x}
+	\str_const:Nn \_pythonimmediate_engine_mark_luatex {l}
 
 	\immediate\write\_pythonimmediate_write_file {
-		\use:c {_pythonimmediate_engine_unicode_indicator_ \c_sys_engine_str}
+		\use:c {_pythonimmediate_engine_mark_ \c_sys_engine_str}
 		\_pythonimmediate_line
 	}
 }

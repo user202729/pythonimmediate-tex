@@ -9,33 +9,93 @@ import subprocess
 from dataclasses import dataclass
 
 
+EngineName=Literal["pdftex", "xetex", "luatex"]
+engine_names: Tuple[EngineName, ...]=EngineName.__args__  # type: ignore
+
+
+mark_to_engine_names: Dict[str, EngineName]={
+		"p": "pdftex",
+		#"P": "ptex",
+		#"u": "uptex",
+		"x": "xetex",
+		"l": "luatex",
+		}
+assert len(mark_to_engine_names)==len(engine_names)
+assert set(mark_to_engine_names.values())==set(engine_names)
+
+
+engine_is_unicode: Dict[EngineName, bool]={
+		"pdftex": False,
+		#"ptex": False,
+		#"uptex": False,
+		"xetex": True,
+		"luatex": True,
+		}
+assert len(engine_is_unicode)==len(engine_names)
+assert set(engine_is_unicode)==set(engine_names)
+
+
+engine_name_to_latex_executable: Dict[EngineName, str]={
+		"pdftex": "pdflatex",
+		"xetex": "xelatex",
+		"luatex": "lualatex",
+		}
+assert len(engine_name_to_latex_executable)==len(engine_names)
+assert set(engine_name_to_latex_executable)==set(engine_names)
+
+
 class Engine(ABC):
-	_is_unicode: bool
+	_name: EngineName
+
 	def __init__(self):
 		self.action_done=False
 		self.exited=False  # once the engine exit, it can't be used anymore.
 
 	# some helper functions for the communication protocol.
 	def check_not_finished(self)->None:
+		"""
+		Internal function.
+		"""
 		if self.action_done:
 			raise RuntimeError("can only do one action per block!")
 
 	@property
+	def name(self)->EngineName:
+		"""
+		Self-explanatory.
+		"""
+		return self._name
+
+	@property
 	def is_unicode(self)->bool: 
-		return self._is_unicode
+		"""
+		Self-explanatory.
+		"""
+		return engine_is_unicode[self.name]
 
 	def check_not_exited(self, message: str)->None:
+		"""
+		Internal function.
+		"""
 		if self.exited:
 			raise RuntimeError(message)
 
 	def check_not_exited_before(self)->None:
+		"""
+		Internal function.
+		"""
 		self.check_not_exited("TeX error already happened, cannot continue")
 
 	def check_not_exited_after(self)->None:
+		"""
+		Internal function.
+		"""
 		self.check_not_exited("TeX error!")
 
 	def read(self)->bytes:
 		"""
+		Internal function.
+		
 		Read one line from the engine.
 
 		It must not be EOF otherwise there's an error.
@@ -81,7 +141,7 @@ class ParentProcessEngine(Engine):
 		super().__init__()
 		line=self.read().decode('u8')
 
-		self._is_unicode={"a": False, "u": True}[line[0]]
+		self._name=mark_to_engine_names[line[0]]
 		line=line[1:]
 
 		from . import communicate
@@ -97,17 +157,6 @@ class ParentProcessEngine(Engine):
 
 	def _write(self, s: bytes)->None:
 		self.communicator.send(s)
-
-
-EngineName=Literal["pdflatex", "xelatex", "lualatex"]
-engine_names: Tuple[str, ...]=EngineName.__args__  # type: ignore
-engine_is_unicode: Dict[EngineName, bool]={
-		"pdflatex": False,
-		"xelatex": True,
-		"lualatex": True,
-		}
-assert len(engine_is_unicode)==len(engine_names)
-assert set(engine_is_unicode)==set(engine_names)
 
 
 @dataclass
@@ -154,8 +203,8 @@ class DefaultEngine(Engine):
 		return self.engine
 
 	@property
-	def is_unicode(self)->bool:
-		return self.get_engine().is_unicode
+	def name(self)->EngineName:
+		return self.get_engine().name
 
 	def _read(self)->bytes:
 		return self.get_engine()._read()
@@ -186,8 +235,7 @@ class ChildProcessEngine(Engine):
 
 	def __init__(self, engine_name: EngineName, args: Iterable[str]=())->None:
 		super().__init__()
-		self.engine_name=engine_name
-		self._is_unicode=engine_is_unicode[engine_name]
+		self._name=engine_name
 
 		# old method, tried, does not work, see details in sty file
 
@@ -202,9 +250,10 @@ class ChildProcessEngine(Engine):
 		#	# we assume nothing maliciously create a file named `.symlink-to-stderr` that is not a symlink to stderr...
 		#	pass
 
-		self.process: Optional[subprocess.Popen]=subprocess.Popen(
+		self.process: Optional[subprocess.Popen]=None  # guard like this so that __del__ does not blow up if Popen() fails
+		self.process=subprocess.Popen(
 				[
-					engine_name, "-shell-escape",
+					engine_name_to_latex_executable[engine_name], "-shell-escape",
 						*args, r"\RequirePackage[mode=child-process]{pythonimmediate}\pythonimmediatechildprocessmainloop\stop"],
 				stdin=subprocess.PIPE,
 				#stdout=subprocess.PIPE,  # we don't need the stdout

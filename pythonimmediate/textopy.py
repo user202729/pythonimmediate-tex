@@ -26,7 +26,8 @@ import collections
 import enum
 
 
-def user_documentation(x: Union[Callable, str])->Any:
+T1 = typing.TypeVar("T1")
+def user_documentation(x: T1)->T1:
 	return x
 
 
@@ -486,6 +487,8 @@ class Token(NToken):
 			BalancedTokenList([self]).put_next(engine=engine)
 		else:
 			assert isinstance(self, CharacterToken)
+			if not engine.is_unicode and self.index>=256:
+				raise ValueError("Cannot put this token for non-Unicode engine!")
 			if d==1:
 				typing.cast(Callable[[PTTInt, Engine], None], Python_call_TeX_local(
 					r"""
@@ -851,6 +854,7 @@ class CharacterToken(Token):
 
 class FrozenRelaxToken(Token):
 	can_blue=False
+	assignable=False
 
 	def __str__(self)->str:
 		return r"\relax"
@@ -858,9 +862,6 @@ class FrozenRelaxToken(Token):
 		return "R"
 	def repr1(self)->str:
 		return r"[frozen]\relax"
-	@property
-	def assignable(self)->bool:
-		return False
 
 frozen_relax_token=FrozenRelaxToken()
 pythonimmediate.frozen_relax_token=frozen_relax_token
@@ -1536,10 +1537,9 @@ class PyToTeXData(ABC):
 		"""
 		...
 	@abstractmethod
-	def write(self, engine: Engine)->None:
+	def serialize(self, engine: Engine)->bytes:
 		"""
-		Write the value represented by ``self`` to the engine
-		in a form suitable for reading from [TeX].
+		Return a bytes object that can be passed to ``engine.write()`` directly.
 		"""
 		...
 
@@ -1551,24 +1551,24 @@ class PTTVerbatimRawLine(PyToTeXData):
 	"""
 	data: bytes
 	read_code=r"\__str_get:N {} ".format
-	def write(self, engine: Engine)->None:
+	def serialize(self, engine: Engine)->bytes:
 		assert b"\n" not in self.data
 		assert self.data.rstrip()==self.data, "Cannot send verbatim line with trailing spaces!"
-		engine.write(self.data+b"\n")
+		return self.data+b"\n"
 
 @dataclass
 class PTTVerbatimLine(PyToTeXData):
 	data: str
 	read_code=PTTVerbatimRawLine.read_code
-	def write(self, engine: Engine)->None:
-		PTTVerbatimRawLine(self.data.encode('u8')).write(engine)
+	def serialize(self, engine: Engine)->bytes:
+		return PTTVerbatimRawLine(self.data.encode('u8')).serialize(engine)
 
 @dataclass
 class PTTInt(PyToTeXData):
 	data: int
 	read_code=PTTVerbatimLine.read_code
-	def write(self, engine: Engine)->None:
-		PTTVerbatimLine(str(self.data)).write(engine=engine)
+	def serialize(self, engine: Engine)->bytes:
+		return PTTVerbatimLine(str(self.data)).serialize(engine=engine)
 
 @dataclass
 class PTTTeXLine(PyToTeXData):
@@ -1578,23 +1578,23 @@ class PTTTeXLine(PyToTeXData):
 	"""
 	data: str
 	read_code=r"\ior_get:NN \__read_file {} ".format
-	def write(self, engine: Engine)->None:
+	def serialize(self, engine: Engine)->bytes:
 		assert "\n" not in self.data
-		send_raw(self.data+"\n", engine=engine)
+		return (self.data+"\n").encode('u8')
 
 @dataclass
 class PTTBlock(PyToTeXData):
 	data: str
 	read_code=r"\__read_block:N {}".format
-	def write(self, engine: Engine)->None:
-		send_raw(surround_delimiter(self.data), engine=engine)
+	def serialize(self, engine: Engine)->bytes:
+		return surround_delimiter(self.data).encode('u8')
 
 @dataclass
 class PTTBalancedTokenList(PyToTeXData):
 	data: BalancedTokenList
 	read_code=r"\__str_get:N {0}  \__tldeserialize_dot:NV {0} {0}".format
-	def write(self, engine: Engine)->None:
-		PTTVerbatimRawLine(self.data.serialize_bytes(engine)+b".").write(engine=engine)
+	def serialize(self, engine: Engine)->bytes:
+		return PTTVerbatimRawLine(self.data.serialize_bytes(engine)+b".").serialize(engine=engine)
 
 
 # ======== define TeX functions that execute Python code ========
@@ -2135,12 +2135,15 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 		engine.check_not_finished()
 		if finish:
 			engine.action_done=True
-		send_raw(identifier+"\n", engine=engine)
 
-		# send function args
+		sending_content=(identifier+"\n").encode('u8')
+
+		# function args. We build all the arguments before sending anything, just in case some serialize() error out
 		for arg, argtype in zip(args, ptt_argtypes):
 			assert isinstance(arg, argtype)
-			arg.write(engine=engine)
+			sending_content+=arg.serialize(engine=engine)
+
+		engine.write(sending_content)
 
 		if not sync: return None
 
