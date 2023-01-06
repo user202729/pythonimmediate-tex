@@ -464,6 +464,23 @@ class Test(unittest.TestCase):
 				T.empty.blue.meaning_str(),
 				[r"\relax", r"[unknown command code! (0, 1)]"])
 
+		Catcode.active("a").assign_value(TokenList.doc("abc"))
+
+		self.assertEqual(Catcode.active("a").meaning_str(), "macro:->abc")
+		self.assertIn(
+				Catcode.active("a").blue.meaning_str(),
+				[r"\relax", r"[unknown command code! (0, 1)]"])
+
+	def test_cannot_blue_tokens(self):
+		for t in [
+				Catcode.letter("a"),
+				Catcode.other("a"),
+				frozen_relax_token
+				]:
+			self.assertEqual(t.noexpand, t)
+			with self.assertRaises(ValueError):
+				t.blue
+
 	def test_meaning_equal(self):
 		self.assertFalse(T.empty.blue.meaning_equal(T.empty))
 		self.assertFalse(T.empty.meaning_equal(T.empty.blue))

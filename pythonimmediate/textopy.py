@@ -265,9 +265,10 @@ class NToken(ABC):
 		"""
 		return NTokenList([T.meaning, self]).expand_x(engine=engine).str()
 
+
 	@property
 	@abstractmethod
-	def blue(self)->"BlueToken":
+	def noexpand(self)->"NToken":
 		r"""
 		Return the result of ``\noexpand`` applied on this token.
 		"""
@@ -312,6 +313,29 @@ class Token(NToken):
 	Represent a [TeX] token, excluding the notexpanded possibility.
 	See also documentation of :class:`NToken`.
 	"""
+
+	@property
+	@abstractmethod
+	def can_blue(self)->bool:
+		"""
+		Return whether this token can possibly be blue i.e. expandable.
+		"""
+		...
+
+	@property
+	def blue(self)->"BlueToken":
+		r"""
+		Return a :class:`BlueToken` containing ``self``. :attr:`can_blue` must be true. 
+		"""
+		if not self.can_blue:
+			raise ValueError("Token cannot be blue!")
+		return BlueToken(self)
+
+	@property
+	def noexpand(self)->"NToken":
+		if not self.can_blue:
+			return self
+		return BlueToken(self)
 
 	@abstractmethod
 	def serialize(self)->str:
@@ -368,6 +392,11 @@ class Token(NToken):
 			}
 			""" , sync=True))(PTTBalancedTokenList(BalancedTokenList([self.no_blue])), engine)
 
+	def assign_value(self, content: "BalancedTokenList")->None:
+		"""
+		Given ``self`` is an expl3 ``tl``-variable, assign *content* to it locally.
+		"""
+		BalancedTokenList([T.edef, self, [T.unexpanded, content]]).execute()
 
 	def value(self, engine: Engine=  default_engine)->"BalancedTokenList":
 		"""
@@ -380,9 +409,6 @@ class Token(NToken):
 		given ``self`` is a expl3 ``str``-variable, return the content.
 		"""
 		return self.value(engine=engine).str()
-
-	@property
-	def blue(self)->"BlueToken": return BlueToken(self)
 
 	@property
 	def no_blue(self)->"Token": return self
@@ -693,8 +719,11 @@ if os.environ.get("SPHINX_BUILD"):
 	enable_get_attribute=False  # otherwise it conflicts with sphinx-autodoc's mechanism to inspect the objects
 
 class ControlSequenceTokenMaker:
-	"""
-	shorthand to create control sequence objects in Python easier.
+	r"""
+	Shorthand to create control sequence objects in Python easier.
+
+	There's a default one that can be used as, if you assign ``T=ControlSequenceToken.make``,
+	then ``T.hello`` returns the token ``\hello``.
 	"""
 	def __init__(self, prefix: str)->None:
 		self.prefix=prefix
@@ -708,8 +737,15 @@ class ControlSequenceTokenMaker:
 @export_function_to_module
 @dataclass(repr=False, frozen=True)
 class ControlSequenceToken(Token):
-	make=typing.cast(ControlSequenceTokenMaker, None)  # some interference makes this incorrect. Manually assign below
 	csname: str
+
+	make=typing.cast(ControlSequenceTokenMaker, None)  # some interference makes this incorrect. Manually assign below
+	"""
+	Refer to the documentation of :class:`ControlSequenceTokenMaker`.
+	"""
+
+	can_blue=True
+
 	@property
 	def assignable(self)->bool:
 		return True
@@ -775,6 +811,11 @@ C=Catcode
 class CharacterToken(Token):
 	index: int
 	catcode: Catcode
+
+	@property
+	def can_blue(self)->bool:
+		return self.catcode==Catcode.active
+
 	@property
 	def chr(self)->str:
 		return chr(self.index)
@@ -809,6 +850,8 @@ class CharacterToken(Token):
 		return self.chr
 
 class FrozenRelaxToken(Token):
+	can_blue=False
+
 	def __str__(self)->str:
 		return r"\relax"
 	def serialize(self)->str:
@@ -836,7 +879,7 @@ class BlueToken(NToken):
 	token: Token
 
 	@property
-	def blue(self)->"BlueToken": return self
+	def noexpand(self)->"BlueToken": return self
 
 	@property
 	def no_blue(self)->"Token": return self.token
