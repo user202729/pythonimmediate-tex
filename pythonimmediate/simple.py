@@ -1,5 +1,5 @@
 r"""
-Simple interface, suitable for users who may not be aware of TeX subtleties, such as category codes.
+Simple interface, suitable for users who may not be aware of [TeX] subtleties, such as category codes.
 
 Start with reading  :func:`newcommand` and :func:`execute`.
 """
@@ -32,13 +32,53 @@ def run_tokenized_line_local(line: str, *, check_braces: bool=True, check_newlin
 @export_function_to_module
 @user_documentation
 def peek_next_char(engine: Engine=  default_engine)->str:
-	"""
+	r"""
 	Get the character of the following token, or empty string if it's not a character.
+
+	This function can be used as follows to simulate ``e``-type argument specifiers
+	of ``xparse``::
+
+		if peek_next_char()=="^":
+			get_next_char()
+			result = get_arg_str()
+			# the following content in the input stream is ``^{...}`` and we stored the content inside to ``result``
+		else:
+			pass  # there's no ``^...`` following in the input stream
+
+	It can also simulate ``s``-type argument specifier (optional star)::
+
+		if peek_next_char()=="*":
+			get_next_char()
+			# there's a star
+		else:
+			pass  # there's no star
+
+	It can even simulate ``o``-type argument specifier (optional argument delimited by ``[...]``)::
+
+		if peek_next_char()=="[":
+			get_next_char()  # skip the `[`
+			result=""
+			while True:
+				if peek_next_char():
+					c=get_next_char()
+					if c=="]": break
+					result+=c
+				else:
+					# following in the input stream must be a control sequence, such as `\relax`
+					result+=get_arg_str()
+			# now result contains the content inside the `[...]`
+		else:
+			pass  # there's no optional argument
+
+	Note that the above does not take into account the balance of braces or brackets, so:
+
+	- If the following content in the input is ``[ab{cd]ef}gh]`` then the result will be ``ab{cd``.
+	- If the following content in the input is ``[ab[cd]ef]`` then the result will be ``ab[cd``.
 
 	.. note::
 		For advanced users:
 
-		Uses :func:`~pythonimmediate.textopy.peek_next_meaning` under the hood to get the meaning of the following token.
+		This function uses :func:`~pythonimmediate.textopy.peek_next_meaning` under the hood to get the meaning of the following token.
 		See that function documentation for a warning on undefined behavior.
 
 		Will also return nonempty if the next token is an implicit character token. This case is not supported and
@@ -61,22 +101,41 @@ def get_next_char(engine: Engine=  default_engine)->str:
 @export_function_to_module
 @user_documentation
 def put_next(arg: str, engine: Engine=  default_engine)->None:
-	"""
+	r"""
 	Put some content forward in the input stream.
 
-	arg: has type |str| (will be tokenized in the current catcode regime, must be a single line)
+	:param arg: The content, must be a single line.
+
+		Note that there must not be any verbatim-like commands in the argument, so for example
+		``put_next(r"\verb|a|")`` is not allowed.
+
+		If there might be verbatim-like arguments, the problem is (almost) unsolvable.
+		Refer to :func:`print_TeX` or :func:`execute` for workarounds,
+		or use the advanced interface.
+
+	For example, if the following content in the input stream are ``{abc}{def}``::
+
+		s = get_arg_str()  # s = "abc"
+		t = get_arg_str()  # t = "def"
+		put_next("{" + t + "}")
+		put_next("{" + s + "}")
+	
+	After the above code, the content in the input stream is "mostly unchanged".
+
+	.. note::
+		The argument is tokenized in the current category regime,
 	"""
 	typing.cast(Callable[[PTTTeXLine, Engine], None], Python_call_TeX_local(
-r"""
-\cs_new_protected:Npn \__put_next_tmpa {
-	%optional_sync%
-	\__read_do_one_command:
-}
-\cs_new_protected:Npn %name% {
-	%read_arg0(\__target)%
-	\expandafter \__put_next_tmpa \__target
-}
-""", recursive=False))(PTTTeXLine(arg), engine)
+		r"""
+		\cs_new_protected:Npn \__put_next_tmpa {
+			%optional_sync%
+			\__read_do_one_command:
+		}
+		\cs_new_protected:Npn %name% {
+			%read_arg0(\__target)%
+			\expandafter \__put_next_tmpa \__target
+		}
+		""", recursive=False))(PTTTeXLine(arg), engine)
 
 def replace_double_hash(s: str)->str:
 	return s.replace("##", "#")
@@ -128,6 +187,8 @@ def get_arg_str(engine: Engine=  default_engine)->str:
 
 		For advanced users:
 
+		This function corresponds to the ``m``-type argument in ``xparse`` package.
+
 		It gets the argument, detokenize it, pass it through :func:`replace_double_hash`, and return the result.
 
 		This is the simple API, as such it assumes normal category code values.
@@ -176,6 +237,9 @@ def get_arg_estr(engine: Engine=  default_engine)->str:
 def get_optional_arg_str(engine: Engine=  default_engine)->Optional[str]:
 	"""
 	Get an optional argument. See also :ref:`str-tokenization`.
+	
+	.. note::
+		For advanced users: This function corresponds to the ``o``-type argument in ``xparse`` package.
 	"""
 	result=typing.cast(Callable[[Engine], TTPLine], Python_call_TeX_local(
 		r"""

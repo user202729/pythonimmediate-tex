@@ -62,3 +62,7 @@ def process_docstring(app, what, name, obj, options, lines):
 
 def setup(app):
 	app.connect('autodoc-process-docstring', process_docstring)
+	app.connect('env-before-read-docs', env_before_read_docs)
+
+def env_before_read_docs(app, env, docnames):
+	env.settings["tab_width"] = 4  # https://stackoverflow.com/a/75037587/5267751

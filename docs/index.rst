@@ -16,7 +16,11 @@ There are different sections of the documentation:
 - :mod:`pythonimmediate.simple` -- interface that "just works" for typical users of the
   ``pythonimmediate`` TeX package, to use Python coding from TeX,
   who does not know TeX inner details such as category codes.
+
+  Note that this should be read in conjunction with the ``pythonimmediate`` TeX package documentation.
+
 - Some properties of the parent TeX interpreter can be accessed from :const:`~pythonimmediate.engine.default_engine`.
+
 - The rest: contain functions to control the precise category codes of the tokens.
 
   Read :func:`~pythonimmediate.textopy.expand_once`
@@ -30,7 +34,6 @@ There are different sections of the documentation:
    :caption: Contents:
 
    pythonimmediate
-
 
 Indices and tables
 ==================
