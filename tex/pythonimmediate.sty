@@ -34,11 +34,14 @@
 \str_set:NV \_pythonimmediate_mode \_pythonimmediate_mode
 \str_set:NV \_pythonimmediate_textopy_script_path \_pythonimmediate_textopy_script_path
 
-\msg_new:nnn {pythonimmediate} {shell-fail} {Shell~command~execution~failed!}
+\msg_new:nnn {pythonimmediate} {shell-fail} {Please~enable~unrestricted~shell~scape!}
 \msg_new:nnn {pythonimmediate} {cannot-read-line} {Cannot~read~line!}
 \msg_new:nnn {pythonimmediate} {internal-error} {Internal~error!}
 \msg_new:nnn {pythonimmediate} {invalid-mode} {Invalid~mode:~'#1'.}
 
+\sys_if_shell_unrestricted:F {
+	\msg_error:nn {pythonimmediate} {shell-fail}
+}
 
 \bool_new:N \_pythonimmediate_mode_multiprocessing_network
 \bool_new:N \_pythonimmediate_mode_unnamed_pipe
