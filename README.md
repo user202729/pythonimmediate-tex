@@ -19,6 +19,8 @@ so you don't need to write a single line of TeX code.
 
 ### Internal note
 
+`tex/` folder contains TeX-related files. The source code of the package is in `tex/pythonimmediate.sty`.
+
 To create the documentation:
 
 ```
