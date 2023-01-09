@@ -554,7 +554,7 @@ r"""
 
 +
 
-# callback will be called exactly once with the serialized result
+# callback will be called exactly once with the serialized result (either other or space catcode)
 # and, as usual, with nothing leftover following in the input stream
 
 # the token itself can be gobbled or \edef-ed to discard it.
@@ -596,7 +596,7 @@ r"""
 }
 \cs_new:Npn \__content_escaper #1 {
 	\ifnum 0<\__if_weird_charcode_or_space:n {`#1} ~
-		\cStr\  \char_generate:nn {`#1+64} {12}
+		\cO\  \char_generate:nn {`#1+64} {12}
 	\else
 		#1
 	\fi
@@ -620,23 +620,23 @@ r"""
 \cs_new_protected:Npn \__continue_after_edef #char #cat #callback {
 	\token_if_eq_charcode:NNTF #cat 0 {
 		\tl_if_eq:NNTF \__the_token \__frozen_relax_container {
-			#callback {\cStr{ R }}
+			#callback {\cO{ R }}
 		} {
 			\tl_if_eq:NNTF \__the_token \__null_cs_container {
-				#callback {\cStr{ \\\  }}
+				#callback {\cO{ \\\  }}
 			} {
 				\tl_set:Nx \__name { \expandafter \cs_to_str:N \__the_token }
 				\exp_args:Nx #callback {
 					\str_map_function:NN \__name \__prefix_escaper
-					\cStr\\
+					\cO\\
 					\str_map_function:NN \__name \__content_escaper
-					\cStr\  }
+					\cO\  }
 			}
 		}
 	} {
 		\exp_args:Nx #callback {
 			\ifnum 0<\__if_weird_charcode:n {#char} ~
-				\cStr{^} #cat \char_generate:nn {#char+64} {12}
+				\cO{^} #cat \char_generate:nn {#char+64} {12}
 			\else
 				#cat \expandafter \string \__the_token
 			\fi
@@ -654,7 +654,7 @@ r"""
 \cs_new_protected:Npn \__process_gobble #char #cat #token #callback {
 	\exp_args:Nx #callback {
 		\ifnum 0<\__if_weird_charcode:n {#char} ~
-			\cStr{^} #cat \char_generate:nn {#char+64} {12}
+			\cO{^} #cat \char_generate:nn {#char+64} {12}
 		\else
 			#cat \expandafter \string #token
 		\fi
