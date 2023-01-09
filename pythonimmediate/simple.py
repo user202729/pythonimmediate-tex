@@ -493,6 +493,123 @@ def renewcommand(x: Union[str, Callable, None]=None, f: Optional[Callable]=None,
 	if isinstance(x, str): return functools.partial(_renewcommand, x, engine=engine)
 	return _renewcommand(x.__name__, x, engine=engine)
 
+T1 = typing.TypeVar("T1", bound=Callable)
+
+@_export
+def define_char(char: str, engine: Engine=  default_engine)->Callable[[T1], T1]:
+	r"""
+	Define a character to do some specification action.
+
+	Can be used as a decorator::
+
+		@define_char("×")
+		def multiplication_sign():
+			print_TeX(end=r"\times")
+
+	.. note::
+		It's **not recommended** to define commonly-used characters, for example if you define ``n``
+		then commands whose name contains ``n`` cannot be used anymore.
+
+		As another example, if you define ``-``, then commands like ``\draw (1, 2) -- (3, 4);`` in TikZ
+		cannot be used.
+
+		:func:`undefine_char` can be used to undo the effect.
+	"""
+	def result(f: T1)->T1:
+		assert len(char)==1
+		identifier=get_random_identifier()
+		_code=define_TeX_call_Python(
+				lambda engine: run_code_redirect_print_TeX(f, engine=engine),
+				"__unused", argtypes=[], identifier=identifier)
+		# ignore _code, already executed something equivalent while running the TeX command below
+
+		if not engine.is_unicode and ord(char)>127:
+			# must define u8:...
+			typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
+				r"""
+				\cs_new_protected:Npn %name% {
+					\begingroup
+						\endlinechar=-1~
+						\readline \__read_file to \__line
+						\readline \__read_file to \__identifier
+						\cs_gset_protected:cpx {u8:\__line} {
+							\unexpanded{\immediate\write \__write_file} { i \__identifier }
+							\unexpanded{\__read_do_one_command:}
+						}
+					\endgroup
+					%optional_sync%
+					\__read_do_one_command:
+				}
+				""", recursive=False))(PTTVerbatimLine(char), PTTVerbatimLine(identifier), engine)
+		else:
+			typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
+				r"""
+				\cs_new_protected:Npn %name% {
+					\begingroup
+						\endlinechar=-1~
+						\readline \__read_file to \__line
+						\readline \__read_file to \__identifier
+						\global \catcode \expandafter`\__line \active
+						\use:x {
+							\protected \gdef
+							\expandafter \expandafter \expandafter \noexpand \char_generate:nn{\expandafter`\__line}{13}
+							{
+								\unexpanded{\immediate\write \__write_file} { i \__identifier }
+								\unexpanded{\__read_do_one_command:}
+							}
+						}
+					\endgroup
+					%optional_sync%
+					\__read_do_one_command:
+				}
+				""", recursive=False))(PTTVerbatimLine(char), PTTVerbatimLine(identifier), engine)
+		return f
+	return result
+
+@_export
+def undefine_char(char: str, engine: Engine=  default_engine)->None:
+	"""
+	The opposite of :func:`define_char`.
+	"""
+	assert len(char)==1
+
+	if not engine.is_unicode and ord(char)>127:
+		# undefine u8:...
+		typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
+			r"""
+			\cs_new_protected:Npn %name% {
+				\begingroup
+					\endlinechar=-1~
+					\readline \__read_file to \__line
+					\cs_undefine:c {u8:\__line}
+				\endgroup
+				%optional_sync%
+				\__read_do_one_command:
+			}
+			""", recursive=False))(PTTVerbatimLine(char), engine)
+	else:
+		# return the normal catcode for the character
+		typing.cast(Callable[[PTTVerbatimLine, Engine], None], Python_call_TeX_local(
+			r"""
+			\precattl_exec:n {
+				\cs_new_protected:Npn %name% {
+					%read_arg0(\__line)%
+					\global \catcode \expandafter`\__line = \cctab_item:Nn  \c_document_cctab {\expandafter`\__line} \relax
+					\int_compare:nNnT {\catcode \expandafter`\__line} = {13} {
+						\expandafter \token_if_eq_charcode:NNTF \__line \cO\~ {
+							% restore ~'s original meaning
+							\global \def \cA\~ { \nobreakspace {} }
+						} {
+							% not sure what to do here
+							\msg_error:nn {pythonimmediate} {internal-error}
+						}
+					}
+					%optional_sync%
+					\__read_do_one_command:
+				}
+			}
+			""", recursive=False))(PTTVerbatimLine(char), engine)
+
 @_export
 def execute(block: str, engine: Engine=default_engine)->None:
 	r"""

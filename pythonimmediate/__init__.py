@@ -1294,7 +1294,7 @@ class TokenList(TokenListBaseClass):
 		"""
 		return NTokenList(self).str_unicode()
 
-	def str(self, engine: Engine)->str:
+	def str(self, engine: Engine=default_engine)->str:
 		"""
 		See :meth:`NTokenList.str`.
 		"""
