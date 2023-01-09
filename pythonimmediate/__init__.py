@@ -2461,4 +2461,4 @@ def parent_process_main():
 
 		os._exit(0)
 
-from . import simple
+from . import simple  # scan the source code and populate bootstrap_code
