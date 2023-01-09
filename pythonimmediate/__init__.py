@@ -1575,20 +1575,6 @@ class TTPLine(TeXToPyData, str):
 	def read(engine: Engine)->"TTPLine":
 		return TTPLine(readline(engine=engine))
 
-# some old commands e.g. \$, \^, \_, \~ require \set@display@protect to be robust.
-# ~ needs to be redefined directly.
-mark_bootstrap(
-r"""
-\precattl_exec:n {
-	\cs_new_protected:Npn \__begingroup_setup_estr: {
-		\begingroup
-			\escapechar=-1~
-			\cC{set@display@protect}
-			\let  \cA\~  \relax
-	}
-}
-""")
-
 class TTPELine(TeXToPyData, str):
 	"""
 	Same as TTPEBlock, but for a single line only.

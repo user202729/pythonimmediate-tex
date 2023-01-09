@@ -293,7 +293,7 @@ class ChildProcessEngine(Engine):
 		self.process=subprocess.Popen(
 				[
 					engine_name_to_latex_executable[engine_name], "-shell-escape",
-						*args, r"\RequirePackage[mode=child-process]{pythonimmediate}\pythonimmediatechildprocessmainloop\stop"],
+						*args, r"\RequirePackage[child-process]{pythonimmediate}\pythonimmediatechildprocessmainloop\stop"],
 				stdin=subprocess.PIPE,
 				#stdout=subprocess.PIPE,  # we don't need the stdout
 				stdout=subprocess.DEVNULL,

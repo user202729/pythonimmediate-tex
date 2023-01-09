@@ -22,33 +22,44 @@
 
 %\GenerateVariantsFile:n{\rescansynclastfilename}
 
-\str_set:Nn \_pythonimmediate_mode{multiprocessing-network}
+% some old commands e.g. \$, \^, \_, \~ require \set@display@protect to be robust.
+% ~ needs to be redefined directly.
+\precattl_exec:n {
+	\cs_new_protected:Npn \_pythonimmediate_begingroup_setup_estr: {
+		\begingroup
+			\escapechar=-1~
+			\cC{set@display@protect}
+			\let  \cA\~  \relax
+	}
+}
+
+% use like this \__begingroup_setup_estr: ⟨some command⟩ \endgroup
+% e.g. \__begingroup_setup_estr: \exp_args:NNx \endgroup \__function:n {⟨text⟩}
+% will eventually execute to \__function:n {⟨estr-expansion of text⟩}
+
+\str_set:Nn \_pythonimmediate_args{--mode=multiprocessing-network}
 \str_set:Nn \_pythonimmediate_python_executable{python3}
+\str_set:Nn \_pythonimmediate_python_flags{}
 \keys_define:nn{pythonimmediate}{
-	mode.tl_set:N=\_pythonimmediate_mode,
-	python-executable.tl_set:N=\_pythonimmediate_python_executable,
+	args.tl_gset:N             =\_pythonimmediate_args,
+	python-executable.tl_gset:N=\_pythonimmediate_python_executable,
+	python-flags.tl_gset:N     =\_pythonimmediate_python_flags,
+	child-process.bool_gset:N  =\_pythonimmediate_child_process,
 }
 \ProcessKeysOptions{pythonimmediate}
 
-\str_set:NV \_pythonimmediate_mode \_pythonimmediate_mode
+\_pythonimmediate_begingroup_setup_estr:
+	\str_gset:Nx \_pythonimmediate_args             { \_pythonimmediate_args }
+	\str_gset:Nx \_pythonimmediate_python_executable{ \_pythonimmediate_python_executable }
+	\str_gset:Nx \_pythonimmediate_python_flags     { \_pythonimmediate_python_flags }
+\endgroup
 
 \msg_new:nnn {pythonimmediate} {shell-fail} {Please~enable~unrestricted~shell~scape!}
 \msg_new:nnn {pythonimmediate} {cannot-read-line} {Cannot~read~line!}
 \msg_new:nnn {pythonimmediate} {internal-error} {Internal~error!}
-\msg_new:nnn {pythonimmediate} {invalid-mode} {Invalid~mode:~'#1'.}
 
 \sys_if_shell_unrestricted:F {
 	\msg_error:nn {pythonimmediate} {shell-fail}
-}
-
-\bool_new:N \_pythonimmediate_mode_multiprocessing_network
-\bool_new:N \_pythonimmediate_mode_unnamed_pipe
-\bool_new:N \_pythonimmediate_mode_child_process
-\str_if_eq:VnT \_pythonimmediate_mode {multiprocessing-network} {\bool_set_true:N \_pythonimmediate_mode_multiprocessing_network}
-\str_if_eq:VnT \_pythonimmediate_mode {unnamed-pipe} {\bool_set_true:N \_pythonimmediate_mode_unnamed_pipe}
-\str_if_eq:VnT \_pythonimmediate_mode {child-process} {\bool_set_true:N \_pythonimmediate_mode_child_process}
-\bool_if:nF {\_pythonimmediate_mode_multiprocessing_network || \_pythonimmediate_mode_unnamed_pipe || \_pythonimmediate_mode_child_process} {
-    \msg_error:nnV {pythonimmediate} {invalid-mode} \_pythonimmediate_mode
 }
 
 % note on \newread: we need to persistently open the file anyway, so using LaTeX3 stream reference counting doesn't help
@@ -56,13 +67,13 @@
 
 % ======== setup read file ========
 
-\bool_if:NTF \_pythonimmediate_mode_child_process {
+\bool_if:NTF \_pythonimmediate_child_process {
 	% make read file read from stdin
 	% note that \ior_str_get:NN cannot be used here as it checks for \ifeof which breaks with terminal for some reason
 	\int_const:Nn \_pythonimmediate_read_file {-1}
 } {
 	\newread \_pythonimmediate_read_file
-	\openin \_pythonimmediate_read_file=|"\_pythonimmediate_python_executable \space -m ~ pythonimmediate.pytotex ~ \_pythonimmediate_mode"~
+	\openin \_pythonimmediate_read_file=|"\_pythonimmediate_python_executable \space \_pythonimmediate_python_flags \space -m ~ pythonimmediate.pytotex ~ \_pythonimmediate_args"~
 }
 
 % ======== copy of ior_str_get but does not check for file end ========
@@ -79,12 +90,12 @@
 
 % ======== setup write file ========
 \newwrite \_pythonimmediate_write_file
-\bool_if:NTF \_pythonimmediate_mode_child_process {
+\bool_if:NTF \_pythonimmediate_child_process {
 	%\immediate\openout \_pythonimmediate_write_file=symlink-to-stderr.txt~
 	% tried this method, it seems to work except that it's buffered when stderr is redirected to a file...
-	\immediate\openout \_pythonimmediate_write_file=|"\_pythonimmediate_python_executable \space -m ~ pythonimmediate.copy_to_stderr"~
+	\immediate\openout \_pythonimmediate_write_file=|"\_pythonimmediate_python_executable \space \_pythonimmediate_python_flags \space -m ~ pythonimmediate.copy_to_stderr"~
 } {
-	\immediate\openout \_pythonimmediate_write_file=|"\_pythonimmediate_python_executable \space -m ~ pythonimmediate.textopy"~
+	\immediate\openout \_pythonimmediate_write_file=|"\_pythonimmediate_python_executable \space \_pythonimmediate_python_flags \space -m ~ pythonimmediate.textopy"~
 	% note that openout, even to shell, will append .tex if there's no dot in the command
 	% so we artificially add a dot here in `.textopy`
 

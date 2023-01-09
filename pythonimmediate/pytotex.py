@@ -29,7 +29,7 @@ if __name__ == "__main__":
 
 	import argparse
 	parser=argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-	parser.add_argument("mode", choices=list(communicator_by_name.keys()), help="the mode of communication")
+	parser.add_argument("-m", "--mode", choices=list(communicator_by_name.keys()), help="the mode of communication")
 	args=parser.parse_args()
 
 

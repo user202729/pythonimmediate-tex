@@ -22,7 +22,7 @@
 \fi
 
 \def\tmp#1{
-	\usepackage[mode=#1,python-executable={PYTHONPATH=/home/user202729/TeX/pythonimmediate/ python3.8}]{pythonimmediate}
+	\usepackage[args={--mode #1},python-executable={PYTHONPATH=/home/user202729/TeX/pythonimmediate/ python3.8}]{pythonimmediate}
 }
 \expandafter\tmp\expandafter{\specifymode}
 
