@@ -1,6 +1,4 @@
-\ProvidesExplPackage{pythonimmediate}{2022/12/23}{0.0.0}{Library to run Python code}
-
-\errorcontextlines=100~
+\ProvidesExplPackage{pythonimmediate}{2023/01/09}{0.1.0}{Library to run Python code}
 
 \RequirePackage{saveenv}
 \RequirePackage{currfile}
@@ -16,11 +14,6 @@
 \cs_generate_variant:Nn \str_if_eq:nnF {VnF}
 \cs_generate_variant:Nn \str_if_in:nnF {VnF}
 \cs_generate_variant:Nn \tl_build_put_right:Nn {NV}
-
-%\bench before~rescan.
-%\bench after~rescan.
-
-%\GenerateVariantsFile:n{\rescansynclastfilename}
 
 % some old commands e.g. \$, \^, \_, \~ require \set@display@protect to be robust.
 % ~ needs to be redefined directly.
