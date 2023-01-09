@@ -36,14 +36,6 @@ pythonimmediate.engine module
    :undoc-members:
    :show-inheritance:
 
-pythonimmediate.main module
----------------------------
-
-.. automodule:: pythonimmediate.main
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 pythonimmediate.pytotex module
 ------------------------------
 
