@@ -1,11 +1,4 @@
 #!/bin/python3
-"""
-======== TeX-to-Py half ========
-
-receive commands from TeX, then execute it here
-"""
-
-
 from __future__ import annotations
 import sys
 import os

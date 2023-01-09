@@ -173,7 +173,7 @@ def get_arg_str(engine: Engine=  default_engine)->str:
 		This function, as well as all the `_str` functions, return the argument that might be mangled in the following ways:
 
 		- A space might be added after each command that consist of multiple characters
-		- the ``^^xx`` or ``^^xxxx`` etc. notation is replaced by the character itself
+		- the ``^^xx`` or ``^^xxxx`` etc. notation is replaced by the character itself, or vice versa -- literal tab character might get replaced with ``^^I``
 		- multiple space characters may be collapsed into one
 		- newline character may become space character
 		- double-newline character may become ``\par``
@@ -215,6 +215,7 @@ def get_arg_estr(engine: Engine=  default_engine)->str:
 	Get a mandatory argument from the input stream, then process it as described in :ref:`estr-expansion`.
 
 	.. _estr-expansion:
+
 	Note on argument expansion of ``estr``-type functions
 	-----------------------------------------------------
 
@@ -222,7 +223,13 @@ def get_arg_estr(engine: Engine=  default_engine)->str:
 
 	The argument is fully expanded, and any "escaped character" are passed as the character itself to Python.
 
-	The behavior is similar to that of the ``\py`` command argument processing, refer to the [TeX] package documentation.
+	The behavior is similar to that of the ``\py`` command argument processing, see also the [TeX] package documentation.
+
+	Some examples: After the [TeX] code ``\def\myvalue{123abc}`` is executed, then:
+
+	- if the argument in [TeX] code is ``{abc}``, then the Python function will return ``"abc"`` (similar to as if :func:`get_arg_str` is used),
+	- if the argument in [TeX] code is ``{\%a\#b\\\~}``, then the Python function will return ``r"%a#b\~"``,
+	- if the argument in [TeX] code is ``{\myvalue}``, then the Python function will return ``"123abc"``.
 	"""
 	return typing.cast(Callable[[Engine], TTPEBlock], Python_call_TeX_local(
 		r"""
@@ -499,7 +506,7 @@ T1 = typing.TypeVar("T1", bound=Callable)
 @_export
 def define_char(char: str, engine: Engine=  default_engine)->Callable[[T1], T1]:
 	r"""
-	Define a character to do some specification action.
+	Define a character to do some specific action.
 
 	Can be used as a decorator::
 
