@@ -94,7 +94,7 @@ Instruction:
 	\item Write the following in the preamble:
 \begin{verbatim}
 \usepackage[abspath]{currfile}
-\usepackage[python-executable={PYTHONPATH=pythonimmediate-tex-0.0.1.zip/pythonimmediate-tex-0.0.1/ python3},mode=unnamed-pipe]{pythonimmediate}
+\usepackage[python-executable={PYTHONPATH=pythonimmediate-tex-0.0.1.zip/pythonimmediate-tex-0.0.1/ python3},args={--mode=unnamed-pipe}]{pythonimmediate}
 \end{verbatim}
 As above, replace |0.0.1| with the downloaded version specified in the zip file above.
 
@@ -111,16 +111,27 @@ Refer to \ref{troubleshoot-Python-error} to read the error traceback in case of 
 
 \subsection{Package options}
 
-\DescribeOption{mode=}
-Method to communicate between \TeX\ and Python. Usually the method will be automatically detected.
+Normally no options are required.
+If you're not sure what they do, just use the default options.
 
-Possible values include |multiprocessing-network| and |unnamed-pipe|.
+\DescribeOption{args=}
+Arguments to be passed to the Python executable. Run
+\begin{verbatim}
+python -m pythonimmediate.pytotex --help
+\end{verbatim}
+on the command-line to view the available options.
 
 \DescribeOption{python-executable=}
-The name/path to the Python executable. Default to "python3".
+The name/path to the Python executable. Default to |python3|.
 
 Can also be used to provide environment variables to the Python process.
 An example how to do that is explained in \ref{installation-on-overleaf}.
+
+\DescribeOption{python-flags=}
+Flags to be passed to the Python interpreter. For example pass |-O| to disable assertions.
+
+The documentations can be found by running |python --help| on the command-line,
+or visit \url{https://docs.python.org/3/using/cmdline.html}.
 
 \subsection{\TeX\ interface}
 

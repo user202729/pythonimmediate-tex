@@ -73,3 +73,21 @@ class Test:
 		])
 	def test_mangle_incorrect(self, original: str, mangled: str)->None:
 		assert not pythonimmediate.can_be_mangled_to(original+"\n", mangled+"\n")
+
+	def test_python_flags(self):
+		"""
+		pass -O to the Python executable and check if assertions are disabled
+		"""
+		with pytest.raises(subprocess.CalledProcessError):
+			subprocess.run(
+					["pdflatex", "-shell-escape", r"\RequirePackage{pythonimmediate}\pyc{assert False}\stop"],
+					check=True,
+					cwd=tempfile.gettempdir(),
+					)
+
+		# but this does not raise anything
+		subprocess.run(
+				["pdflatex", "-shell-escape", r"\RequirePackage[python-flags=-O]{pythonimmediate}\pyc{assert False}\stop"],
+				check=True,
+				cwd=tempfile.gettempdir(),
+				)
