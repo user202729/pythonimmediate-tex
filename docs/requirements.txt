@@ -1,2 +1,4 @@
 docutils==0.16
 # https://stackoverflow.com/questions/67542699/readthedocs-sphinx-not-rendering-bullet-list-from-rst-file
+sphinx==5.3.0
+# avoid conflict with the above
