@@ -30,9 +30,9 @@
 % e.g. \__begingroup_setup_estr: \exp_args:NNx \endgroup \__function:n {⟨text⟩}
 % will eventually execute to \__function:n {⟨estr-expansion of text⟩}
 
-\str_set:Nn \_pythonimmediate_args{--mode=multiprocessing-network}
-\str_set:Nn \_pythonimmediate_python_executable{python3}
-\str_set:Nn \_pythonimmediate_python_flags{}
+\str_gset:Nn \_pythonimmediate_args{}
+\str_gset:Nn \_pythonimmediate_python_executable{python3}
+\str_gset:Nn \_pythonimmediate_python_flags{}
 \keys_define:nn{pythonimmediate}{
 	args.tl_gset:N             =\_pythonimmediate_args,
 	python-executable.tl_gset:N=\_pythonimmediate_python_executable,
@@ -48,7 +48,8 @@
 \endgroup
 
 \msg_new:nnn {pythonimmediate} {shell-fail} {Please~enable~unrestricted~shell~scape!}
-\msg_new:nnn {pythonimmediate} {cannot-read-line} {Cannot~read~line!}
+\msg_new:nnn {pythonimmediate} {process-start-error} {Cannot~start~Python~process!~
+	Make~sure~package~options~are~correct~and~the~Python~package~is~installed.}
 \msg_new:nnn {pythonimmediate} {internal-error} {Internal~error!}
 
 \sys_if_shell_unrestricted:F {
@@ -96,7 +97,7 @@
 	\_pythonimmediate_str_get:N \_pythonimmediate_line  % read one line from pytotex half, forward to textopy half
 
 	\str_if_eq:VnT \_pythonimmediate_line {} {
-		\msg_error:nn {pythonimmediate} {cannot-read-line}
+		\msg_error:nn {pythonimmediate} {process-start-error}
 	}
 
 	\str_const:Nn \_pythonimmediate_engine_mark_pdftex {p}

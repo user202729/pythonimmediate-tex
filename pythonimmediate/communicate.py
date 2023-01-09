@@ -27,6 +27,11 @@ class Communicator(ABC):
 		"""
 		raise NotImplementedError
 
+	@staticmethod
+	@abstractmethod
+	def is_available()->bool:
+		raise NotImplementedError
+
 
 class MultiprocessingNetworkCommunicator(Communicator):
 	character = 'm'
@@ -67,6 +72,10 @@ class MultiprocessingNetworkCommunicator(Communicator):
 						sys.__stdout__.buffer.flush()
 					except EOFError: break
 
+	@staticmethod
+	def is_available()->bool:
+		return True
+
 
 class UnnamedPipeCommunicator(Communicator):
 	character = 'u'
@@ -94,6 +103,12 @@ class UnnamedPipeCommunicator(Communicator):
 				closed_w=True
 			sys.stdout.buffer.write(line)
 			sys.stdout.buffer.flush()
+
+	@staticmethod
+	def is_available()->bool:
+		import os
+		from pathlib import Path
+		return os.name=="posix" and Path("/proc").is_dir()
 
 
 communicator_classes: List[Any] = [MultiprocessingNetworkCommunicator, UnnamedPipeCommunicator]

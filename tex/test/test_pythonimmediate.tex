@@ -10,26 +10,17 @@
 
 \ExplSyntaxOn
 \pretty:n{going to load}
-\ExplSyntaxOff
 
-\makeatletter
-\let\firstoftwo\@firstoftwo
-\let\secondoftwo\@secondoftwo
-\makeatother
-
-\unless\ifdefined\specifymode
-	\def\specifymode{unnamed-pipe}
+\tl_set:Nn\tmp{\usepackage[}
+\ifdefined\specifymode
+	\tl_put_right:Nx\tmp{args={--mode ~ \specifymode},}
 \fi
+\tl_put_right:Nn\tmp{python-executable={PYTHONPATH=/home/user202729/TeX/pythonimmediate/ ~ python3.8},}
+\tl_put_right:Nn\tmp{]{pythonimmediate}}
 
-\def\tmp#1{
-	\usepackage[args={--mode #1},python-executable={PYTHONPATH=/home/user202729/TeX/pythonimmediate/ python3.8}]{pythonimmediate}
-}
-\expandafter\tmp\expandafter{\specifymode}
-
-%\usepackage[mode=unnamed-pipe]{pythonimmediate}
-
-
-
+\pretty:V\tmp
+\ExplSyntaxOff
+\tmp
 
 
 

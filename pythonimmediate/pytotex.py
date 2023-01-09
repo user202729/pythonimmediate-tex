@@ -20,14 +20,13 @@ import argparse
 from .communicate import MultiprocessingNetworkCommunicator, UnnamedPipeCommunicator
 
 communicator_by_name={
-		"multiprocessing-network": MultiprocessingNetworkCommunicator,
 		"unnamed-pipe": UnnamedPipeCommunicator,
-		}
+		"multiprocessing-network": MultiprocessingNetworkCommunicator,
+		}  # sorted by priority. We prefer unnamed-pipe because it's faster
 
 def get_parser()->argparse.ArgumentParser:
 	parser=argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 	parser.add_argument("-m", "--mode", choices=list(communicator_by_name.keys()),
-					 required=True,
 					 help="The mode of communication.\n\n"
 					 "Refer to :mod:`pythonimmediate.communicate` for the detail on what each mode mean.")
 	return parser
@@ -43,4 +42,12 @@ if __name__ == "__main__":
 	parser=get_parser()
 	args=parser.parse_args()
 
-	communicator_by_name[args.mode].forward()
+	mode=args.mode
+	if mode is None:
+		for mode in communicator_by_name:
+			if communicator_by_name[mode].is_available():
+				break
+		else:
+			raise RuntimeError("No available mode of communication! (this cannot happen)")
+
+	communicator_by_name[mode].forward()
