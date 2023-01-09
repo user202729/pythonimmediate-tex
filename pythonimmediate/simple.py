@@ -12,7 +12,7 @@ import functools
 import re
 
 import pythonimmediate
-from .textopy import export_function_to_module, scan_Python_call_TeX, PTTTeXLine, Python_call_TeX_local, check_line, user_documentation, Token, TTPEBlock, TTPEmbeddedLine, get_random_identifier, CharacterToken, define_TeX_call_Python, parse_meaning_str, peek_next_meaning, PTTVerbatimLine, run_block_local, run_code_redirect_print_TeX, TTPBlock, TTPLine
+from .textopy import export_function_to_module, scan_Python_call_TeX_module, PTTTeXLine, Python_call_TeX_local, check_line, user_documentation, Token, TTPEBlock, TTPEmbeddedLine, get_random_identifier, CharacterToken, define_TeX_call_Python, parse_meaning_str, peek_next_meaning, PTTVerbatimLine, run_block_local, run_code_redirect_print_TeX, TTPBlock, TTPLine
 from .engine import Engine, default_engine
 
 
@@ -561,6 +561,6 @@ def print_TeX(*args, **kwargs)->None:
 	if pythonimmediate.file is not None:
 		functools.partial(print, file=pythonimmediate.file)(*args, **kwargs)  # allow user to override `file` kwarg
 
-scan_Python_call_TeX(inspect.getsource(sys.modules[__name__]))
+scan_Python_call_TeX_module(__name__)
 
 

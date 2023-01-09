@@ -2164,6 +2164,14 @@ def scan_Python_call_TeX(sourcecode: str)->None:
 			print("======== while scanning file for Python_call_TeX_local(...) -- error on line", node.lineno, "of file ========", file=sys.stderr)
 			raise
 
+def scan_Python_call_TeX_module(name: str)->None:
+	"""
+	Internal function.
+	Can be used as ``scan_Python_call_TeX_module(__name__)`` to scan the current module.
+	"""
+	assert name != "__main__"  # https://github.com/python/cpython/issues/86291
+	scan_Python_call_TeX(inspect.getsource(sys.modules[name]))
+
 def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]], ttp_argtypes: List[Type[TeXToPyData]],
 						   *,
 						   recursive: bool=True,
@@ -2285,7 +2293,7 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 
 	return TeX_code, f
 
-scan_Python_call_TeX(inspect.getsource(sys.modules[__name__]))
+scan_Python_call_TeX_module(__name__)
 
 run_none_finish=typing.cast(Callable[[Engine], None], Python_call_TeX_local(
 r"""
