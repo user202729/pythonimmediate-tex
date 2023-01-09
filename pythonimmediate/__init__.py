@@ -1692,7 +1692,7 @@ class PTTTeXLine(PyToTeXData):
 	The trailing newline is not included, i.e. it's tokenized under |\endlinechar=-1|.
 	"""
 	data: str
-	read_code=r"\ior_get:NN \__read_file {} ".format
+	read_code=r"\exp_args:Nno \use:nn {{ \endlinechar-1 \ior_get:NN \__read_file {} \endlinechar}} {{\the\endlinechar\relax}}".format
 	def serialize(self, engine: Engine)->bytes:
 		assert "\n" not in self.data
 		return (self.data+"\n").encode('u8')

@@ -18,7 +18,6 @@
 \tl_put_right:Nn\tmp{python-executable={PYTHONPATH=/home/user202729/TeX/pythonimmediate/ ~ python3.8},}
 \tl_put_right:Nn\tmp{]{pythonimmediate}}
 
-\pretty:V\tmp
 \ExplSyntaxOff
 \tmp
 
@@ -602,6 +601,9 @@ class Test(unittest.TestCase):
 		"""))
 		self.assertEqual(a, 1)
 
+	def test_var(self)->None:
+		simple.var["abc"]=r"\test  \###\a\b{}#&?"
+		self.assertEqual(simple.var["abc"], r"\test \###\a \b {}#&?")
 
 
 suite = unittest.defaultTestLoader.loadTestsFromTestCase(Test)
@@ -616,7 +618,7 @@ x=y=z=1
 \def\testFilePath{test_pythonimmediate_file.py}
 \def\letYThree{y=3}
 \def\letZFour{z=4}
-
+?
 % ======== test indirect execution
 \pyfile{\testFilePath}  % x=2
 \pyc{\letYThree}

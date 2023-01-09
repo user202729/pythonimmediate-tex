@@ -1,8 +1,12 @@
 r"""
 Simple interface, suitable for users who may not be aware of [TeX] subtleties, such as category codes.
 
+This is only guaranteed to work properly in normal category code situations. In other cases, use the advanced API.
+
 Start with reading  :func:`newcommand` and :func:`execute`.
 """
+
+from __future__ import annotations
 
 import sys
 import inspect
@@ -10,9 +14,10 @@ from typing import Optional, Union, Callable, Any, Iterator, Protocol, Iterable,
 import typing
 import functools
 import re
+from dataclasses import dataclass
 
 import pythonimmediate
-from . import scan_Python_call_TeX_module, PTTTeXLine, Python_call_TeX_local, check_line, Token, TTPEBlock, TTPEmbeddedLine, get_random_identifier, CharacterToken, define_TeX_call_Python, parse_meaning_str, peek_next_meaning, PTTVerbatimLine, run_block_local, run_code_redirect_print_TeX, TTPBlock, TTPLine
+from . import scan_Python_call_TeX_module, PTTTeXLine, PTTVerbatimLine, PTTTeXLine, Python_call_TeX_local, check_line, Token, TTPEBlock, TTPEmbeddedLine, get_random_identifier, CharacterToken, define_TeX_call_Python, parse_meaning_str, peek_next_meaning, run_block_local, run_code_redirect_print_TeX, TTPBlock, TTPLine, BalancedTokenList, ControlSequenceToken
 from .engine import Engine, default_engine
 
 __all__ = []
@@ -862,5 +867,55 @@ def newenvironment_verb(name: str, f: Callable[[str], None], engine: Engine)->No
 			lambda engine: run_code_redirect_print_TeX(f1, engine=engine),
 			"__unused", argtypes=[], identifier=identifier)
 
+
+@dataclass
+class VarManager:
+	engine: Engine
+
+	def __call__(self, engine: Engine)->VarManager:
+		"""
+		Shorthand to bind to another engine.
+		"""
+		return VarManager(engine)
+
+	def __getitem__(self, key: str)->str:
+		"""
+		Get the value of a variable.
+		"""
+		return _replace_double_hash(
+				BalancedTokenList([ControlSequenceToken(key)])
+				.expand_o(engine=self.engine)
+				.detokenize(engine=self.engine)
+				)
+
+	def __setitem__(self, key: str, val: str)->None:
+		"""
+		Set the value of a variable.
+		"""
+		return typing.cast(Callable[[PTTVerbatimLine, PTTTeXLine, Engine], None], Python_call_TeX_local(
+			r"""
+			\cs_new_protected:Npn %name% {
+				%read_arg0(\__line)%
+				%read_arg1(\__value)%
+				\tl_set_eq:cN {\__line} \__value
+				%optional_sync%
+				\__read_do_one_command:
+			}
+			""", recursive=False, sync=None))(PTTVerbatimLine(key), PTTTeXLine(val), self.engine)
+
+
+var=VarManager(default_engine)
+r"""
+Can be used like this::
+
+	var["myvar"]="myvalue"  # "equivalent" to \def\myvar{myvalue}
+	var["myvar"]=r"\textbf{123}"  # "equivalent" to \def\myvar{\textbf{123}}
+	var["myvar"]=r"\def\test#1{#1}"  # "equivalent" to \tl_set:Nn \myvar {\def\test#1{#1}}  (note that `#` doesn't need to be doubled here unlike in `\def`)
+	var(engine)["myvar"]="myvalue"  # pass explicit engine
+	print(var["myvar"])  # get the value of the variable, return a string
+
+Notes in :ref:`str-tokenization` apply -- in other words, after you set a value it may become slightly different when read back.
+"""
+__all__.append("var")
 
 scan_Python_call_TeX_module(__name__)
