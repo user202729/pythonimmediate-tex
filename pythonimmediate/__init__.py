@@ -130,6 +130,7 @@ r"""
 }
 
 % internal function. Just send an arbitrary block of data to Python.
+% this function only works properly when newlinechar = 10.
 \cs_new_protected:Npn \__send_block:e #1 {
 	\immediate\write \__write_file {
 		#1 ^^J

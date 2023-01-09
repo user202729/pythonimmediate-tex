@@ -327,15 +327,16 @@ def get_multiline_verb_arg(engine: Engine=  default_engine)->str:
 	"""
 	return typing.cast(Callable[[Engine], TTPBlock], Python_call_TeX_local(
 		r"""
-		\NewDocumentCommand %name% {+v} {
-			\immediate\write\__write_file { r }
-			\begingroup
-				\newlinechar=13~  % this is what +v argument type in xparse uses
-				\__send_block:n { #1 }
-			\endgroup
-			\__read_do_one_command:
+		\precattl_exec:n {
+			\NewDocumentCommand %name% {+v} {
+				\immediate\write\__write_file { r }
+				\str_set:Nn \l_tmpa_tl { #1 }
+				\str_replace_all:Nnn \l_tmpa_tl { \cO\^^M } { ^^J }
+				\__send_block:e { \l_tmpa_tl }
+				\__read_do_one_command:
+			}
 		}
-		""", recursive=False))(engine)
+		""", recursive=False))(engine)  # we cannot set newlinechar=13 because otherwise \__send_block:e does not work properly
 
 def _check_function_name(name: str)->None:
 	if not re.fullmatch("[A-Za-z]+", name) or (len(name)==1 and ord(name)<=0x7f):
