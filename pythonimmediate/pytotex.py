@@ -1,17 +1,36 @@
-#!/bin/python3
 """
-======== Py-to-TeX half ========
+Receive things that should be passed to [TeX] from [TeX]-to-Py half (:mod:`pythonimmediate.textopy`),
+then pass to [TeX].
 
-receive things that should be passed to TeX from TeX-to-Py half,
-then pass to TeX.
+User code are not executed here.
 
-the things that are sent should already be newline-terminated if necessary.
+Supported command-line arguments:
 
-user code are not executed here.
+.. argparse::
+   :module: pythonimmediate.pytotex
+   :func: get_parser
+   :prog: pytotex
+
 """
 
 import sys
 import signal
+import argparse
+
+from .communicate import MultiprocessingNetworkCommunicator, UnnamedPipeCommunicator
+
+communicator_by_name={
+		"multiprocessing-network": MultiprocessingNetworkCommunicator,
+		"unnamed-pipe": UnnamedPipeCommunicator,
+		}
+
+def get_parser()->argparse.ArgumentParser:
+	parser=argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+	parser.add_argument("-m", "--mode", choices=list(communicator_by_name.keys()),
+					 required=True,
+					 help="The mode of communication.\n\n"
+					 "Refer to :mod:`pythonimmediate.communicate` for the detail on what each mode mean.")
+	return parser
 
 if __name__ == "__main__":
 	signal.signal(signal.SIGINT, signal.SIG_IGN)  # when the other half terminates this one will terminates "gracefully"
@@ -20,17 +39,8 @@ if __name__ == "__main__":
 	#debug=functools.partial(print, file=debug_file, flush=True)
 	debug=lambda *args, **kwargs: None
 
-	from .communicate import MultiprocessingNetworkCommunicator, UnnamedPipeCommunicator
 
-	communicator_by_name={
-			"multiprocessing-network": MultiprocessingNetworkCommunicator,
-			"unnamed-pipe": UnnamedPipeCommunicator,
-			}
-
-	import argparse
-	parser=argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-	parser.add_argument("-m", "--mode", choices=list(communicator_by_name.keys()), help="the mode of communication")
+	parser=get_parser()
 	args=parser.parse_args()
-
 
 	communicator_by_name[args.mode].forward()

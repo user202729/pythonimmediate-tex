@@ -12,7 +12,6 @@ The package works both ways -- you can run Python code from TeX, or TeX code fro
 
 There are different sections of the documentation:
 
-
 - :mod:`pythonimmediate.simple` -- interface that "just works" for typical users of the
   ``pythonimmediate`` TeX package, to use Python coding from TeX,
   who does not know TeX inner details such as category codes.
@@ -28,6 +27,10 @@ There are different sections of the documentation:
 
 - See the documentation of :class:`pythonimmediate.engine.ChildProcessEngine` for ways to create a TeX engine from inside Python,
   and explanation of the ``engine=`` optional argument for most functions.
+
+- The command-line arguments that the Python component accepts
+  (can be specified through the ``args=`` TeX module option)
+  are documented in :mod:`pythonimmediate.pytotex`.
 
 .. toctree::
    :maxdepth: 4
