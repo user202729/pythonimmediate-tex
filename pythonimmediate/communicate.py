@@ -86,14 +86,12 @@ class UnnamedPipeCommunicator(Communicator):
 		sys.stdout.write(f"{UnnamedPipeCommunicator.character}{os.getpid()},{w}\n")
 		sys.stdout.flush()
 
-		import select
-		rlist, _, _ = select.select([r], [], [], 10)
-		os.close(w)
-
-		if not rlist:
-			raise RuntimeError("Internal error, timeout while waiting for a connection")
-
+		closed_w=False
+		# TODO if the other process never write anything, this will block forever
 		for line in os.fdopen(r, "rb"):
+			if not closed_w:
+				os.close(w)  # so that the loop will end when the other process closes the pipe
+				closed_w=True
 			sys.stdout.buffer.write(line)
 			sys.stdout.buffer.flush()
 
