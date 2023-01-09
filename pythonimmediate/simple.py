@@ -372,7 +372,7 @@ def make_nf_function(wrapped: Callable[[str, Callable, Engine], None])->NFFuncti
 	def result(x: Union[str, Callable, None]=None, f: Optional[Callable]=None, engine: Engine=  default_engine)->Callable:
 		if f is not None: return result(x, engine=engine)(f)
 		if x is None: return functools.partial(result, engine=engine)
-		if isinstance(x, str): return functools.partial(wrapped_return_identity, x, engine)
+		if isinstance(x, str): return functools.partial(wrapped_return_identity, x, engine=engine)
 		return wrapped_return_identity(x.__name__, x, engine)
 	return result  # type: ignore
 
@@ -691,5 +691,176 @@ def print_TeX(*args, **kwargs)->None:
 		raise TypeError("print_TeX() got an unexpected keyword argument 'file'")
 	if pythonimmediate.file is not None:
 		functools.partial(print, file=pythonimmediate.file)(*args, **kwargs)  # allow user to override `file` kwarg
+
+@_export
+@make_nf_function
+def newenvironment(name: str, f: Callable, engine: Engine)->None:
+	r"""
+	Define a new [TeX] normal environment.
+
+	Note that the environment will normally not have access to the body of the environment,
+	see :func:`newenvironment_verb` for some alternatives.
+
+	:param name: the name of the environment, e.g. ``"myenv"`` or ``"myenv*"``.
+	:param f: a function that should execute the code for the begin part of the environment, ``yield``, then execute the code for the end part of the environment.
+	:param engine: the engine to use.
+
+	Usage example::
+
+		@newenvironment("myenv")
+		def	myenv():
+			x=random.randint(1, 100)
+			print_TeX(f"begin {x}")
+			yield
+			print_TeX(f"end {x}")
+
+	then the following [TeX] code::
+
+		\begin{myenv}
+		\begin{myenv}
+		Hello world!
+		\end{myenv}
+		\end{myenv}
+
+	might typeset the following content::
+
+		begin 42
+		begin 24
+		Hello world!
+		end 24
+		end 42
+
+	Functions such as :func:`get_arg_str` etc. can also be used in the first part of the function
+	to take arguments.
+
+	If the name is omitted, the function name is used as the environment name.
+
+	It can be used either as a decorator or a function, see :func:`newcommand` for details.
+	"""
+	begin_identifier=get_random_identifier()
+	end_identifier=get_random_identifier()
+
+	typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
+		r"""
+		\cs_new_protected:Npn %name% {
+			%read_arg0(\__line)%
+			%read_arg1(\__begin_identifier)%
+			%read_arg2(\__end_identifier)%
+			\use:x {
+				\noexpand\newenvironment
+					{\__line}
+					{
+						\unexpanded{\immediate\write \__write_file} { i \__begin_identifier }
+						\unexpanded{\__read_do_one_command:}
+					}
+					{
+						\unexpanded{\immediate\write \__write_file} { i \__end_identifier }
+						\unexpanded{\__read_do_one_command:}
+					}
+			}
+			%optional_sync%
+			\__read_do_one_command:
+		}
+		""", recursive=False))(PTTVerbatimLine(name), PTTVerbatimLine(begin_identifier), PTTVerbatimLine(end_identifier), engine)
+
+
+	pending_objects=[]  # nonlocal mutable, create one for each environment
+
+	def begin_f():
+		a=f()
+		next(a)
+		pending_objects.append(a)
+
+	def end_f():
+		a=pending_objects.pop()
+		try:
+			next(a)
+			assert False, "Function must yield exactly once!"
+		except StopIteration:
+			pass
+
+	_code=define_TeX_call_Python(
+			lambda engine: run_code_redirect_print_TeX(begin_f, engine=engine),
+			"__unused", argtypes=[], identifier=begin_identifier)
+	_code=define_TeX_call_Python(
+			lambda engine: run_code_redirect_print_TeX(end_f, engine=engine),
+			"__unused", argtypes=[], identifier=end_identifier)
+	# ignore _code, already executed something equivalent in the TeX command
+
+@_export
+@make_nf_function
+def newenvironment_verb(name: str, f: Callable[[str], None], engine: Engine)->None:
+	r"""
+	Define a new [TeX] environment that reads its body verbatim.
+
+	The environment must not take any argument. For example the following built-in ``tabular`` environment takes some argument, so cannot be implemented with this function:
+
+	.. code-block:: latex
+
+		\begin{tabular}[t]
+			...
+		\end{tabular}
+
+	It can be used either as a decorator or a function, see :func:`newenvironment` for details.
+
+	Some usage example::
+
+		@newenvironment_verb("myenv")
+		def myenv(body: str):
+			execute(body.replace("a", "b"))
+
+	If later the following [TeX] code is executed:
+
+	.. code-block:: latex
+	
+		\begin{myenv}
+		aaa
+		\end{myenv}
+
+	then the value of the variable ``body`` will be ``"aaa\n"``, and the following content will be typeset::
+	
+		bbb
+
+	.. note::
+		For advanced users: unlike a typical environment, the code will not be executed in a new [TeX] *group*.
+	"""
+	identifier=get_random_identifier()
+
+	typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
+		r"""
+		\cs_new_protected:Npn %name% {
+			%read_arg0(\__line)%
+			%read_arg1(\__identifier)%
+			\use:x {
+				\noexpand\newenvironment
+					{\__line}
+					{
+						\immediate\write \noexpand\__write_file { i \__identifier }
+						\noexpand\__read_do_one_command:
+					}
+					{}
+			}
+			%optional_sync%
+			\__read_do_one_command:
+		}
+		""", recursive=False))(PTTVerbatimLine(name), PTTVerbatimLine(identifier), engine)
+
+	def f1():
+		body=typing.cast(Callable[[Engine], TTPBlock], Python_call_TeX_local(
+			r"""
+			\cs_new_protected:Npn %name% {
+				\saveenvreinsert \__tmp {
+					%sync%
+					\__send_block:e {\__tmp}
+					\__read_do_one_command:
+				}
+			}
+			""", recursive=False))(engine)
+		f(body)
+
+	_code=define_TeX_call_Python(
+			lambda engine: run_code_redirect_print_TeX(f1, engine=engine),
+			"__unused", argtypes=[], identifier=identifier)
+
 
 scan_Python_call_TeX_module(__name__)

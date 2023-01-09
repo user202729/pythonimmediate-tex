@@ -567,6 +567,51 @@ class Test(unittest.TestCase):
 
 				simple.undefine_char(c)
 
+	def test_new_environment(self)->None:
+		import random
+		l=[]
+		@simple.newenvironment("myenv")
+		def	myenv():
+			x=random.randint(1, 10**18)
+			l.append(f"begin {x}")
+			yield
+			l.append(f"end {x}")
+
+
+		simple.execute(r"""
+		\begin{myenv}
+		\begin{myenv}
+		\end{myenv}
+		\end{myenv}
+		""")
+
+		self.assertEqual(len(l), 4)
+		assert l[0].startswith("begin "), l
+		assert l[1].startswith("begin "), l
+		assert l[2].startswith("end "), l
+		assert l[3].startswith("end "), l
+		self.assertEqual(l[0][6:], l[3][4:])
+		self.assertEqual(l[1][6:], l[2][4:])
+
+	def test_new_verbatim_environment(self)->None:
+		a=0
+		@simple.newenvironment_verb("myenv*")
+		def myenv(s: str):
+			nonlocal a
+			a=1
+			self.assertEqual(s, "hello world\n \\#^&%$\n")
+
+		self.assertEqual(a, 0)
+		import textwrap
+		simple.execute(textwrap.dedent(r"""
+		\begin{myenv*}
+		hello world
+		 \#^&%$
+		\end{myenv*}
+		"""))
+		self.assertEqual(a, 1)
+
+
 
 suite = unittest.defaultTestLoader.loadTestsFromTestCase(Test)
 result = unittest.TextTestRunner(failfast=True).run(suite)
