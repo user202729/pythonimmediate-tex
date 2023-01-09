@@ -85,6 +85,14 @@ class UnnamedPipeCommunicator(Communicator):
 		r, w = os.pipe()
 		sys.stdout.write(f"{UnnamedPipeCommunicator.character}{os.getpid()},{w}\n")
 		sys.stdout.flush()
+
+		import select
+		rlist, _, _ = select.select([r], [], [], 10)
+		os.close(w)
+
+		if not rlist:
+			raise RuntimeError("Internal error, timeout while waiting for a connection")
+
 		for line in os.fdopen(r, "rb"):
 			sys.stdout.buffer.write(line)
 			sys.stdout.buffer.flush()
