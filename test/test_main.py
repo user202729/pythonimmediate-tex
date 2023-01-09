@@ -13,7 +13,7 @@ T=ControlSequenceToken.make
 
 
 from pathlib import Path
-for name in ["test_pythonimmediate.tex", "test_pythonimmediate_file.py"]:
+for name in ["test_pythonimmediate.tex", "helper_file.py"]:
 	a=Path("/tmp")/name
 	a.unlink(missing_ok=True)
 	a.symlink_to(Path(__file__).parent.parent/"tex"/"test"/name)

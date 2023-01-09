@@ -2437,6 +2437,7 @@ def parse_meaning_str(s: str)->Optional[Tuple[Catcode, str]]:
 
 
 from .simple import *
+from .simple import run_tokenized_line_local
 # also scan the source code and populate bootstrap_code
 
 def get_bootstrap_code()->str: return bootstrap_code

@@ -358,13 +358,13 @@ T1 = typing.TypeVar("T1", bound=Callable)
 
 class NFFunctionType(Protocol):
 	@overload
-	def __call__(self, name: str, f: T1, engine: Engine)->T1: ...
+	def __call__(self, name: str, f: T1, engine: Engine=default_engine)->T1: ...
 	@overload
-	def __call__(self, f: T1, engine: Engine)->T1: ...  # omit name, deduced from f.__name__
+	def __call__(self, f: T1, engine: Engine=default_engine)->T1: ...  # omit name, deduced from f.__name__
 	@overload
-	def __call__(self, name: str, engine: Engine)->Callable[[T1], T1]: ...  # use as decorator
+	def __call__(self, name: str, engine: Engine=default_engine)->Callable[[T1], T1]: ...  # use as decorator
 	@overload
-	def __call__(self, engine: Engine)->Callable[[T1], T1]: ...  # use as decorator and omit name
+	def __call__(self, engine: Engine=default_engine)->Callable[[T1], T1]: ...  # use as decorator and omit name
 
 def make_nf_function(wrapped: Callable[[str, Callable, Engine], None])->NFFunctionType:
 	"""
