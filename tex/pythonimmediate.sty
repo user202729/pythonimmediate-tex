@@ -22,7 +22,6 @@
 
 %\GenerateVariantsFile:n{\rescansynclastfilename}
 
-\tl_set:Nn \_pythonimmediate_textopy_script_path{}
 \str_set:Nn \_pythonimmediate_mode{multiprocessing-network}
 \str_set:Nn \_pythonimmediate_python_executable{python3}
 \keys_define:nn{pythonimmediate}{
@@ -32,7 +31,6 @@
 \ProcessKeysOptions{pythonimmediate}
 
 \str_set:NV \_pythonimmediate_mode \_pythonimmediate_mode
-\str_set:NV \_pythonimmediate_textopy_script_path \_pythonimmediate_textopy_script_path
 
 \msg_new:nnn {pythonimmediate} {shell-fail} {Please~enable~unrestricted~shell~scape!}
 \msg_new:nnn {pythonimmediate} {cannot-read-line} {Cannot~read~line!}
