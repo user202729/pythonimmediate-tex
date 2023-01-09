@@ -197,7 +197,7 @@ The Python function will only return when |\pythonimmediatecontinue| is called.
 In other words, |run_*_local(code)| is almost identical to |run_*_peek(code + "\pythonimmediatecontinue {}")|.
 """)
 
-@export_function_to_module
+#@export_function_to_module
 def run_block_finish(block: str, engine: Engine=  default_engine)->None:
 	send_finish("block\n" + surround_delimiter(block), engine=engine)
 
@@ -239,7 +239,7 @@ def read_block(engine: Engine)->str:
 			lines.append(line)
 
 
-@export_function_to_module
+#@export_function_to_module
 class NToken(ABC):
 	"""
 	Represent a possibly-notexpanded token.
@@ -311,7 +311,7 @@ class NToken(ABC):
 		return 0
 
 
-@export_function_to_module
+#@export_function_to_module
 class Token(NToken):
 	"""
 	Represent a [TeX] token, excluding the notexpanded possibility.
@@ -740,7 +740,7 @@ class ControlSequenceTokenMaker:
 		return ControlSequenceToken(object.__getattribute__(self, "prefix")+a)
 
 
-@export_function_to_module
+#@export_function_to_module
 @dataclass(repr=False, frozen=True)
 class ControlSequenceToken(Token):
 	csname: str
@@ -775,7 +775,7 @@ ControlSequenceToken.make=ControlSequenceTokenMaker("")
 T=ControlSequenceToken.make
 P=ControlSequenceTokenMaker("_pythonimmediate_")  # create private tokens
 
-@export_function_to_module
+#@export_function_to_module
 class Catcode(enum.Enum):
 	"""
 	This class contains a shorthand to allow creating a token with little Python code.
@@ -825,7 +825,7 @@ class Catcode(enum.Enum):
 
 C=Catcode
 
-@export_function_to_module
+#@export_function_to_module
 @dataclass(repr=False, frozen=True)  # must be frozen because bgroup and egroup below are reused
 class CharacterToken(Token):
 	index: int
@@ -896,7 +896,7 @@ space=Catcode.space(" ")
 
 
 
-@export_function_to_module
+#@export_function_to_module
 @dataclass(frozen=True)
 class BlueToken(NToken):
 	token: Token
@@ -954,7 +954,7 @@ if typing.TYPE_CHECKING:
 else:  # Python 3.8 compatibility
 	TokenListBaseClass = collections.UserList
 
-@export_function_to_module
+#@export_function_to_module
 class TokenList(TokenListBaseClass):
 	r"""
 	Represent a [TeX] token list, none of which can contain a blue token.
@@ -1301,7 +1301,7 @@ class TokenList(TokenListBaseClass):
 		return NTokenList(self).str(engine)
 
 
-@export_function_to_module
+#@export_function_to_module
 class BalancedTokenList(TokenList):
 	"""
 	Represents a balanced token list.
@@ -1405,7 +1405,7 @@ if typing.TYPE_CHECKING:
 else:  # Python 3.8 compatibility
 	NTokenListBaseClass = collections.UserList
 
-@export_function_to_module
+#@export_function_to_module
 class NTokenList(NTokenListBaseClass):
 	"""
 	Similar to :class:`TokenList`, but can contain blue tokens.
@@ -2307,7 +2307,7 @@ r"""
 
 
 
-@export_function_to_module
+#@export_function_to_module
 def run_tokenized_line_peek(line: str, *, check_braces: bool=True, check_newline: bool=True, check_continue: bool=True, engine: Engine=  default_engine)->str:
 	check_line(line, braces=check_braces, newline=check_newline, continue_=(True if check_continue else None))
 	return typing.cast(
@@ -2323,7 +2323,7 @@ def run_tokenized_line_peek(line: str, *, check_braces: bool=True, check_newline
 
 
 
-@export_function_to_module
+#@export_function_to_module
 def run_block_local(block: str, engine: Engine=  default_engine)->None:
 	typing.cast(Callable[[PTTBlock, Engine], None], Python_call_TeX_local(
 		r"""
@@ -2339,7 +2339,7 @@ def run_block_local(block: str, engine: Engine=  default_engine)->None:
 		"""))(PTTBlock(block), engine)
 
 
-@export_function_to_module
+#@export_function_to_module
 def continue_until_passed_back_str(engine: Engine=  default_engine)->str:
 	r"""
 	Usage:
@@ -2354,7 +2354,7 @@ def continue_until_passed_back_str(engine: Engine=  default_engine)->str:
 		\cs_new_eq:NN %name% \relax
 		"""))(engine)
 
-@export_function_to_module
+#@export_function_to_module
 def continue_until_passed_back(engine: Engine=  default_engine)->None:
 	"""
 	Same as |continue_until_passed_back_str()| but nothing can be returned from TeX to Python.
@@ -2363,7 +2363,7 @@ def continue_until_passed_back(engine: Engine=  default_engine)->None:
 	assert not result
 
 
-@export_function_to_module
+#@export_function_to_module
 def expand_once(engine: Engine=  default_engine)->None:
 	r"""
 	Expand the following content in the input stream once.
@@ -2381,7 +2381,7 @@ def expand_once(engine: Engine=  default_engine)->None:
 # ========
 
 
-@export_function_to_module
+#@export_function_to_module
 @user_documentation
 def peek_next_meaning(engine: Engine=  default_engine)->str:
 	r"""
@@ -2427,7 +2427,7 @@ def parse_meaning_str(s: str)->Optional[Tuple[Catcode, str]]:
 	return None
 
 
-from . import simple  # scan the source code and populate bootstrap_code
-
+from .simple import *
+# also scan the source code and populate bootstrap_code
 
 def get_bootstrap_code()->str: return bootstrap_code

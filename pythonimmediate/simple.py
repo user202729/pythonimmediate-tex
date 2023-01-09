@@ -6,17 +6,24 @@ Start with reading  :func:`newcommand` and :func:`execute`.
 
 import sys
 import inspect
-from typing import Optional, Union, Callable, Any, Iterator, Protocol, Iterable, Sequence, Type, Tuple, List, Dict
+from typing import Optional, Union, Callable, Any, Iterator, Protocol, Iterable, Sequence, Type, Tuple, List, Dict, TypeVar
 import typing
 import functools
 import re
 
 import pythonimmediate
-from . import export_function_to_module, scan_Python_call_TeX_module, PTTTeXLine, Python_call_TeX_local, check_line, user_documentation, Token, TTPEBlock, TTPEmbeddedLine, get_random_identifier, CharacterToken, define_TeX_call_Python, parse_meaning_str, peek_next_meaning, PTTVerbatimLine, run_block_local, run_code_redirect_print_TeX, TTPBlock, TTPLine
+from . import scan_Python_call_TeX_module, PTTTeXLine, Python_call_TeX_local, check_line, Token, TTPEBlock, TTPEmbeddedLine, get_random_identifier, CharacterToken, define_TeX_call_Python, parse_meaning_str, peek_next_meaning, PTTVerbatimLine, run_block_local, run_code_redirect_print_TeX, TTPBlock, TTPLine
 from .engine import Engine, default_engine
 
+__all__ = []
 
-@export_function_to_module
+T = TypeVar("T", bound=Callable)
+
+def _export(f: T)->T:
+	__all__.append(f.__name__)
+	return f
+
+@_export
 def run_tokenized_line_local(line: str, *, check_braces: bool=True, check_newline: bool=True, check_continue: bool=True, engine: Engine=  default_engine)->None:
 	check_line(line, braces=check_braces, newline=check_newline, continue_=(False if check_continue else None))
 	typing.cast(Callable[[PTTTeXLine, Engine], None], Python_call_TeX_local(
@@ -29,8 +36,7 @@ def run_tokenized_line_local(line: str, *, check_braces: bool=True, check_newlin
 		}
 		"""))(PTTTeXLine(line), engine)
 
-@export_function_to_module
-@user_documentation
+@_export
 def peek_next_char(engine: Engine=  default_engine)->str:
 	r"""
 	Get the character of the following token, or empty string if it's not a character.
@@ -89,7 +95,7 @@ def peek_next_char(engine: Engine=  default_engine)->str:
 		return ""
 	return r[1]
 
-@export_function_to_module
+@_export
 def get_next_char(engine: Engine=  default_engine)->str:
 	"""
 	Return the character of the following token as with :func:`peek_next_char`, but also removes it from the input stream.
@@ -98,8 +104,7 @@ def get_next_char(engine: Engine=  default_engine)->str:
 	assert isinstance(result, CharacterToken), "Next token is not a character!"
 	return result.chr
 
-@export_function_to_module
-@user_documentation
+@_export
 def put_next(arg: str, engine: Engine=  default_engine)->None:
 	r"""
 	Put some content forward in the input stream.
@@ -137,11 +142,10 @@ def put_next(arg: str, engine: Engine=  default_engine)->None:
 		}
 		""", recursive=False))(PTTTeXLine(arg), engine)
 
-def replace_double_hash(s: str)->str:
+def _replace_double_hash(s: str)->str:
 	return s.replace("##", "#")
 
-@export_function_to_module
-@user_documentation
+@_export
 def get_arg_str(engine: Engine=  default_engine)->str:
 	r"""
 	Get a mandatory argument from the input stream.
@@ -189,13 +193,13 @@ def get_arg_str(engine: Engine=  default_engine)->str:
 
 		This function corresponds to the ``m``-type argument in ``xparse`` package.
 
-		It gets the argument, detokenize it, pass it through :func:`replace_double_hash`, and return the result.
+		It gets the argument, detokenize it, pass it through :func:`_replace_double_hash`, and return the result.
 
 		This is the simple API, as such it assumes normal category code values.
 		Refer to :meth:`BalancedTokenList.get_next()` for a more advanced API.
 
 	"""
-	return replace_double_hash(typing.cast(Callable[[Engine], TTPEmbeddedLine], Python_call_TeX_local(
+	return _replace_double_hash(typing.cast(Callable[[Engine], TTPEmbeddedLine], Python_call_TeX_local(
 		r"""
 		\cs_new_protected:Npn %name% #1 {
 			\immediate\write\__write_file { \unexpanded {
@@ -205,8 +209,7 @@ def get_arg_str(engine: Engine=  default_engine)->str:
 		}
 		""", recursive=False))(engine))
 
-@export_function_to_module
-@user_documentation
+@_export
 def get_arg_estr(engine: Engine=  default_engine)->str:
 	r"""
 	Get a mandatory argument from the input stream, then process it as described in :ref:`estr-expansion`.
@@ -231,9 +234,7 @@ def get_arg_estr(engine: Engine=  default_engine)->str:
 		}
 		""", recursive=False))(engine)
 
-
-@export_function_to_module
-@user_documentation
+@_export
 def get_optional_arg_str(engine: Engine=  default_engine)->Optional[str]:
 	"""
 	Get an optional argument. See also :ref:`str-tokenization`.
@@ -260,10 +261,7 @@ def get_optional_arg_str(engine: Engine=  default_engine)->Optional[str]:
 	assert result_[0]=="1", result_
 	return result_[1:]
 
-
-
-@export_function_to_module
-@user_documentation
+@_export
 def get_optional_arg_estr(engine: Engine=  default_engine)->Optional[str]:
 	"""
 	Get an optional argument. See also :ref:`estr-expansion`.
@@ -285,9 +283,7 @@ def get_optional_arg_estr(engine: Engine=  default_engine)->Optional[str]:
 	assert result_[0]=="1", result_
 	return result_[1:]
 
-
-@export_function_to_module
-@user_documentation
+@_export
 def get_verb_arg(engine: Engine=  default_engine)->str:
 	r"""
 	Get a verbatim argument.
@@ -320,8 +316,7 @@ def get_verb_arg(engine: Engine=  default_engine)->str:
 		}
 		""", recursive=False))(engine)
 
-@export_function_to_module
-@user_documentation
+@_export
 def get_multiline_verb_arg(engine: Engine=  default_engine)->str:
 	r"""
 	Get a multi-line verbatim argument. Usage is identical to :func:`get_verb_arg`, except newline characters
@@ -342,9 +337,7 @@ def get_multiline_verb_arg(engine: Engine=  default_engine)->str:
 		}
 		""", recursive=False))(engine)
 
-
-
-def check_function_name(name: str)->None:
+def _check_function_name(name: str)->None:
 	if not re.fullmatch("[A-Za-z]+", name) or (len(name)==1 and ord(name)<=0x7f):
 		raise RuntimeError("Invalid function name: "+name)
 
@@ -374,7 +367,7 @@ def _newcommand(name: str, f: Callable, engine: Engine)->Callable:
 	# ignore _code, already executed something equivalent in the TeX command
 	return f
 
-def renewcommand_(name: str, f: Callable, engine: Engine)->Callable:
+def _renewcommand(name: str, f: Callable, engine: Engine)->Callable:
 	identifier=get_random_identifier()
 
 	typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
@@ -404,7 +397,7 @@ def renewcommand_(name: str, f: Callable, engine: Engine)->Callable:
 	# ignore _code, already executed something equivalent in the TeX command
 	return f
 
-@export_function_to_module
+@_export
 def newcommand(x: Union[str, Callable, None]=None, f: Optional[Callable]=None, engine: Engine=  default_engine)->Callable:
 	r"""
 	Define a new [TeX]-command.
@@ -490,18 +483,17 @@ def newcommand(x: Union[str, Callable, None]=None, f: Optional[Callable]=None, e
 	if isinstance(x, str): return functools.partial(_newcommand, x, engine=engine)
 	return _newcommand(x.__name__, x, engine=engine)
 
-@export_function_to_module
+@_export
 def renewcommand(x: Union[str, Callable, None]=None, f: Optional[Callable]=None, engine: Engine=  default_engine)->Callable:
 	r"""
 	Redefine a [TeX]-command. Usage is similar to :func:`newcommand`.
 	"""
 	if f is not None: return renewcommand(x, engine=engine)(f)
 	if x is None: return renewcommand  # weird design but okay (allow |@newcommand()| as well as |@newcommand|)
-	if isinstance(x, str): return functools.partial(renewcommand_, x, engine=engine)
-	return renewcommand_(x.__name__, x, engine=engine)
+	if isinstance(x, str): return functools.partial(_renewcommand, x, engine=engine)
+	return _renewcommand(x.__name__, x, engine=engine)
 
-@user_documentation
-@export_function_to_module
+@_export
 def execute(block: str, engine: Engine=default_engine)->None:
 	r"""
 	Run a block of [TeX]-code (might consist of multiple lines).
@@ -535,7 +527,7 @@ def execute(block: str, engine: Engine=default_engine)->None:
 	"""
 	run_block_local(block, engine=engine)
 
-@export_function_to_module
+@_export
 def print_TeX(*args, **kwargs)->None:
 	r"""
 	Unlike other packages, the normal ``print()`` function prints to the console.
@@ -562,5 +554,3 @@ def print_TeX(*args, **kwargs)->None:
 		functools.partial(print, file=pythonimmediate.file)(*args, **kwargs)  # allow user to override `file` kwarg
 
 scan_Python_call_TeX_module(__name__)
-
-
