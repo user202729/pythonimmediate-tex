@@ -575,7 +575,7 @@ def undefine_char(char: str, engine: Engine=  default_engine)->None:
 
 	if not engine.is_unicode and ord(char)>127:
 		# undefine u8:...
-		typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
+		typing.cast(Callable[[PTTVerbatimLine, Engine], None], Python_call_TeX_local(
 			r"""
 			\cs_new_protected:Npn %name% {
 				\begingroup
