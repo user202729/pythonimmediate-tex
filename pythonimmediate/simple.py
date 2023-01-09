@@ -6,7 +6,7 @@ Start with reading  :func:`newcommand` and :func:`execute`.
 
 import sys
 import inspect
-from typing import Optional, Union, Callable, Any, Iterator, Protocol, Iterable, Sequence, Type, Tuple, List, Dict, TypeVar
+from typing import Optional, Union, Callable, Any, Iterator, Protocol, Iterable, Sequence, Type, Tuple, List, Dict, TypeVar, overload
 import typing
 import functools
 import re
@@ -349,64 +349,36 @@ def _check_function_name(name: str)->None:
 	if not re.fullmatch("[A-Za-z]+", name) or (len(name)==1 and ord(name)<=0x7f):
 		raise RuntimeError("Invalid function name: "+name)
 
-def _newcommand(name: str, f: Callable, engine: Engine)->Callable:
-	identifier=get_random_identifier()
+T1 = typing.TypeVar("T1", bound=Callable)
 
-	typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
-		r"""
-		\cs_new_protected:Npn %name% {
-			\begingroup
-				\endlinechar=-1~
-				%read_arg0(\__line)%
-				%read_arg1(\__identifier)%
-				\cs_new_protected:cpx {\__line} {
-					\unexpanded{\immediate\write \__write_file} { i \__identifier }
-					\unexpanded{\__read_do_one_command:}
-				}
-			\endgroup
-			%optional_sync%
-			\__read_do_one_command:
-		}
-		""", recursive=False))(PTTVerbatimLine(name), PTTVerbatimLine(identifier), engine)
+class NFFunctionType(Protocol):
+	@overload
+	def __call__(self, name: str, f: T1, engine: Engine)->T1: ...
+	@overload
+	def __call__(self, f: T1, engine: Engine)->T1: ...  # omit name, deduced from f.__name__
+	@overload
+	def __call__(self, name: str, engine: Engine)->Callable[[T1], T1]: ...  # use as decorator
+	@overload
+	def __call__(self, engine: Engine)->Callable[[T1], T1]: ...  # use as decorator and omit name
 
-	_code=define_TeX_call_Python(
-			lambda engine: run_code_redirect_print_TeX(f, engine=engine),
-			name, argtypes=[], identifier=identifier)
-	# ignore _code, already executed something equivalent in the TeX command
-	return f
-
-def _renewcommand(name: str, f: Callable, engine: Engine)->Callable:
-	identifier=get_random_identifier()
-
-	typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
-		r"""
-		\cs_new_protected:Npn %name% {
-			\begingroup
-				\endlinechar=-1~
-				\readline \__read_file to \__line
-				\readline \__read_file to \__identifier
-				\exp_args:Ncx \renewcommand {\__line} {
-					\unexpanded{\immediate\write \__write_file} { i \__identifier }
-					\unexpanded{\__read_do_one_command:}
-				}
-				\exp_args:Nc \MakeRobust {\__line}  % also make the command global
-			\endgroup
-			%optional_sync%
-			\__read_do_one_command:
-		}
-		""", recursive=False))(PTTVerbatimLine(name), PTTVerbatimLine(identifier), engine)
-	# TODO remove the redundant entry from TeX_handlers (although technically is not very necessary, just cause slight memory leak)
-	#try: del TeX_handlers["u"+name]
-	#except KeyError: pass
-
-	_code=define_TeX_call_Python(
-			lambda engine: run_code_redirect_print_TeX(f, engine=engine),
-			name, argtypes=[], identifier=identifier)
-	# ignore _code, already executed something equivalent in the TeX command
-	return f
+def make_nf_function(wrapped: Callable[[str, Callable, Engine], None])->NFFunctionType:
+	"""
+	Internal helper decorator.
+	"""
+	def wrapped_return_identity(name: str, f: Callable, engine: Engine)->Callable:
+		wrapped(name, f, engine)
+		return f
+	@functools.wraps(wrapped, assigned=("__name__", "__doc__"), updated=())  # the annotation is changed, exclude that from `assigned`
+	def result(x: Union[str, Callable, None]=None, f: Optional[Callable]=None, engine: Engine=  default_engine)->Callable:
+		if f is not None: return result(x, engine=engine)(f)
+		if x is None: return functools.partial(result, engine=engine)
+		if isinstance(x, str): return functools.partial(wrapped_return_identity, x, engine)
+		return wrapped_return_identity(x.__name__, x, engine)
+	return result  # type: ignore
 
 @_export
-def newcommand(x: Union[str, Callable, None]=None, f: Optional[Callable]=None, engine: Engine=  default_engine)->Callable:
+@make_nf_function
+def newcommand(name: str, f: Callable, engine: Engine)->None:
 	r"""
 	Define a new [TeX]-command.
 
@@ -486,22 +458,64 @@ def newcommand(x: Union[str, Callable, None]=None, f: Optional[Callable]=None, e
 		if these cases happen.
 
 	"""
-	if f is not None: return newcommand(x, engine=engine)(f)
-	if x is None: return functools.partial(newcommand, engine=engine)
-	if isinstance(x, str): return functools.partial(_newcommand, x, engine=engine)
-	return _newcommand(x.__name__, x, engine=engine)
+	identifier=get_random_identifier()
+
+	typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
+		r"""
+		\cs_new_protected:Npn %name% {
+			\begingroup
+				\endlinechar=-1~
+				%read_arg0(\__line)%
+				%read_arg1(\__identifier)%
+				\cs_new_protected:cpx {\__line} {
+					\unexpanded{\immediate\write \__write_file} { i \__identifier }
+					\unexpanded{\__read_do_one_command:}
+				}
+			\endgroup
+			%optional_sync%
+			\__read_do_one_command:
+		}
+		""", recursive=False))(PTTVerbatimLine(name), PTTVerbatimLine(identifier), engine)
+
+	_code=define_TeX_call_Python(
+			lambda engine: run_code_redirect_print_TeX(f, engine=engine),
+			name, argtypes=[], identifier=identifier)
+	# ignore _code, already executed something equivalent in the TeX command
 
 @_export
-def renewcommand(x: Union[str, Callable, None]=None, f: Optional[Callable]=None, engine: Engine=  default_engine)->Callable:
+@make_nf_function
+def renewcommand(name: str, f: Callable, engine: Engine)->None:
 	r"""
 	Redefine a [TeX]-command. Usage is similar to :func:`newcommand`.
 	"""
-	if f is not None: return renewcommand(x, engine=engine)(f)
-	if x is None: return renewcommand  # weird design but okay (allow |@newcommand()| as well as |@newcommand|)
-	if isinstance(x, str): return functools.partial(_renewcommand, x, engine=engine)
-	return _renewcommand(x.__name__, x, engine=engine)
+	identifier=get_random_identifier()
 
-T1 = typing.TypeVar("T1", bound=Callable)
+	typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
+		r"""
+		\cs_new_protected:Npn %name% {
+			\begingroup
+				\endlinechar=-1~
+				\readline \__read_file to \__line
+				\readline \__read_file to \__identifier
+				\exp_args:Ncx \renewcommand {\__line} {
+					\unexpanded{\immediate\write \__write_file} { i \__identifier }
+					\unexpanded{\__read_do_one_command:}
+				}
+				\exp_args:Nc \MakeRobust {\__line}  % also make the command global
+			\endgroup
+			%optional_sync%
+			\__read_do_one_command:
+		}
+		""", recursive=False))(PTTVerbatimLine(name), PTTVerbatimLine(identifier), engine)
+	# TODO remove the redundant entry from TeX_handlers (although technically is not very necessary, just cause slight memory leak)
+	#try: del TeX_handlers["u"+name]
+	#except KeyError: pass
+
+	_code=define_TeX_call_Python(
+			lambda engine: run_code_redirect_print_TeX(f, engine=engine),
+			name, argtypes=[], identifier=identifier)
+	# ignore _code, already executed something equivalent in the TeX command
+
 
 @_export
 def define_char(char: str, engine: Engine=  default_engine)->Callable[[T1], T1]:
