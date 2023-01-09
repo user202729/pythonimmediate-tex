@@ -359,10 +359,10 @@ class Token(NToken):
 
 	def assign_future(self, engine: Engine=  default_engine)->None:
 		r"""
-		Assign the meaning of this token to be equivalent to that of the second token in the input stream.
+		Assign the meaning of this token to be equivalent to that of the following token in the input stream.
 
 		For example if this token is ``\a``, and the input stream starts with ``bcde``, then ``\a``'s meaning
-		will be assigned to that of the explicit character ``c``.
+		will be assigned to that of the explicit character ``b``.
 
 		.. note::
 			Tokenizes one more token in the input stream, and remove its blue status if any.
@@ -374,10 +374,15 @@ class Token(NToken):
 				%read_arg0(\__data)%
 				\expandafter \futurelet \__data \pythonimmediatecontinuenoarg
 			}
-			""" , sync=True))(PTTBalancedTokenList(BalancedTokenList([self.no_blue])), engine)
+			""" , sync=True))(PTTBalancedTokenList(BalancedTokenList([self])), engine)
 
 	def assign_futurenext(self, engine: Engine=  default_engine)->None:
-		"""
+		r"""
+		Assign the meaning of this token to be equivalent to that of the second-next token in the input stream.
+
+		For example if this token is ``\a``, and the input stream starts with ``bcde``, then ``\a``'s meaning
+		will be assigned to that of the explicit character ``c``.
+
 		.. note::
 			Tokenizes two more tokens in the input stream, and remove their blue status if any.
 		"""
@@ -388,7 +393,7 @@ class Token(NToken):
 				%read_arg0(\__data)%
 				\afterassignment \pythonimmediatecontinuenoarg \expandafter \futurelet \__data 
 			}
-			""" , sync=True))(PTTBalancedTokenList(BalancedTokenList([self.no_blue])), engine)
+			""" , sync=True))(PTTBalancedTokenList(BalancedTokenList([self])), engine)
 
 	def assign_value(self, content: "BalancedTokenList")->None:
 		"""
@@ -893,6 +898,9 @@ space=Catcode.space(" ")
 #@export_function_to_module
 @dataclass(frozen=True)
 class BlueToken(NToken):
+	"""
+	Represents a blue token (see documentation of :class:`NToken`).
+	"""
 	token: Token
 
 	@property
@@ -1010,7 +1018,7 @@ class TokenList(TokenListBaseClass):
 
 	def is_balanced(self)->bool:
 		"""
-		check if this is balanced.
+		See :meth:`NTokenList.is_balanced`.
 		"""
 		degree=0
 		for x in self:
@@ -1428,6 +1436,9 @@ class NTokenList(NTokenListBaseClass):
 		super().__init__(NTokenList.force_token_list(a))
 
 	def is_balanced(self)->bool:
+		"""
+		Check if this is balanced.
+		"""
 		return TokenList(self).is_balanced()  # a bit inefficient (need to construct a TokenList) but good enough
 
 	def simple_parts(self)->List[Union[BalancedTokenList, Token, BlueToken]]:
@@ -1516,6 +1527,10 @@ class NTokenList(NTokenListBaseClass):
 
 
 class TeXToPyData(ABC):
+	"""
+	Internal class (for now). Represent a data type that can be sent from [TeX] to Python.
+	"""
+
 	@staticmethod
 	@abstractmethod
 	def read(engine: Engine)->"TeXToPyData":

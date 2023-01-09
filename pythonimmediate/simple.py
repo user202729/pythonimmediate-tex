@@ -116,7 +116,7 @@ def put_next(arg: str, engine: Engine=  default_engine)->None:
 
 		If there might be verbatim-like arguments, the problem is (almost) unsolvable.
 		Refer to :func:`print_TeX` or :func:`execute` for workarounds,
-		or use the advanced interface.
+		or use the advanced interface such as :meth:`pythonimmediate.BalancedTokenList.put_next`.
 
 	For example, if the following content in the input stream are ``{abc}{def}``::
 
@@ -128,7 +128,7 @@ def put_next(arg: str, engine: Engine=  default_engine)->None:
 	After the above code, the content in the input stream is "mostly unchanged".
 
 	.. note::
-		The argument is tokenized in the current category regime,
+		For advanced users: the argument is tokenized in the current category regime.
 	"""
 	typing.cast(Callable[[PTTTeXLine, Engine], None], Python_call_TeX_local(
 		r"""
