@@ -22,8 +22,8 @@ There are different sections of the documentation:
 
 - The rest: contain functions to control the precise category codes of the tokens.
 
-  Read :func:`~pythonimmediate.textopy.expand_once`
-  and :class:`~pythonimmediate.textopy.NTokenList` for some examples.
+  Read :func:`~pythonimmediate.expand_once`
+  and :class:`~pythonimmediate.NTokenList` for some examples.
 
 - See the documentation of :class:`pythonimmediate.engine.ChildProcessEngine` for ways to create a TeX engine from inside Python,
   and explanation of the ``engine=`` optional argument for most functions.
