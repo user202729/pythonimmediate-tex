@@ -5,7 +5,6 @@ from typing import List
 import pytest
 
 import pythonimmediate
-import pythonimmediate.textopy
 from pythonimmediate.engine import ChildProcessEngine, default_engine, engine_names, engine_name_to_latex_executable, EngineName
 from pythonimmediate import TokenList, ControlSequenceToken, BalancedTokenList
 from pythonimmediate import Catcode as C
@@ -67,10 +66,10 @@ class Test:
 		("a b  ", "a b"),
 		])
 	def test_mangle(self, original: str, mangled: str)->None:
-		assert pythonimmediate.textopy.can_be_mangled_to(original+"\n", mangled+"\n")
+		assert pythonimmediate.can_be_mangled_to(original+"\n", mangled+"\n")
 
 	@pytest.mark.parametrize("original, mangled", [
 		("a", "b")
 		])
 	def test_mangle_incorrect(self, original: str, mangled: str)->None:
-		assert not pythonimmediate.textopy.can_be_mangled_to(original+"\n", mangled+"\n")
+		assert not pythonimmediate.can_be_mangled_to(original+"\n", mangled+"\n")

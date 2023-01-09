@@ -86,9 +86,9 @@
 	% tried this method, it seems to work except that it's buffered when stderr is redirected to a file...
 	\immediate\openout \_pythonimmediate_write_file=|"\_pythonimmediate_python_executable \space -m ~ pythonimmediate.copy_to_stderr"~
 } {
-	\immediate\openout \_pythonimmediate_write_file=|"\_pythonimmediate_python_executable \space -m ~ pythonimmediate.main"~
+	\immediate\openout \_pythonimmediate_write_file=|"\_pythonimmediate_python_executable \space -m ~ pythonimmediate.textopy"~
 	% note that openout, even to shell, will append .tex if there's no dot in the command
-	% so we artificially add a dot here in `.main`
+	% so we artificially add a dot here in `.textopy`
 
 	% both processes must be before the \readline below so that the 2 Python processes are started "in parallel"
 	\_pythonimmediate_str_get:N \_pythonimmediate_line  % read one line from pytotex half, forward to textopy half

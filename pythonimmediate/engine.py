@@ -249,7 +249,6 @@ For Python running inside a TeX process, useful attributes are :attr:`~Engine.na
 
 
 
-from . import textopy
 
 
 @dataclass
@@ -302,9 +301,9 @@ class ChildProcessEngine(Engine):
 				cwd=tempfile.gettempdir(),
 				)
 
-		from .textopy import surround_delimiter, send_raw, substitute_private
+		from . import surround_delimiter, send_raw, substitute_private, get_bootstrap_code
 		send_raw(surround_delimiter(substitute_private(
-			textopy.bootstrap_code + 
+			get_bootstrap_code() + 
 			r"""
 			\cs_new_eq:NN \pythonimmediatechildprocessmainloop \__read_do_one_command:
 			"""
@@ -337,7 +336,8 @@ class ChildProcessEngine(Engine):
 		this might be called from __del__ so do not import anything here.
 		"""
 		process=self.get_process()
-		textopy.run_none_finish(self)
+		from . import run_none_finish
+		run_none_finish(self)
 		process.wait()
 		assert process.stdin is not None
 		assert process.stderr is not None

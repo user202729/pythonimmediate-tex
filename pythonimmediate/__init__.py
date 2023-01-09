@@ -2441,24 +2441,7 @@ def parse_meaning_str(s: str)->Optional[Tuple[Catcode, str]]:
 	return None
 
 
-# ========
-
-def parent_process_main():
-	try:
-		engine=ParentProcessEngine()
-		default_engine.set_engine(engine)
-		send_bootstrap_code(engine=engine)
-		run_main_loop(engine=engine)  # if this returns cleanly TeX has no error. Otherwise some readline() will reach eof and print out a stack trace
-		assert not engine._read(), "Internal error: TeX sends extra line"
-
-	except:
-		# see also documentation of run_error_finish.
-		sys.stderr.write("\n")
-		traceback.print_exc(file=sys.stderr)
-
-		engine.action_done=False  # force run it
-		run_error_finish(PTTBlock("".join(traceback.format_exc())), engine)
-
-		os._exit(0)
-
 from . import simple  # scan the source code and populate bootstrap_code
+
+
+def get_bootstrap_code()->str: return bootstrap_code

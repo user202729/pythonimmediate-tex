@@ -12,7 +12,7 @@ import functools
 import re
 
 import pythonimmediate
-from .textopy import export_function_to_module, scan_Python_call_TeX_module, PTTTeXLine, Python_call_TeX_local, check_line, user_documentation, Token, TTPEBlock, TTPEmbeddedLine, get_random_identifier, CharacterToken, define_TeX_call_Python, parse_meaning_str, peek_next_meaning, PTTVerbatimLine, run_block_local, run_code_redirect_print_TeX, TTPBlock, TTPLine
+from . import export_function_to_module, scan_Python_call_TeX_module, PTTTeXLine, Python_call_TeX_local, check_line, user_documentation, Token, TTPEBlock, TTPEmbeddedLine, get_random_identifier, CharacterToken, define_TeX_call_Python, parse_meaning_str, peek_next_meaning, PTTVerbatimLine, run_block_local, run_code_redirect_print_TeX, TTPBlock, TTPLine
 from .engine import Engine, default_engine
 
 
