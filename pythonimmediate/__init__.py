@@ -742,6 +742,15 @@ class ControlSequenceTokenMaker:
 #@export_function_to_module
 @dataclass(repr=False, frozen=True)
 class ControlSequenceToken(Token):
+	r"""
+	Represents a control sequence.
+
+	Note that currently, on non-Unicode engines, the ``csname`` field is represented in a particular way: each
+	character represents a byte in the TokenList, and thus it has character code no more than 255.
+
+	So for example, the control sequence obtained by expanding ``\csname ℝ\endcsname`` once
+	has ``.csname`` field equal to ``"\xe2\x84\x9d"`` (which has ``len=3``).
+	"""
 	csname: str
 
 	make=typing.cast(ControlSequenceTokenMaker, None)  # some interference makes this incorrect. Manually assign below
@@ -2437,7 +2446,6 @@ def parse_meaning_str(s: str)->Optional[Tuple[Catcode, str]]:
 
 
 from .simple import *
-from .simple import run_tokenized_line_local
 # also scan the source code and populate bootstrap_code
 
 def get_bootstrap_code()->str: return bootstrap_code

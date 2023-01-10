@@ -51,6 +51,27 @@ class Test(unittest.TestCase):
 		t=BalancedTokenList.get_next()
 		assert t.str(engine=default_engine)==s
 
+	def test_csname_unicode(self)->None:
+		s='Æ²×⁴ℝ𝕏'
+		pythonimmediate.execute(r'\edef\testb{\expandafter \noexpand \csname \detokenize{' + s + r'}\endcsname}')
+		
+		def byte_to_char_hack(s: str)->str:
+			return "".join(chr(c) for c in s.encode('u8'))
+
+		if default_engine.is_unicode:
+			self.assertEqual(BalancedTokenList([T.testb]).expand_o(), BalancedTokenList([ControlSequenceToken(s)]))
+		else:
+			self.assertEqual(BalancedTokenList([T.testb]).expand_o(), BalancedTokenList([ControlSequenceToken(byte_to_char_hack(s))]))
+
+		if default_engine.is_unicode:
+			pythonimmediate.execute(r'\edef\testb{\expandafter \noexpand \csname \detokenize{' + f"^^^^{ord('ℝ'):04x}" + r'}\endcsname}')
+			self.assertEqual(BalancedTokenList([T.testb]).expand_o(), BalancedTokenList([ControlSequenceToken("ℝ")]))
+		else:
+			pythonimmediate.execute(r'\edef\testb{\expandafter \noexpand \csname \detokenize{' + 
+						   "".join(f"^^{a:02x}" for a in 'ℝ'.encode('u8')) +
+						   r'}\endcsname}')
+			self.assertEqual(BalancedTokenList([T.testb]).expand_o(), BalancedTokenList([ControlSequenceToken(byte_to_char_hack("ℝ"))]))
+
 	def test_hash(self):
 		for put, get in [
 				("#", None),
