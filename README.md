@@ -30,7 +30,8 @@ Things to do:
 * Expandable functions for Lua
 * `pysub` environments, `evalz()` in Python, etc.
 * preprocess `pycode` to allow using inside command argument (with a few caveats, but still good)
-
+* restore `select.select` for unnamed pipe or `threading` to cancel the pipe on timeout
+* refactor serialization to allow passing more data in a structured way
 
 
 `tex/` folder contains TeX-related files. The source code of the package is in `tex/pythonimmediate.sty`.
