@@ -19,6 +19,20 @@ so you don't need to write a single line of TeX code.
 
 ### Internal note
 
+Things to do:
+
+* Make `newenvironment_verb` not strip spaces at the end of the line
+* Define an environment that gobbles the body in `str`-type tokenization
+* Get arguments delimited
+* Get pair-delimited argument (`d`-type and `D`-type argument in xparse)
+* Function to write to log file (why?)
+* Function to parse log file for things such as `\showoutput` (very hacky...)
+* Expandable functions for Lua
+* `pysub` environments, `evalz()` in Python, etc.
+* preprocess `pycode` to allow using inside command argument (with a few caveats, but still good)
+
+
+
 `tex/` folder contains TeX-related files. The source code of the package is in `tex/pythonimmediate.sty`.
 
 To create the documentation:

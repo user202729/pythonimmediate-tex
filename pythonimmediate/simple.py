@@ -798,6 +798,8 @@ def newenvironment_verb(name: str, f: Callable[[str], None], engine: Engine)->No
 	r"""
 	Define a new [TeX] environment that reads its body verbatim.
 
+	Note that space characters at the end of each line are removed.
+
 	The environment must not take any argument. For example the following built-in ``tabular`` environment takes some argument, so cannot be implemented with this function:
 
 	.. code-block:: latex
