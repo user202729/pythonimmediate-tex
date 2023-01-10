@@ -254,7 +254,7 @@ For Python running inside a TeX process, useful attributes are :attr:`~Engine.na
 @dataclass
 class ChildProcessEngine(Engine):
 	r"""
-	An object that represents an engine that runs as a subprocess of this process.
+	An object that represents a [TeX] engine that runs as a subprocess of this process.
 
 	Can be used as a context manager to automatically close the subprocess when the context is exited.
 

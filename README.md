@@ -1,19 +1,27 @@
 # pythonimmediate-tex
 
-Python helper library for the `pythonimmediate` TeX package. Description of the TeX package follows.
+A library to facilitate bidirectional communication between Python and TeX,
+with support of manipulating TeX tokens as Python objects.
+
+The TeX package is available on CTAN: https://ctan.org/pkg/pythonimmediate
+
+The Python package is available on PyPI: https://pypi.org/project/pythonimmediate-tex/
+with documentation on Read the Docs: https://pythonimmediate.readthedocs.io
 
 ------
 
-Just like PerlTeX or PyLuaTeX (and unlike PythonTeX or lt3luabridge),
-this only requires a single run, and variables are persistent throughout the run.
+Description of the TeX package follows.
 
-Unlike PerlTeX or PyLuaTeX, there's no restriction on compiler or script required to run the code.
-
-There's also debugging functionalities -- TeX errors results in Python traceback, and Python error results in TeX traceback.
-Errors in code executed with the `pycode` environment gives the correct traceback point to the Python line of code in the TeX file.
-
-For advanced users, this package allows the user to manipulate the TeX state directly from within Python,
-so you don't need to write a single line of TeX code.
+> Just like PerlTeX or PyLuaTeX (and unlike PythonTeX or lt3luabridge),
+> this only requires a single run, and variables are persistent throughout the run.
+> 
+> Unlike PerlTeX or PyLuaTeX, there's no restriction on compiler or script required to run the code.
+> 
+> There's also debugging functionalities -- TeX errors results in Python traceback, and Python error results in TeX traceback.
+> Errors in code executed with the `pycode` environment gives the correct traceback point to the Python line of code in the TeX file.
+> 
+> For advanced users, this package allows the user to manipulate the TeX state directly from within Python,
+> so you don't need to write a single line of TeX code.
 
 ------
 
