@@ -20,7 +20,8 @@ import pythonimmediate
 from . import scan_Python_call_TeX_module, PTTTeXLine, PTTVerbatimLine, PTTTeXLine, Python_call_TeX_local, check_line, Token, TTPEBlock, TTPEmbeddedLine, get_random_identifier, CharacterToken, define_TeX_call_Python, parse_meaning_str, peek_next_meaning, run_block_local, run_code_redirect_print_TeX, TTPBlock, TTPLine, BalancedTokenList, ControlSequenceToken
 from .engine import Engine, default_engine
 
-__all__ = []
+if not typing.TYPE_CHECKING:
+	__all__ = []
 
 T = TypeVar("T", bound=Callable)
 
