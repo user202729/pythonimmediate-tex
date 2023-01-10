@@ -258,14 +258,20 @@ class ChildProcessEngine(Engine):
 
 	Can be used as a context manager to automatically close the subprocess when the context is exited.
 
-	Example::
+	For example, the following Python code, if run alone, will spawn a [TeX] process and use it to write "Hello world" to a file named ``a.txt`` in the temporary directory::
 
-		with ChildProcessEngine(...) as engine:
+		from pythonimmediate.engine import ChildProcessEngine
+		from pythonimmediate import execute
+
+		with ChildProcessEngine("pdftex") as engine:
 			# do something with the engine, for example:
-			execute(r"\begin{document}", engine=engine)
-			execute("hello world", engine=engine)
+			execute(r'''
+			\immediate\openout9=a.txt
+			\immediate\write9{Hello world}
+			\immediate\closeout9
+			''', engine=engine)
 
-		# the subprocess is closed here
+		# now the engine is closed.
 
 	Note that explicit ``engine`` argument must be passed in most functions.
 
