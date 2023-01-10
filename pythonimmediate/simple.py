@@ -23,10 +23,8 @@ from .engine import Engine, default_engine
 if not typing.TYPE_CHECKING:
 	__all__ = []
 
-T = TypeVar("T", bound=Callable)
-
-def _export(f: T)->T:
-	__all__.append(f.__name__)
+def _export(f: T2)->T2:
+	__all__.append(f.__name__)  # type: ignore
 	return f
 
 @_export
@@ -355,17 +353,17 @@ def _check_function_name(name: str)->None:
 	if not re.fullmatch("[A-Za-z]+", name) or (len(name)==1 and ord(name)<=0x7f):
 		raise RuntimeError("Invalid function name: "+name)
 
-T1 = typing.TypeVar("T1", bound=Callable)
+T2 = typing.TypeVar("T2", bound=Callable)
 
 class NFFunctionType(Protocol):
 	@overload
-	def __call__(self, name: str, f: T1, engine: Engine=default_engine)->T1: ...
+	def __call__(self, name: str, f: T2, engine: Engine=default_engine)->T2: ...
 	@overload
-	def __call__(self, f: T1, engine: Engine=default_engine)->T1: ...  # omit name, deduced from f.__name__
+	def __call__(self, f: T2, engine: Engine=default_engine)->T2: ...  # omit name, deduced from f.__name__
 	@overload
-	def __call__(self, name: str, engine: Engine=default_engine)->Callable[[T1], T1]: ...  # use as decorator
+	def __call__(self, name: str, engine: Engine=default_engine)->Callable[[T2], T2]: ...  # use as decorator
 	@overload
-	def __call__(self, engine: Engine=default_engine)->Callable[[T1], T1]: ...  # use as decorator and omit name
+	def __call__(self, engine: Engine=default_engine)->Callable[[T2], T2]: ...  # use as decorator and omit name
 
 def make_nf_function(wrapped: Callable[[str, Callable, Engine], None])->NFFunctionType:
 	"""
@@ -524,7 +522,7 @@ def renewcommand(name: str, f: Callable, engine: Engine)->None:
 
 
 @_export
-def define_char(char: str, engine: Engine=  default_engine)->Callable[[T1], T1]:
+def define_char(char: str, engine: Engine=  default_engine)->Callable[[T2], T2]:
 	r"""
 	Define a character to do some specific action.
 
@@ -543,7 +541,7 @@ def define_char(char: str, engine: Engine=  default_engine)->Callable[[T1], T1]:
 
 		:func:`undefine_char` can be used to undo the effect.
 	"""
-	def result(f: T1)->T1:
+	def result(f: T2)->T2:
 		assert len(char)==1
 		identifier=get_random_identifier()
 		_code=define_TeX_call_Python(
@@ -919,6 +917,7 @@ Can be used like this::
 
 Notes in :ref:`str-tokenization` apply -- in other words, after you set a value it may become slightly different when read back.
 """
-__all__.append("var")
+if not typing.TYPE_CHECKING:
+	__all__.append("var")
 
 scan_Python_call_TeX_module(__name__)

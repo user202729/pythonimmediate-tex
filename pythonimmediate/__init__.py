@@ -277,7 +277,14 @@ class NToken(ABC):
 		"""
 		...
 
-	def meaning_equal(self, other: "Token", engine: Engine=  default_engine)->bool:
+	@abstractmethod
+	def put_next(self, engine: Engine=default_engine):
+		"""
+		Put this token forward in the input stream.
+		"""
+		...
+
+	def meaning_equal(self, other: "NToken", engine: Engine=  default_engine)->bool:
 		"""
 		Whether this token is the same in meaning as the token specified in the parameter *other*.
 
@@ -481,9 +488,6 @@ class Token(NToken):
 		return t
 
 	def put_next(self, engine: Engine=  default_engine)->None:
-		"""
-		Put this token forward in the input stream.
-		"""
 		d=self.degree()
 		if d==0:
 			BalancedTokenList([self]).put_next(engine=engine)

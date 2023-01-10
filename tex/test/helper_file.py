@@ -1,5 +1,6 @@
 import unittest
 import pythonimmediate
+from typing import Any
 from pythonimmediate import Token, TokenList, BalancedTokenList, Catcode, ControlSequenceToken, frozen_relax_token, BlueToken, NTokenList
 from pythonimmediate import Catcode as C
 from pythonimmediate import default_engine, simple
@@ -19,18 +20,18 @@ class Test(unittest.TestCase):
 		self.assertEqual(x, "123")
 		self.assertEqual(y, "456")
 
-	def test_renewcommand_non_Python_defined(self):
+	def test_renewcommand_non_Python_defined(self)->None:
 		pythonimmediate.run_tokenized_line_local(r'\def \testb {}')
 
 		@pythonimmediate.renewcommand
-		def testb(): pass
+		def testb()->None: pass
 
-	def test_newcommand(self):
+	def test_newcommand(self)->None:
 		global x
 		x=1
 
 		@pythonimmediate.newcommand
-		def testa():
+		def testa()->None:
 			global x
 			x=2
 
@@ -38,7 +39,7 @@ class Test(unittest.TestCase):
 		pythonimmediate.run_tokenized_line_local(r'\testa')
 		self.assertEqual(x, 2)
 
-	def test_unicode_str(self):
+	def test_unicode_str(self)->None:
 		s='Æ²×⁴ℝ𝕏'
 		pythonimmediate.put_next('{' + s + '}')
 		self.assertEqual(pythonimmediate.get_arg_str(), s)
@@ -72,7 +73,7 @@ class Test(unittest.TestCase):
 						   r'}\endcsname}')
 			self.assertEqual(BalancedTokenList([T.testb]).expand_o(), BalancedTokenList([ControlSequenceToken(byte_to_char_hack("ℝ"))]))
 
-	def test_hash(self):
+	def test_hash(self)->None:
 		for put, get in [
 				("#", None),
 				("#1#2#3##", None),
@@ -84,9 +85,9 @@ class Test(unittest.TestCase):
 			self.assertEqual(pythonimmediate.get_arg_str(), (put if get is None else get))
 
 
-	def test_newcommand_with_name(self):
+	def test_newcommand_with_name(self)->None:
 		@pythonimmediate.newcommand("testd")
-		def testa():
+		def testa()->None:
 			global x
 			x=3
 
@@ -94,14 +95,14 @@ class Test(unittest.TestCase):
 		pythonimmediate.run_tokenized_line_local(r'\testd')
 		self.assertEqual(x, 3)
 
-		@pythonimmediate.renewcommand
-		def testa():
+		@pythonimmediate.renewcommand  # type: ignore
+		def testa()->None:
 			global x, y
 			x=pythonimmediate.get_arg_str()
 			y=pythonimmediate.get_arg_str()
 
 		@pythonimmediate.newcommand
-		def testc():
+		def testc()->str:
 			self.assertEqual(pythonimmediate.get_arg_str(), "ab")
 			self.assertEqual(pythonimmediate.get_optional_arg_str(), "cd")
 			self.assertEqual(pythonimmediate.get_optional_arg_str(), None)
@@ -109,7 +110,7 @@ class Test(unittest.TestCase):
 			self.assertEqual(pythonimmediate.get_optional_arg_str(), None)
 			self.assertEqual(pythonimmediate.get_verb_arg(), "gh")
 			self.assertEqual(pythonimmediate.get_multiline_verb_arg(), "ijk\nlm")
-			printT("123", end="")
+			pythonimmediate.print_TeX("123", end="")
 			return "456"
 
 		pythonimmediate.run_tokenized_line_local("789%")
@@ -120,12 +121,12 @@ class Test(unittest.TestCase):
 		pythonimmediate.run_tokenized_line_local("789%")
 
 
-	def test_tokens(self):
+	def test_tokens(self)->None:
 		global x
 		x=0
 
 		@pythonimmediate.renewcommand
-		def testd():
+		def testd()->None:
 			global x
 			x=1
 
@@ -161,7 +162,7 @@ class Test(unittest.TestCase):
 		''')
 		self.assertEqual(x, 1)
 
-	def test_tokens2(self):
+	def test_tokens2(self)->None:
 		for t in [
 				frozen_relax_token,
 				ControlSequenceToken(">>"),
@@ -182,7 +183,7 @@ class Test(unittest.TestCase):
 				self.assertEqual(Token.peek_next(), t)
 				self.assertEqual(Token.get_next(), t)
 
-	def test_tokens_control_chars(self):
+	def test_tokens_control_chars(self)->None:
 		for s in [
 				chr(i)
 				for i in range(0, 700)
@@ -211,7 +212,7 @@ class Test(unittest.TestCase):
 							t.put_next()
 
 
-	def test_put_get_next(self):
+	def test_put_get_next(self)->None:
 		pythonimmediate.put_next("a")
 		self.assertEqual(pythonimmediate.peek_next_char(), "a")
 
@@ -231,13 +232,13 @@ class Test(unittest.TestCase):
 		pythonimmediate.put_next(r"\bgroup\egroup")
 		self.assertEqual(pythonimmediate.peek_next_char(), "{")
 
-	def test_balanced(self):
+	def test_balanced(self)->None:
 		a=TokenList.doc(r'}{')
 		self.assertFalse(a.is_balanced())
 		with self.assertRaises(ValueError):
 			a.check_balanced()
 
-	def test_get_next_tokenlist(self):
+	def test_get_next_tokenlist(self)->None:
 		t=BalancedTokenList.doc(r'{}abc:  d?&#^_\test+\test a\##') + [frozen_relax_token]
 		u=BalancedTokenList([t])
 		self.assertEqual(len(u), len(t)+2)
@@ -245,7 +246,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(BalancedTokenList.get_next(), t)
 
 
-	def test_from_str(self):
+	def test_from_str(self)->None:
 		self.assertEqual(TokenList.doc(r'}{abc:  d?&#^_\test+\test a\##'),
 			  TokenList([
 				  C.egroup("}"),
@@ -287,7 +288,7 @@ class Test(unittest.TestCase):
 				  C.letter("a"),
 				  ]))
 
-	def test_balanced_parts(self):
+	def test_balanced_parts(self)->None:
 		for s in [
 				r"",
 				r"}{",
@@ -308,7 +309,7 @@ class Test(unittest.TestCase):
 			for x in t:
 				self.assertEqual(Token.get_next(), x)
 
-	def test_expand(self):
+	def test_expand(self)->None:
 		BalancedTokenList.doc(r'\def\testexpand{\testexpanda}\def\testexpanda{123}').execute()
 		self.assertEqual(BalancedTokenList.doc(r'\testexpand').expand_o(), BalancedTokenList.doc(r'\testexpanda'))
 		self.assertEqual(BalancedTokenList.doc(r'\testexpand').expand_x(), BalancedTokenList.doc(r'123'))
@@ -318,7 +319,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(BalancedTokenList([frozen_relax_token]).expand_x(), BalancedTokenList([frozen_relax_token]))
 		self.assertEqual(TokenList.doc(r'\string}\string{\number`{').expand_x().str(), "}{123")
 
-	def test_get_arg_estr(self):
+	def test_get_arg_estr(self)->None:
 		BalancedTokenList.doc(r'{123}').put_next()
 		self.assertEqual(pythonimmediate.get_arg_estr(), "123")
 
@@ -329,7 +330,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(pythonimmediate.get_arg_estr(), r"a \{}$&#^_%~~b")
 
 		
-	def test_get_optional_arg_estr(self):
+	def test_get_optional_arg_estr(self)->None:
 		BalancedTokenList.doc(r'[123]').put_next()
 		self.assertEqual(pythonimmediate.get_optional_arg_estr(), "123")
 
@@ -358,17 +359,17 @@ class Test(unittest.TestCase):
 		self.assertEqual(pythonimmediate.get_optional_arg_estr(), None)
 		self.assertEqual(pythonimmediate.get_arg_str(), "ab")
 
-	def test_control_sequence_token_maker(self):
+	def test_control_sequence_token_maker(self)->None:
 		self.assertEqual(ControlSequenceToken("ab_c"), ControlSequenceToken.make.ab_c)
 		self.assertEqual(ControlSequenceToken("ab_c"), ControlSequenceToken.make["ab_c"])
 
-	def test_expand_once(self):
+	def test_expand_once(self)->None:
 		BalancedTokenList.doc(r'\def\aaa{\bbb}').execute()
 		T.aaa.put_next()
 		pythonimmediate.expand_once()
 		self.assertEqual(Token.get_next(), T.bbb)
 
-	def test_blue_tokens(self):
+	def test_blue_tokens(self)->None:
 		self.assertEqual(
 				T.empty.meaning_str(),
 				"macro:->")
@@ -376,14 +377,14 @@ class Test(unittest.TestCase):
 				T.empty.blue.meaning_str(),
 				[r"\relax", r"[unknown command code! (0, 1)]"])
 
-		Catcode.active("a").assign_value(TokenList.doc("abc"))
+		Catcode.active("a").assign_value(BalancedTokenList.doc("abc"))
 
 		self.assertEqual(Catcode.active("a").meaning_str(), "macro:->abc")
 		self.assertIn(
 				Catcode.active("a").blue.meaning_str(),
 				[r"\relax", r"[unknown command code! (0, 1)]"])
 
-	def test_cannot_blue_tokens(self):
+	def test_cannot_blue_tokens(self)->None:
 		for t in [
 				Catcode.letter("a"),
 				Catcode.other("a"),
@@ -393,24 +394,24 @@ class Test(unittest.TestCase):
 			with self.assertRaises(ValueError):
 				t.blue
 
-	def test_meaning_equal(self):
+	def test_meaning_equal(self)->None:
 		self.assertFalse(T.empty.blue.meaning_equal(T.empty))
 		self.assertFalse(T.empty.meaning_equal(T.empty.blue))
 		self.assertTrue(T.relax.blue.meaning_equal(T.relax))
 		self.assertTrue(T.empty.blue.meaning_equal(T.empty.blue))
 
-	def test_assign_to_blue(self):
+	def test_assign_to_blue(self)->None:
 		NTokenList([T.let, T.aaa.blue, T.ifx]).execute()
 		self.assertTrue(T.aaa.meaning_equal(T.ifx))
 
 		NTokenList([T.futurelet, T.aaa.blue, T["@gobble"], T.ifcat]).execute()
 		self.assertTrue(T.aaa.meaning_equal(T.ifcat))
 
-	def test_make_tokenlist_from_blue(self):
+	def test_make_tokenlist_from_blue(self)->None:
 		with self.assertRaises(RuntimeError):
 			TokenList([T.aaa.blue])
 
-	def test_assign(self):
+	def test_assign(self)->None:
 		for t in [T.ifx, T.ifx.blue, C.other("="), C.space(' '), T.empty, T.relax, T.empty.blue]:
 			with self.subTest(t=t):
 				T.aaa.assign(t)
@@ -523,4 +524,4 @@ result = unittest.TextTestRunner(failfast=True).run(suite)
 assert not result.errors
 
 
-x=2
+x: Any=2
