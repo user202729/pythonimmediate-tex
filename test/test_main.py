@@ -72,3 +72,51 @@ class Test:
 				check=True,
 				cwd=tempfile.gettempdir(),
 				)
+
+	def test_set_globals_locals(self):
+		def f():
+			f_var = 1
+			g()
+
+		def g():
+			g_var = 2
+			h()
+
+		def h():
+			h_var = 3
+			i()
+
+		def i():
+			g, l = pythonimmediate.simple.set_globals_locals(None, None)
+			assert "f_var" not in l
+			assert "g_var" not in l
+			assert l["h_var"] == 3
+
+		f()
+
+		def h():
+			h_var = 4
+			x = 5
+			[list(i() for x in range(1)) for y in range(1, 2)]
+
+		def i():
+			g, l = pythonimmediate.simple.set_globals_locals(None, None)
+			assert "f_var" not in l
+			assert "g_var" not in l
+			assert l["h_var"] == 4
+			assert l["x"] == 0
+			assert l["y"] == 1
+
+		f()
+
+	def test_f1(self):
+		from pythonimmediate.simple import f1
+		def f():
+		    k = 1
+		    return [f"j={j}, k={k}" for j in range(5)]
+		assert f() == ['j=0, k=1', 'j=1, k=1', 'j=2, k=1', 'j=3, k=1', 'j=4, k=1']
+
+		def f():
+		    k = 1
+		    return [f1("j=`j`, k=`k`") for j in range(5)]
+		assert f() == ['j=0, k=1', 'j=1, k=1', 'j=2, k=1', 'j=3, k=1', 'j=4, k=1']

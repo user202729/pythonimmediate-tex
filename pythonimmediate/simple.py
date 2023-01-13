@@ -1059,6 +1059,178 @@ def strip_optional_braces(content: str)->str:
 	return content
 
 
+def set_globals_locals(globals, locals)->Tuple[Optional[dict], Optional[dict]]:
+	"""
+	Helper function, compute the globals and locals dict of the caller's parent frame.
+	"""
+	if globals is None and locals is None:
+		i=2
+		f=sys._getframe(i)
+		globals = dict(f.f_globals)
+		locals = dict(f.f_locals)
+
+		# https://bugs.python.org/issue21161
+		# each list comprehension has its own local namespace
+		while f.f_code.co_name in ("<listcomp>", "<genexpr>"):
+			i+=1
+			f=sys._getframe(i)
+			globals = f.f_globals | globals
+			locals = f.f_locals | locals
+
+	return globals, locals
+
+T3=TypeVar("T3")
+def riffle(s: Iterable[T3], sep: T3)->Iterator[T3]:
+	"""
+	Helper function, yield the given strings, separated by the given separator.
+
+	?>> [*riffle(["a", "b", "c"], ",")]
+	['a', ',', 'b', ',', 'c']
+	"""
+	for i, x in enumerate(s):
+		if i>0:
+			yield sep
+		yield x
+
+class F1Protocol(Protocol):
+	default_escape: Any
+	def __call__(self, s: str, globals: Optional[dict]=None, locals: Optional[dict]=None, escape: Optional[Union[Tuple, str]]=None)->str: ...
+
+f1: F1Protocol
+
+@_export  # type: ignore
+def f1(s: str, globals: Optional[dict]=None, locals: Optional[dict]=None, escape: Optional[Union[Tuple[str, ...], str]]=None)->str:
+	"""
+	Helper function to construct a string from Python expression parts,
+	similar to f-strings, but allow using arbitrary delimiters.
+
+	This is useful for constructing [TeX] code, because the ``{`` and ``}`` characters are frequently used in [TeX].
+
+	Example::
+
+		>>> a = 1
+		>>> b = 2
+		>>> f1("a=`a`, b=`b`")
+		'a=1, b=2'
+		>>> f1("`")
+		Traceback (most recent call last):
+			...
+		ValueError: Unbalanced delimiters!
+
+	The escape/delimiter character can be escaped by doubling it::
+
+		>>> f1("a``b")
+		'a`b'
+		>>> f1("a ` '````' ` b")
+		'a `` b'
+
+	It's possible to customize the delimiters::
+
+		>>> f1("a=!a!", escape="!")
+		'a=1'
+
+	It's possible to use different delimiters for the opening and the closing::
+
+		>>> f1("a=⟨a⟩, b=⟨b⟩", escape="⟨⟩")
+		'a=1, b=2'
+		>>> f1("<", escape="<>")
+		Traceback (most recent call last):
+			...
+		ValueError: Unbalanced delimiters!
+
+	There's no way to escape them, they must be balanced in the string::
+
+		>>> f1("a=⟨ '⟨'+str(a)+'⟩' ⟩", escape="⟨⟩")
+		'a=⟨1⟩'
+
+	The default value of *escape* is stored in ``f1.default_escape``, it can be reassigned::
+
+		>>> f1.default_escape="!"
+		>>> f1("a=!a!")
+		'a=1'
+
+	It's even possible to use multiple characters as the delimiter::
+
+		>>> f1("a=**a**, b=**b**", escape=["**"])
+		'a=1, b=2'
+		>>> f1("a=[[a]], b=[[b]]", escape=["[[", "]]"])
+		'a=1, b=2'
+
+	In the first case above, remember to put the delimiter in a list because otherwise it will be interpreted
+	as an opening and a closing delimiter.
+
+	Currently, format specifiers such as ``:d`` are not supported.
+	"""
+	globals, locals=set_globals_locals(globals, locals)
+
+	if escape is None:
+		escape=f1.default_escape
+	assert len(escape) in (1, 2), "Invalid escape value provided"
+
+	if len(escape)==2:
+		opening=escape[0]
+		closing=escape[1]
+		assert opening!=closing, "If len(escape)==2, the two delimiters must be different"
+
+		parts=[
+				small_part
+				for part in riffle((
+					riffle(part.split(closing), closing)
+					for part in s.split(opening)
+					), [opening])
+				for small_part in part
+				]
+		degree=0
+		result=[]
+		partial_code=""
+
+		for part in parts:
+			if part==opening:
+				if degree>0: partial_code+=part
+				degree+=1
+			elif part==closing:
+				degree-=1
+				if degree>0: partial_code+=part
+				elif degree<0: raise ValueError("Unbalanced delimiters!")
+				else:
+					item=eval(partial_code, globals, locals)
+					result.append(str(item))
+					partial_code=""
+			else:
+				if degree>0: partial_code+=part
+				else: result.append(part)
+		if degree!=0: raise ValueError("Unbalanced delimiters!")
+		return "".join(result)
+	
+	else:
+		assert len(escape)==1
+		parts_=s.split(escape[0])
+		if len(parts_)%2==0: raise ValueError("Unbalanced delimiters!")
+		result=[]
+		partial_code=""
+		for i, part in enumerate(parts_):
+			if i%2==0:
+				# it's the string part e.g. "a = " in "a = `a`", so just append to result
+				result.append(part)
+			elif parts_[i]=="":
+				# e.g. "a `` b", the part between the two backticks is empty
+				result.append(escape[0])
+			else:
+				partial_code+=part
+				if i+2<len(parts_) and not parts_[i+1]:
+					# it's of the form ` some code ` other code `, so wait for the next part
+					partial_code+=escape[0]
+				else:
+					# it's not of the form ` some code `` other code `, so execute immediately
+					item=eval(partial_code, globals, locals)
+					result.append(str(item))
+					partial_code=""
+
+		assert not partial_code
+		return "".join(result)
+
+f1.default_escape="`"  # type: ignore
+
 @dataclass
 class VarManager:
 	engine: Engine
