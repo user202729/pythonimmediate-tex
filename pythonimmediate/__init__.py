@@ -349,6 +349,13 @@ class Token(NToken):
 		"""
 		...
 
+	@abstractmethod
+	def simple_detokenize(self, get_catcode: Callable[[int], Catcode])->str:
+		"""
+		Simple approximate detokenizer, implemented in Python.
+		"""
+		...
+
 	@property
 	@abstractmethod
 	def assignable(self)->bool:
@@ -781,11 +788,24 @@ class ControlSequenceToken(Token):
 	def repr1(self)->str:
 		return f"\\" + repr(self.csname.replace(' ', "␣"))[1:-1]
 
+	def simple_detokenize(self, get_catcode: Callable[[int], Catcode])->str:
+		if not self.csname:
+			raise NotImplementedError("This isn't simple!")
+		if len(self.csname)>1 or get_catcode(ord(self.csname))==Catcode.letter:
+			for ch in self.csname:
+				if get_catcode(ord(ch))!=Catcode.letter:
+					raise NotImplementedError("This isn't simple!")
+			return "\\"+self.csname+" "
+		return "\\"+self.csname
+
 
 ControlSequenceToken.make=ControlSequenceTokenMaker("")
 
 T=ControlSequenceToken.make
 P=ControlSequenceTokenMaker("_pythonimmediate_")  # create private tokens
+
+if enable_get_attribute:
+	assert isinstance(T.testa, ControlSequenceToken)
 
 #@export_function_to_module
 class Catcode(enum.Enum):
@@ -885,6 +905,8 @@ class CharacterToken(Token):
 		if catcode!=self.catcode:
 			raise ValueError("this CharacterToken does not represent a string!")
 		return self.chr
+	def simple_detokenize(self, get_catcode: Callable[[int], Catcode])->str:
+		return self.chr
 
 class FrozenRelaxToken(Token):
 	can_blue=False
@@ -896,6 +918,8 @@ class FrozenRelaxToken(Token):
 		return "R"
 	def repr1(self)->str:
 		return r"[frozen]\relax"
+	def simple_detokenize(self, get_catcode: Callable[[int], Catcode])->str:
+		raise NotImplementedError("This isn't simple!")
 
 frozen_relax_token=FrozenRelaxToken()
 pythonimmediate.frozen_relax_token=frozen_relax_token
@@ -1046,7 +1070,7 @@ class TokenList(TokenListBaseClass):
 		:raises ValueError: if this is not balanced.
 		"""
 		if not self.is_balanced():
-			raise ValueError("Token list is not balanced")
+			raise ValueError(f"Token list {self} is not balanced")
 
 	def balanced_parts(self)->"List[Union[BalancedTokenList, Token]]":
 		"""
@@ -1176,6 +1200,7 @@ class TokenList(TokenListBaseClass):
 		:param get_catcode: A function that given a character code, return its desired category code.
 		"""
 		return cls(TokenList.iterable_from_string(s, get_catcode))
+
 
 	@classmethod
 	def e3(cls: Type[TokenListType], s: str)->TokenListType:
@@ -1308,6 +1333,9 @@ class TokenList(TokenListBaseClass):
 		See :meth:`NTokenList.str_unicode`.
 		"""
 		return NTokenList(self).str_unicode()
+
+	def simple_detokenize(self, get_catcode: Callable[[int], Catcode])->str:
+		return "".join(token.simple_detokenize(get_catcode) for token in self)
 
 	def str(self, engine: Engine=default_engine)->str:
 		"""

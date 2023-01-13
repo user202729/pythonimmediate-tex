@@ -17,11 +17,13 @@ import re
 from dataclasses import dataclass
 
 import pythonimmediate
-from . import scan_Python_call_TeX_module, PTTTeXLine, PTTVerbatimLine, PTTTeXLine, Python_call_TeX_local, check_line, Token, TTPEBlock, TTPEmbeddedLine, get_random_identifier, CharacterToken, define_TeX_call_Python, parse_meaning_str, peek_next_meaning, run_block_local, run_code_redirect_print_TeX, TTPBlock, TTPLine, BalancedTokenList, ControlSequenceToken
+from . import scan_Python_call_TeX_module, PTTTeXLine, PTTVerbatimLine, PTTTeXLine, Python_call_TeX_local, check_line, Token, TTPEBlock, TTPEmbeddedLine, get_random_identifier, CharacterToken, define_TeX_call_Python, parse_meaning_str, peek_next_meaning, run_block_local, run_code_redirect_print_TeX, TTPBlock, TTPLine, BalancedTokenList, TokenList, ControlSequenceToken, doc_catcode_table, Catcode
 from .engine import Engine, default_engine
 
 if not typing.TYPE_CHECKING:
 	__all__ = []
+
+default_get_catcode = lambda x: doc_catcode_table.get(x, Catcode.other)
 
 def _export(f: T2)->T2:
 	__all__.append(f.__name__)  # type: ignore
@@ -349,9 +351,12 @@ def get_multiline_verb_arg(engine: Engine=  default_engine)->str:
 		}
 		""", recursive=False))(engine)  # we cannot set newlinechar=13 because otherwise \__send_block:e does not work properly
 
-def _check_function_name(name: str)->None:
-	if not re.fullmatch("[A-Za-z]+", name) or (len(name)==1 and ord(name)<=0x7f):
-		raise RuntimeError("Invalid function name: "+name)
+def _check_name(name: str)->None:
+	"""
+	Internal function, check if user provide a valid name (that can be given in a "normal" control sequence)
+	"""
+	if any(default_get_catcode(ord(ch))!=Catcode.letter for ch in name):
+		raise RuntimeError("Invalid name: \\"+name)
 
 T2 = typing.TypeVar("T2", bound=Callable)
 
@@ -462,6 +467,7 @@ def newcommand(name: str, f: Callable, engine: Engine)->None:
 		if these cases happen.
 
 	"""
+	_check_name(name)
 	identifier=get_random_identifier()
 
 	typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
@@ -492,6 +498,7 @@ def renewcommand(name: str, f: Callable, engine: Engine)->None:
 	r"""
 	Redefine a [TeX]-command. Usage is similar to :func:`newcommand`.
 	"""
+	_check_name(name)
 	identifier=get_random_identifier()
 
 	typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
@@ -868,6 +875,98 @@ def newenvironment_verb(name: str, f: Callable[[str], None], engine: Engine)->No
 			lambda engine: run_code_redirect_print_TeX(f1, engine=engine),
 			"__unused", argtypes=[], identifier=identifier)
 
+@_export
+def fully_expand(content: str, engine: Engine=  default_engine)->str:
+	"""
+	Expand all macros in the given string.
+	"""
+	return typing.cast(Callable[[PTTTeXLine, Engine], TTPEmbeddedLine], Python_call_TeX_local(
+		r"""
+		\cs_new_protected:Npn %name% {
+			%read_arg0(\__content)%
+			\exp_args:Nx \pythonimmediatecontinue { \__content }
+		}
+		"""))(PTTTeXLine(content), engine)
+
+@_export
+def is_balanced(content: str)->bool:
+	r"""
+	Check if the given string is balanced, i.e. if all opening and closing braces match.
+
+	This is a bit tricky to implement, it's recommended to use the library function.
+
+	For example::
+
+		>>> is_balanced("a{b}c")
+		True
+		>>> is_balanced("a{b}c}")
+		False
+		>>> is_balanced(r"\{")
+		True
+	"""
+	return TokenList.from_string(content, default_get_catcode).is_balanced()
+
+@_export
+def split_balanced(content: str, separator: str)->List[str]:
+	r"""
+	Split the given string at the given substring, but only if the string is balanced.
+
+	This is a bit tricky to implement, it's recommended to use the library function.
+
+	If either *content* or *separator* is unbalanced, the function will raise ValueError.
+
+	For example::
+
+		>>> split_balanced("a{b,c},c{d}", ",")
+		['a{b,c}', 'c{d}']
+		>>> split_balanced(r"\{,\}", ",")
+		['\\{', '\\}']
+		>>> split_balanced("{", "{")
+		Traceback (most recent call last):
+			...
+		ValueError: Content is not balanced!
+	"""
+	content1=TokenList.from_string(content, default_get_catcode)
+	if not content1.is_balanced():
+		raise ValueError("Content is not balanced!")
+	separator1=BalancedTokenList.from_string(separator, default_get_catcode)
+	result: List[str]=[]
+	result_degree=0
+	remaining=TokenList()
+	i=0
+	while i<len(content1):
+		if i+len(separator1)<=len(content1) and content1[i:i+len(separator1)]==separator1 and result_degree==0:
+			result.append(remaining.simple_detokenize(default_get_catcode))
+			remaining=TokenList()
+			i+=len(separator1)
+		else:
+			remaining.append(content1[i])
+			result_degree+=content1[i].degree()
+			assert result_degree>=0, "This cannot happen, the input is balanced"
+			i+=1
+	result.append(remaining.simple_detokenize(default_get_catcode))
+	return result
+
+@_export
+def strip_optional_braces(content: str)->str:
+	"""
+	Strip the optional braces from the given string, if the whole string is wrapped in braces.
+
+	For example::
+
+		>>> strip_optional_braces("{a}")
+		'a'
+		>>> strip_optional_braces("a")
+		'a'
+		>>> strip_optional_braces("{a},{b}")
+		'{a},{b}'
+	"""
+	t=TokenList.from_string(content, default_get_catcode)
+	assert t.is_balanced(), "The string must be balanced!"
+	if content.startswith("{") and content.endswith("}") and t[1:-1].is_balanced():
+		return content[1:-1]
+	return content
+
 
 @dataclass
 class VarManager:
@@ -883,6 +982,7 @@ class VarManager:
 		"""
 		Get the value of a variable.
 		"""
+		_check_name(key)
 		return _replace_double_hash(
 				BalancedTokenList([ControlSequenceToken(key)])
 				.expand_o(engine=self.engine)
@@ -893,6 +993,7 @@ class VarManager:
 		"""
 		Set the value of a variable.
 		"""
+		_check_name(key)
 		return typing.cast(Callable[[PTTVerbatimLine, PTTTeXLine, Engine], None], Python_call_TeX_local(
 			r"""
 			\cs_new_protected:Npn %name% {
