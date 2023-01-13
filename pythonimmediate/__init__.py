@@ -99,7 +99,7 @@ def send_bootstrap_code(engine: Engine)->None:
 # as the name implies, this reads one "command" from Python side and execute it.
 # the command might do additional tasks e.g. read more [TeX]-code.
 #
-# e.g. if `block' is read from the communication channel, run |\__run_block:|.
+# e.g. if `block' is read from the communication channel, run ``\__run_block:``.
 
 mark_bootstrap(
 r"""
@@ -112,7 +112,7 @@ r"""
 		\csname __run_ \__line :\endcsname
 }
 
-% read documentation of |_peek| commands for details what this command does.
+% read documentation of ``_peek`` commands for details what this command does.
 \cs_new_protected:Npn \pythonimmediatecontinue #1 {
 	\immediate\write \__write_file {r #1}
 	\__read_do_one_command:
@@ -169,26 +169,26 @@ def run_main_loop_get_return_one(engine: Engine)->str:
 
 user_documentation(
 r"""
-All exported functions can be accessed through the module as |import pythonimmediate|.
+All exported functions can be accessed through the module as ``import pythonimmediate``.
 
-The |_finish| functions are internal functions, which must be called \emph{at most} once in each
-|\pythonimmediate:n| call from [TeX]-to tell [TeX]-what to do.
+The ``_finish`` functions are internal functions, which must be called \emph{at most} once in each
+``\pythonimmediate:n`` call from [TeX]-to tell [TeX]-what to do.
 
-The |_local| functions simply execute the code. These functions will only return when
+The ``_local`` functions simply execute the code. These functions will only return when
 the [TeX]-code finishes executing; nevertheless, the [TeX]-code might recursively execute some Python code
 inside it.
 
-A simple example is |pythonimmediate.run_block_local('123')| which simply typesets |123|.
+A simple example is ``pythonimmediate.run_block_local('123')`` which simply typesets ``123``.
 
-The |_peek| functions is the same as above; however, the [TeX]-code must contain an explicit command
-|\pythonimmediatecontinue{...}|.
+The ``_peek`` functions is the same as above; however, the [TeX]-code must contain an explicit command
+``\pythonimmediatecontinue{...}``.
 
-The argument of |\pythonimmediatecontinue| will be |e|-expanded
-by |\write| (note that the written content must not contain any newline character,
+The argument of ``\pythonimmediatecontinue`` will be ``e``-expanded
+by ``\write`` (note that the written content must not contain any newline character,
 otherwise the behavior is undefined), then returned as a string by the Python code.
-The Python function will only return when |\pythonimmediatecontinue| is called.
+The Python function will only return when ``\pythonimmediatecontinue`` is called.
 
-In other words, |run_*_local(code)| is almost identical to |run_*_peek(code + "\pythonimmediatecontinue {}")|.
+In other words, ``run_*_local(code)`` is almost identical to ``run_*_peek(code + "\pythonimmediatecontinue {}")``.
 """)
 
 #@export_function_to_module
@@ -1702,8 +1702,8 @@ class PyToTeXData(ABC):
 @dataclass
 class PTTVerbatimRawLine(PyToTeXData):
 	r"""
-	Represents a line to be tokenized verbatim. Internally the |\readline| primitive is used, as such, any trailing spaces are stripped.
-	The trailing newline is not included, i.e. it's read under |\endlinechar=-1|.
+	Represents a line to be tokenized verbatim. Internally the ``\readline`` primitive is used, as such, any trailing spaces are stripped.
+	The trailing newline is not included, i.e. it's read under ``\endlinechar=-1``.
 	"""
 	data: bytes
 	read_code=r"\__str_get:N {} ".format
@@ -1730,7 +1730,7 @@ class PTTInt(PyToTeXData):
 class PTTTeXLine(PyToTeXData):
 	r"""
 	Represents a line to be tokenized in \TeX's current catcode regime.
-	The trailing newline is not included, i.e. it's tokenized under |\endlinechar=-1|.
+	The trailing newline is not included, i.e. it's tokenized under ``\endlinechar=-1``.
 	"""
 	data: str
 	read_code=r"\exp_args:Nno \use:nn {{ \endlinechar-1 \ior_get:NN \__read_file {} \endlinechar}} {{\the\endlinechar\relax}}".format
@@ -1754,7 +1754,7 @@ class PTTBalancedTokenList(PyToTeXData):
 
 
 # ======== define TeX functions that execute Python code ========
-# ======== implementation of |\py| etc. Doesn't support verbatim argument yet. ========
+# ======== implementation of ``\py`` etc. Doesn't support verbatim argument yet. ========
 
 import itertools
 import string
@@ -1777,13 +1777,13 @@ def define_TeX_call_Python(f: Callable[..., None], name: Optional[str]=None, arg
 	returns the [TeX]-code to be executed on the [TeX]-side to define the macro.
 
 	f: the Python function to be executed.
-	It should take some arguments plus a keyword argument `engine` and eventually (optionally) call one of the |_finish| functions.
+	It should take some arguments plus a keyword argument `engine` and eventually (optionally) call one of the ``_finish`` functions.
 
-	name: the macro name on the [TeX]-side. This should only consist of letter characters in |expl3| catcode regime.
+	name: the macro name on the [TeX]-side. This should only consist of letter characters in ``expl3`` catcode regime.
 
-	argtypes: list of argument types. If it's None it will be automatically deduced from the function |f|'s signature.
+	argtypes: list of argument types. If it's None it will be automatically deduced from the function ``f``'s signature.
 
-	Returns: some code (to be executed in |expl3| catcode regime) as explained above.
+	Returns: some code (to be executed in ``expl3`` catcode regime) as explained above.
 	"""
 	if argtypes is None:
 		argtypes=[p.annotation for p in inspect.signature(f).parameters.values()]
@@ -1944,7 +1944,7 @@ r"""
 \NewDocumentCommand\pycv{v}{\pyc{#1}}
 """)
 
-# ======== implementation of |pycode| environment
+# ======== implementation of ``pycode`` environment
 mark_bootstrap(
 r"""
 \NewDocumentEnvironment{pycode}{}{
@@ -2063,7 +2063,7 @@ user_documentation(
 r"""
 These functions get an argument in the input stream and returns it detokenized.
 
-Which means, for example, |#| are doubled, multiple spaces might be collapsed into one, spaces might be introduced
+Which means, for example, ``#`` are doubled, multiple spaces might be collapsed into one, spaces might be introduced
 after a control sequence.
 
 It's undefined behavior if the message's "string representation" contains a "newline character".
@@ -2241,19 +2241,19 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 	r"""
 	Internal function.
 
-	|TeX_code| should be some expl3 code that defines a function with name |%name%| that when called should:
+	``TeX_code`` should be some expl3 code that defines a function with name ``%name%`` that when called should:
 		* run some [TeX]-code (which includes reading the arguments, if any)
-		* do the following if |sync|:
-			* send |r| to Python (equivalently write %sync%)
-			* send whatever needed for the output (as in |ttp_argtypes|)
-		* call |\__read_do_one_command:| iff not |finish|.
+		* do the following if ``sync``:
+			* send ``r`` to Python (equivalently write %sync%)
+			* send whatever needed for the output (as in ``ttp_argtypes``)
+		* call ``\__read_do_one_command:`` iff not ``finish``.
 
 		This is allowed to contain the following:
 		* %name%: the name of the function to be defined as explained above.
 		* %read_arg0(\var_name)%, %read_arg1(...)%: will be expanded to code that reads the input.
 		* %send_arg0(...)%, %send_arg1(...)%: will be expanded to code that sends the content.
 		* %send_arg0_var(\var_name)%, %send_arg1_var(...)%: will be expanded to code that sends the content in the variable.
-		* %optional_sync%: expanded to code that writes |r| (to sync), if |sync| is True.
+		* %optional_sync%: expanded to code that writes ``r`` (to sync), if ``sync`` is True.
 
 	ptt_argtypes: list of argument types to be sent from Python to TeX (i.e. input of the TeX function)
 
@@ -2263,15 +2263,15 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 		It does not hurt to always specify True, but performance would be a bit slower.
 
 	sync: whether the Python function need to wait for the TeX function to finish.
-		Required if |ttp_argtypes| is not empty.
-		This should be left to be the default None most of the time. (which will make it always sync if |debugging|,
+		Required if ``ttp_argtypes`` is not empty.
+		This should be left to be the default None most of the time. (which will make it always sync if ``debugging``,
 		otherwise only sync if needed i.e. there's some output)
 
-	finish: Include this if and only if |\__read_do_one_command:| is omitted.
+	finish: Include this if and only if ``\__read_do_one_command:`` is omitted.
 		Normally this is not needed, but it can be used as a slight optimization; and it's needed internally to implement
-		|run_none_finish| among others.
-		For each TeX-call-Python layer, \emph{exactly one} |finish| call can be made. If the function itself doesn't call
-		any |finish| call (which happens most of the time), then the wrapper will call |run_none_finish|.
+		``run_none_finish`` among others.
+		For each TeX-call-Python layer, \emph{exactly one} ``finish`` call can be made. If the function itself doesn't call
+		any ``finish`` call (which happens most of the time), then the wrapper will call ``run_none_finish``.
 
 	Return some TeX code to be executed, and a Python function object that when called will call the TeX function
 	on the passed-in TeX engine and return the result.
@@ -2279,9 +2279,9 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 	Note that the TeX_code must eventually be executed on the corresponding engine for the program to work correctly.
 
 	Possible optimizations:
-		* the |r| is not needed if not recursive and |ttp_argtypes| is nonempty
+		* the ``r`` is not needed if not recursive and ``ttp_argtypes`` is nonempty
 			(the output itself tells Python when the [TeX]-code finished)
-		* the first line of the output may be on the same line as the |r| itself (done, use TTPEmbeddedLine type, although a bit hacky)
+		* the first line of the output may be on the same line as the ``r`` itself (done, use :class:`TTPEmbeddedLine` type, although a bit hacky)
 	"""
 	if ttp_argtypes!=[]:
 		assert sync!=False
@@ -2418,10 +2418,10 @@ def continue_until_passed_back_str(engine: Engine=  default_engine)->str:
 	r"""
 	Usage:
 
-	First put some tokens in the input stream that includes |\pythonimmediatecontinue{...}|
-	(or |%sync% \__read_do_one_command:|), then call |continue_until_passed_back()|.
+	First put some tokens in the input stream that includes ``\pythonimmediatecontinue{...}``
+	(or ``%sync% \__read_do_one_command:``), then call ``continue_until_passed_back()``.
 
-	The function will only return when the |\pythonimmediatecontinue| is called.
+	The function will only return when the ``\pythonimmediatecontinue`` is called.
 	"""
 	return typing.cast(Callable[[Engine], TTPEmbeddedLine], Python_call_TeX_local(
 		r"""
@@ -2431,7 +2431,7 @@ def continue_until_passed_back_str(engine: Engine=  default_engine)->str:
 #@export_function_to_module
 def continue_until_passed_back(engine: Engine=  default_engine)->None:
 	"""
-	Same as |continue_until_passed_back_str()| but nothing can be returned from TeX to Python.
+	Same as ``continue_until_passed_back_str()`` but nothing can be returned from TeX to Python.
 	"""
 	result=continue_until_passed_back_str()
 	assert not result
@@ -2470,7 +2470,7 @@ def peek_next_meaning(engine: Engine=  default_engine)->str:
 			r"""
 			\cs_new_protected:Npn \__peek_next_meaning_callback: {
 
-				\edef \__tmp {\meaning \__tmp}  % just in case |\__tmp| is outer, |\write| will not be able to handle it
+				\edef \__tmp {\meaning \__tmp}  % just in case ``\__tmp`` is outer, ``\write`` will not be able to handle it
 				%\immediate\write \__write_file { r \unexpanded\expandafter{\__tmp} }
 				\immediate\write \__write_file { r \__tmp }
 

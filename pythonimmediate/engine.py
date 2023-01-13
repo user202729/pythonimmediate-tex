@@ -337,9 +337,9 @@ class ChildProcessEngine(Engine):
 
 	def close(self)->None:
 		"""
-		sent a "r" to the process so TeX exits gracefully.
+		sent a ``r`` to the process so TeX exits gracefully.
 
-		this might be called from __del__ so do not import anything here.
+		this might be called from :meth:`__del__` so do not import anything here.
 		"""
 		process=self.get_process()
 		from . import run_none_finish
