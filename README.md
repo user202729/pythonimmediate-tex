@@ -29,6 +29,7 @@ Description of the TeX package follows.
 
 Things to do:
 
+* make sure everything are defined globally (a bit difficult, e.g. https://tex.stackexchange.com/q/357869/250119)
 * Make `newenvironment_verb` not strip spaces at the end of the line
 * Define an environment that gobbles the body in `str`-type tokenization
 * Get arguments delimited
