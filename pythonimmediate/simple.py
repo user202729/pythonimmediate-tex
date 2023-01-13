@@ -1,9 +1,58 @@
 r"""
 Simple interface, suitable for users who may not be aware of [TeX] subtleties, such as category codes.
 
-This is only guaranteed to work properly in normal category code situations. In other cases, use the advanced API.
+This is only guaranteed to work properly in normal category code situations
+(in other words, ``\makeatletter`` or ``\ExplSyntaxOn`` are not officially supported).
+In all other cases, use the advanced API.
 
-Start with reading  :func:`newcommand` and :func:`execute`.
+Nevertheless, there are still some parts that you must be aware of:
+
+*   Any "output", resulted from any command related to Python, can only be used to typeset text,
+	it must not be used to pass "values" to other [TeX] commands.
+
+	This is already mentioned in the documentation of the [TeX] file in ``\py`` command, just repeated here.
+
+	For example:
+
+	.. code-block:: latex
+
+		\py{1+1}  % legal, typeset 2
+
+		\setcounter{abc}{\py{1+1}}  % illegal
+
+		% the following is still illegal no many how many ``\expanded`` and such are used
+		\edef\tmp{\py{1+1}}
+		\setcounter{abc}{\tmp}
+
+		\py{ r'\\setcounter{abc}{' + str(1+1) + '}' }  % legal workaround
+
+	Similar for commands defined with :func:`newcommand`::
+
+		@newcommand
+		def test():
+			print_TeX("123", end="")
+
+	Then the [TeX] code:
+
+	.. code-block:: latex
+
+		The result is \test.  % legal, typesets "123"
+		\setcounter{abc}{\test}  % illegal
+
+*   There's the function :func:`fully_expand`, but some [TeX] commands cannot be used inside this.
+
+	Refer to the :ref:`expansion-issue` section for more details.
+
+*   Regarding values being passed from [TeX] to Python, you can do one of the following:
+
+	* Either simply do ``\py{value = r'''#1'''}``, or
+	* ``\py{value = get_arg_str()}{#1}``.
+
+	You can easily see both forms are equivalent, except that in the first form, ``#1`` cannot end with unbalanced ``\``
+	or contain triple single quotes.
+
+
+Start with reading :func:`newcommand` and :func:`execute`. Then read the rest of the functions in this module.
 """
 
 from __future__ import annotations
@@ -877,8 +926,50 @@ def newenvironment_verb(name: str, f: Callable[[str], None], engine: Engine)->No
 
 @_export
 def fully_expand(content: str, engine: Engine=  default_engine)->str:
-	"""
+	r"""
 	Expand all macros in the given string.
+
+	.. _expansion-issue:
+
+	Note on unexpandable and fragile macros
+	---------------------------------------
+
+	Not all [TeX] commands/macros can be used inside this function.
+	If you try to, they will either return the input unchanged, or error out.
+
+	In such cases, the problem is **impossible** to solve, so just look for workarounds.
+
+	An example is the ``\py`` command, which is already mentioned in the initial introduction to the
+	:mod:`~pythonimmediate.simple` module::
+
+		>> fully_expand(r"\py{1+1}")
+		r"\py{1+1}"
+
+	Some other examples (assuming ``\usepackage{ifthen}`` is used)::
+
+		>> execute(r'\ifthenelse{1=2}{equal}{not equal}')  # legal, typeset "not equal"
+		>> fully_expand(r'\ifthenelse{1=2}{equal}{not equal}')  # error out
+		
+		>> execute(r'\uppercase{abc}')  # legal, typeset "ABC"
+		>> fully_expand(r'\uppercase{abc}')  # just returned verbatim
+		r'\uppercase {abc}'
+
+	There might be a few workarounds, but they're all dependent on the exact macros involved.
+
+	For if-style commands, assign the desired result to a temporary variable::
+
+		>> execute(r'\ifthenelse{1=2}{\pyc{result = "equal"}}{\pyc{result = "not equal"}}')
+		>> result
+		"not equal"
+
+	For for-loop-style commands, you can do something similar (demonstrated here with ``tikz``'s ``\foreach`` command)::
+		
+		>> result = []
+		>> execute(r'\foreach \x in {1, 2, ..., 10} {\pyc{result.append(var["x"])}}')
+		>> result
+		['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
+
+	For macros such as ``\uppercase{...}``, there's no simple workaround. Reimplement it yourself (such as with ``.upper()`` in Python).
 	"""
 	return typing.cast(Callable[[PTTTeXLine, Engine], TTPEmbeddedLine], Python_call_TeX_local(
 		r"""
@@ -909,7 +1000,7 @@ def is_balanced(content: str)->bool:
 @_export
 def split_balanced(content: str, separator: str)->List[str]:
 	r"""
-	Split the given string at the given substring, but only if the string is balanced.
+	Split the given string at the given substring, but only if the parts are balanced.
 
 	This is a bit tricky to implement, it's recommended to use the library function.
 
@@ -1008,13 +1099,20 @@ class VarManager:
 
 var=VarManager(default_engine)
 r"""
+Get and set value of "variables" in [TeX].
+
 Can be used like this::
 
 	var["myvar"]="myvalue"  # "equivalent" to \def\myvar{myvalue}
 	var["myvar"]=r"\textbf{123}"  # "equivalent" to \def\myvar{\textbf{123}}
 	var["myvar"]=r"\def\test#1{#1}"  # "equivalent" to \tl_set:Nn \myvar {\def\test#1{#1}}  (note that `#` doesn't need to be doubled here unlike in `\def`)
 	var(engine)["myvar"]="myvalue"  # pass explicit engine
+
+	# after ``\def\myvar{myvalue}`` (or ``\edef``, etc.) on TeX you can do:
 	print(var["myvar"])  # get the value of the variable, return a string
+
+It's currently undefined behavior if the passed-in value is not a "variable".
+(in some future version additional checking might be performed in debug run)
 
 Notes in :ref:`str-tokenization` apply -- in other words, after you set a value it may become slightly different when read back.
 """
