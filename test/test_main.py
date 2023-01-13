@@ -55,25 +55,6 @@ class Test:
 				cwd=tempfile.gettempdir(),
 				)
 
-	@pytest.mark.parametrize("original, mangled", [
-		("a", "a"),
-		("", ""),
-		("\t", ""),
-		("\t", "\t"),
-		("\t", "^^I"),
-		("\ta", "^^Ia"),
-		("a b", "a b"),
-		("a b  ", "a b"),
-		])
-	def test_mangle(self, original: str, mangled: str)->None:
-		assert pythonimmediate.can_be_mangled_to(original+"\n", mangled+"\n")
-
-	@pytest.mark.parametrize("original, mangled", [
-		("a", "b")
-		])
-	def test_mangle_incorrect(self, original: str, mangled: str)->None:
-		assert not pythonimmediate.can_be_mangled_to(original+"\n", mangled+"\n")
-
 	def test_python_flags(self):
 		"""
 		pass -O to the Python executable and check if assertions are disabled

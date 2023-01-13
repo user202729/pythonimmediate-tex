@@ -1978,8 +1978,32 @@ def normalize_line(line: str)->str:
 
 def can_be_mangled_to(original: str, mangled: str)->bool:
 	r"""
-	if original is put in a TeX file, read engine other catcode regime, and then sent through \write,
-	is it possible that the written content is mangled?
+	If *original* is put in a [TeX] file, read in other catcode regime (possibly drop trailing spaces/tabs),
+	and then sent through ``\write`` (possibly convert control characters to ``^^``-notation),
+	is it possible that the written content is equal to *mangled*?
+
+	The function is somewhat tolerant (might return ``True`` in some cases where ``False`` should be returned), but not too tolerant.
+
+	Example::
+
+		>>> can_be_mangled_to("a\n", "a\n")
+		True
+		>>> can_be_mangled_to("\n", "\n")
+		True
+		>>> can_be_mangled_to("\t\n", "\n")
+		True
+		>>> can_be_mangled_to("\t\n", "\t\n")
+		True
+		>>> can_be_mangled_to("\t\n", "^^I\n")
+		True
+		>>> can_be_mangled_to("\ta\n", "^^Ia\n")
+		True
+		>>> can_be_mangled_to("a b\n", "a b\n")
+		True
+		>>> can_be_mangled_to("a b  \n", "a b\n")
+		True
+		>>> can_be_mangled_to("a\n", "b\n")
+		False
 	"""
 	return normalize_line(original)==normalize_line(mangled)
 
