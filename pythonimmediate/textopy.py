@@ -5,7 +5,7 @@ import sys
 
 def main():
 	from .engine import ParentProcessEngine
-	from . import PTTBlock, run_error_finish, default_engine, send_bootstrap_code, run_main_loop
+	from . import PTTBlock, PTTVerbatimLine, run_error_finish, default_engine, send_bootstrap_code, run_main_loop
 
 	try:
 		engine=ParentProcessEngine()
@@ -20,8 +20,28 @@ def main():
 		traceback.print_exc(file=sys.stderr)
 
 		engine.action_done=False  # force run it
-		run_error_finish(PTTBlock("".join(traceback.format_exc())), engine)
 
+		full_error = "".join(traceback.format_exc())  # to be printed on TeX's log file
+
+		# the short_error will be printed on the terminal, so make sure it's not too long.
+
+		type_, value, tb = sys.exc_info()
+
+		short_error = "".join(
+				traceback.format_exception_only(value) +
+				["--\n"] +
+				traceback.format_tb(tb, limit=-1)
+				).strip()
+
+		# force limit the line width of the error message
+		import textwrap
+		short_error="\n".join(
+				wrapped_line
+				for paragraph in short_error.splitlines()
+				for wrapped_line in textwrap.wrap(paragraph, width=40)
+				)
+
+		run_error_finish(PTTBlock(full_error), PTTBlock(short_error), engine)
 		os._exit(0)
 
 

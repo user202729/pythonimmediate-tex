@@ -2317,7 +2317,7 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 							   optional=True)
 
 	def f(*args, engine: Engine)->Optional[Tuple[TeXToPyData, ...]]:
-		assert len(args)==len(ptt_argtypes)
+		assert len(args)==len(ptt_argtypes), f"passed in {len(args)} = {args}, expect {len(ptt_argtypes)}"
 
 		# send function header
 		engine.check_not_finished()
@@ -2369,13 +2369,14 @@ Internal function.
 We want to make sure the Python traceback is printed strictly before run_error_finish() is called,
 so that the Python traceback is not interleaved with [TeX] error messages.
 """
-run_error_finish=typing.cast(Callable[[PTTBlock, Engine], None], Python_call_TeX_local(
+run_error_finish=typing.cast(Callable[[PTTBlock, PTTBlock, Engine], None], Python_call_TeX_local(
 r"""
-\msg_new:nnn {pythonimmediate} {python-error} {Python~error.}
+\msg_new:nnn {pythonimmediate} {python-error} {Python~error:~#1.}
 \cs_new_protected:Npn %name% {
 	%read_arg0(\__data)%
+	%read_arg1(\__summary)%
 	\wlog{^^JPython~error~traceback:^^J\__data^^J}
-    \msg_error:nn {pythonimmediate} {python-error}
+    \msg_error:nnx {pythonimmediate} {python-error} {\__summary}
 }
 """, finish=True, sync=False))
 
