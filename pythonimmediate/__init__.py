@@ -2030,7 +2030,7 @@ def __pycodex(code: TTPBlock, lineno_: TTPLine, filename: TTPLine, fileabspath: 
 		if not f: continue
 		p=Path(f)
 		if not p.is_file(): continue
-		file_lines=p.read_text().splitlines(keepends=True)[lineno-len(code_lines)-1:lineno-1]
+		file_lines=p.read_text(encoding='u8').splitlines(keepends=True)[lineno-len(code_lines)-1:lineno-1]
 		if len(file_lines)==len(code_lines) and all(
 			can_be_mangled_to(file_line, code_line) for file_line, code_line in zip(file_lines, code_lines)
 			):
