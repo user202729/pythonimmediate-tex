@@ -134,11 +134,11 @@ class UnnamedPipeCommunicator(Communicator):
 
 @dataclass
 class GlobalConfiguration:
-	debug: int
-	communicator: Communicator
-	sanity_check_extra_line: bool
-	debug_force_buffered: bool
-	naive_flush: bool
+	debug: int=0
+	communicator: Communicator=typing.cast(Communicator, None)
+	sanity_check_extra_line: bool=False
+	debug_force_buffered: bool=False
+	naive_flush: bool=False
 
 	def __post_init__(self)->None:
 		assert 0<=self.debug<=9

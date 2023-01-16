@@ -74,24 +74,23 @@ def surround_delimiter(block: str)->str:
 		if delimiter not in block: break
 	return delimiter + "\n" + block + "\n" + delimiter + "\n"
 
+bootstrap_code_functions: list[Callable[[Engine], str]]=[]
 """
-Internal constant. When this module is done loading, it contains the bootstrap code that
-should be executed on an engine (with expl3 catcode) so that all module-defined functions
-execute properly.
+Internal constant.
+Contains functions that takes an engine object and returns some code before :meth:`substitute_private` is applied on it.
 """
-bootstrap_code: str=""
 def mark_bootstrap(code: str)->None:
-	global bootstrap_code
-	bootstrap_code+=code
+	bootstrap_code_functions.append(lambda engine: code)
 
 def substitute_private(code: str)->str:
+	assert "_pythonimmediate_" not in code  # avoid double-apply this function
 	return (code
 		  #.replace("\n", ' ')  # because there are comments in code, cannot
 		  .replace("__", "_" + "pythonimmediate" + "_")
 		 )
 
 def send_bootstrap_code(engine: Engine)->None:
-	send_raw(surround_delimiter(substitute_private(bootstrap_code)), engine=engine)
+	send_raw(surround_delimiter(substitute_private(get_bootstrap_code(engine))), engine=engine)
 
 # ========
 
@@ -101,7 +100,39 @@ def send_bootstrap_code(engine: Engine)->None:
 #
 # e.g. if `block' is read from the communication channel, run ``\__run_block:``.
 
-mark_bootstrap(
+@bootstrap_code_functions.append
+def _naive_flush_data_define(engine: Engine)->str:
+	if engine.config.naive_flush:
+		# the function x-expand to something in a single line that is at least 4095 bytes long and ignored by Python
+		# (plus the newline would be 4096)
+		return r"""
+			\cs_new:Npn \__naive_flush_data: {
+				pythonimmediate-naive-flush-line \prg_replicate:nn {4063} {~}
+			}
+			"""
+	return ""
+
+def mark_bootstrap_naive_replace(code: str)->None:
+	r"""
+	Similar to :func:`mark_bootstrap`, but code may contain one of the following:
+
+		- ``%naive_inline``: replaced with ``^^J \__naive_flush_data:``
+			if :attr:`Engine.config.naive_flush` is ``True``, else become empty
+		- ``%naive_flush%``: replaced with ``\immediate\write \__write_file {\__naive_flush_data:}``
+			if :attr:`Engine.config.naive_flush` is ``True``
+	"""
+	def result(engine: Engine)->str:
+		code1=code
+		if engine.config.naive_flush:
+			code1=code1.replace("%naive_inline%", r"^^J \__naive_flush_data: ")
+			code1=code1.replace("%naive_flush%", r"\immediate\write \__write_file {\__naive_flush_data:}")
+		else:
+			code1=code1.replace("%naive_inline%", "")
+			code1=code1.replace("%naive_flush%", "")
+		return code1
+	bootstrap_code_functions.append(result)
+
+mark_bootstrap_naive_replace(
 r"""
 \cs_new_protected:Npn \__read_do_one_command: {
 	\begingroup
@@ -112,9 +143,10 @@ r"""
 		\csname __run_ \__line :\endcsname
 }
 
+
 % read documentation of ``_peek`` commands for details what this command does.
 \cs_new_protected:Npn \pythonimmediatecontinue #1 {
-	\immediate\write \__write_file {r #1}
+	\immediate\write \__write_file {r #1 %naive_inline% }
 	\__read_do_one_command:
 }
 
@@ -128,6 +160,7 @@ r"""
 	\immediate\write \__write_file {
 		#1 ^^J
 		pythonimm?""" + '"""' + r"""?'''?  % following character will be newline
+		%naive_inline%
 	}
 }
 
@@ -140,6 +173,7 @@ r"""
 	\immediate\closeout \__write_file
 }
 """)
+# the last one don't need to flush because will close anyway (right?)
 
 
 # ========
@@ -2509,4 +2543,12 @@ def parse_meaning_str(s: str)->Optional[Tuple[Catcode, str]]:
 from .simple import *
 # also scan the source code and populate bootstrap_code
 
-def get_bootstrap_code()->str: return bootstrap_code
+def get_bootstrap_code(engine: Engine)->str:
+	"""
+	Return the bootstrap code for an engine.
+
+	This is before the call to :meth:`substitute_private`.
+	"""
+	return "\n".join(
+			f(engine)
+			for f in bootstrap_code_functions)

@@ -49,10 +49,12 @@ assert set(engine_name_to_latex_executable)==set(engine_names)
 
 class Engine(ABC):
 	_name: EngineName
+	_config: GlobalConfiguration
 
 	def __init__(self):
 		self.action_done=False
 		self.exited=False  # once the engine exit, it can't be used anymore.
+		self._config=GlobalConfiguration()  # dummy value
 
 	# some helper functions for the communication protocol.
 	def check_not_finished(self)->None:
@@ -68,6 +70,13 @@ class Engine(ABC):
 		Self-explanatory.
 		"""
 		return self._name
+
+	@property
+	def config(self)->GlobalConfiguration:
+		"""
+		Self-explanatory.
+		"""
+		return self._config
 
 	@property
 	def is_unicode(self)->bool: 
@@ -106,7 +115,10 @@ class Engine(ABC):
 		The returned line does not contain the newline character.
 		"""
 		self.check_not_exited_before()
-		result=self._read()
+		while True:
+			result=self._read()
+			if result.rstrip()!=b"pythonimmediate-naive-flush-line":
+				break
 		self.check_not_exited_after()
 		return result[:-1]
 
@@ -176,11 +188,11 @@ class ParentProcessEngine(Engine):
 		self._name=mark_to_engine_names[line[0]]
 		line=line[1:]
 
-		#self.config: GlobalConfiguration=eval(line)  # this is not safe but there should not be anything except the TeX process writing here anyway
+		#self.config=eval(line)  # this is not safe but there should not be anything except the TeX process writing here anyway
 		import base64
 		import pickle
-		self.config: GlobalConfiguration=pickle.loads(base64.b64decode(line))
-		assert isinstance(self.config, communicate.GlobalConfiguration)
+		self._config=pickle.loads(base64.b64decode(line))
+		assert isinstance(self._config, GlobalConfiguration)
 
 		sys.stdin=None  # type: ignore
 		# avoid user mistakenly read
@@ -268,6 +280,14 @@ class DefaultEngine(Engine):
 	def name(self)->EngineName:
 		return self.get_engine().name
 
+	@property
+	def config(self)->GlobalConfiguration:
+		return self.get_engine().config
+
+	@config.setter
+	def config(self, value: GlobalConfiguration)->None:
+		raise NotImplementedError
+
 	def _read(self)->bytes:
 		line=self.get_engine()._read()
 		return line
@@ -347,7 +367,7 @@ class ChildProcessEngine(Engine):
 
 		from . import surround_delimiter, send_raw, substitute_private, get_bootstrap_code
 		send_raw(surround_delimiter(substitute_private(
-			get_bootstrap_code() + 
+			get_bootstrap_code(self) + 
 			r"""
 			\cs_new_eq:NN \pythonimmediatechildprocessmainloop \__read_do_one_command:
 			"""

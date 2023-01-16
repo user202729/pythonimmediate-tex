@@ -7,7 +7,7 @@ import typing
 
 def main()->None:
 	from .engine import ParentProcessEngine
-	from . import PTTBlock, PTTVerbatimLine, run_error_finish, default_engine, send_bootstrap_code, run_main_loop
+	from . import PTTBlock, PTTVerbatimLine, run_error_finish, default_engine, send_raw, surround_delimiter, substitute_private, get_bootstrap_code, run_main_loop
 	from .pytotex import get_parser
 	from .communicate import GlobalConfiguration, Communicator
 
@@ -18,7 +18,7 @@ def main()->None:
 	try:
 		engine=ParentProcessEngine(pseudo_config)
 		default_engine.set_engine(engine)
-		send_bootstrap_code(engine=engine)
+		send_raw(surround_delimiter(substitute_private(get_bootstrap_code(engine))), engine)
 		run_main_loop(engine=engine)  # if this returns cleanly TeX has no error. Otherwise some readline() will reach eof and print out a stack trace
 		if engine.config.sanity_check_extra_line:
 			assert not engine._read(), "Internal error: TeX sends extra line"
