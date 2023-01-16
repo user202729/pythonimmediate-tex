@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Receive things that should be passed to [TeX] from [TeX]-to-Py half (:mod:`pythonimmediate.textopy`),
 then pass to [TeX].
@@ -16,10 +17,11 @@ Supported command-line arguments:
 import sys
 import signal
 import argparse
+from typing import Type
 
-from .communicate import MultiprocessingNetworkCommunicator, UnnamedPipeCommunicator
+from .communicate import Communicator, MultiprocessingNetworkCommunicator, UnnamedPipeCommunicator
 
-communicator_by_name={
+communicator_by_name: dict[str, Type[Communicator]]={
 		"unnamed-pipe": UnnamedPipeCommunicator,
 		"multiprocessing-network": MultiprocessingNetworkCommunicator,
 		}  # sorted by priority. We prefer unnamed-pipe because it's faster
@@ -50,4 +52,18 @@ if __name__ == "__main__":
 		else:
 			raise RuntimeError("No available mode of communication! (this cannot happen)")
 
-	communicator_by_name[mode].forward()
+	from .communicate import GlobalConfiguration
+	communicator, listen_forwarder=communicator_by_name[mode].setup()
+	config=GlobalConfiguration(
+			debug=0,
+			communicator=communicator
+			)
+
+	import pickle
+	import base64
+	config_str=base64.b64encode(pickle.dumps(config)).decode('ascii')
+	assert "\n" not in config_str
+	sys.stdout.write(config_str+"\n")
+	sys.stdout.flush()
+
+	listen_forwarder()

@@ -145,7 +145,12 @@ class ParentProcessEngine(Engine):
 		line=line[1:]
 
 		from . import communicate
-		self.communicator=communicate.create_communicator(line)
+		from .communicate import GlobalConfiguration
+		#self.config: GlobalConfiguration=eval(line)  # this is not safe but there should not be anything except the TeX process writing here anyway
+		import base64
+		import pickle
+		self.config: GlobalConfiguration=pickle.loads(base64.b64decode(line))
+		assert isinstance(self.config, communicate.GlobalConfiguration)
 
 		sys.stdin=None  # type: ignore
 		# avoid user mistakenly read
@@ -156,7 +161,7 @@ class ParentProcessEngine(Engine):
 		return line
 
 	def _write(self, s: bytes)->None:
-		self.communicator.send(s)
+		self.config.communicator.send(s)
 
 
 @dataclass

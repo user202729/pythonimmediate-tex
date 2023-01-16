@@ -1763,7 +1763,10 @@ def random_identifiers()->Iterator[str]:  # do this to avoid TeX hash collision 
 	for len_ in itertools.count(0):
 		for value in range(1<<len_):
 			for initial in string.ascii_letters:
-				yield initial + f"{value:0{len_}b}".translate({ord("0"): "a", ord("1"): "b"})
+				identifier = initial
+				if len_>0:
+					identifier += f"{value:0{len_}b}".translate({ord("0"): "a", ord("1"): "b"})
+				yield identifier
 
 random_identifier_iterable=random_identifiers()
 
@@ -1802,7 +1805,7 @@ def define_TeX_call_Python(f: Callable[..., None], name: Optional[str]=None, arg
 	if name is None: name=f.__name__
 
 	if identifier is None: identifier=get_random_identifier()
-	assert identifier not in TeX_handlers
+	assert identifier not in TeX_handlers, identifier
 
 	@functools.wraps(f)
 	def g(engine: Engine)->None:
