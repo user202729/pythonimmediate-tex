@@ -141,18 +141,16 @@ class ParentProcessEngine(Engine):
 		super().__init__()
 
 		import threading
-		initialized=False
 		def f()->None:
 			"""
 			Sanity check, just in case the readline() below block forever. (should never happen.)
 			"""
-			if not initialized:
-				raise RuntimeError("Cannot read anything from TeX!")
+			raise RuntimeError("Cannot read anything from TeX!")
 		timer=threading.Timer(3, f)
 		timer.start()
 
-
 		line=sys.__stdin__.buffer.readline().decode('u8')  # can't use _read() here, config is uninitialized
+		timer.cancel()
 
 		self._name=mark_to_engine_names[line[0]]
 		line=line[1:]
