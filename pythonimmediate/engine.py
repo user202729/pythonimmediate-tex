@@ -139,7 +139,20 @@ class ParentProcessEngine(Engine):
 	"""
 	def __init__(self)->None:
 		super().__init__()
-		line=self.read().decode('u8')
+
+		import threading
+		initialized=False
+		def f()->None:
+			"""
+			Sanity check, just in case the readline() below block forever. (should never happen.)
+			"""
+			if not initialized:
+				raise RuntimeError("Cannot read anything from TeX!")
+		timeout=3
+		timer=threading.Timer(10, f)
+
+
+		line=sys.__stdin__.buffer.readline().decode('u8')  # can't use _read() here, config is uninitialized
 
 		self._name=mark_to_engine_names[line[0]]
 		line=line[1:]
@@ -157,10 +170,12 @@ class ParentProcessEngine(Engine):
 
 	def _read(self)->bytes:
 		line=sys.__stdin__.buffer.readline()
+		if self.config.debug>=5: print("TeX → Python:", repr(line))
 		if not line: self.exited=True
 		return line
 
 	def _write(self, s: bytes)->None:
+		if self.config.debug>=5: print("Python → TeX:", repr(s))
 		self.config.communicator.send(s)
 
 
@@ -237,7 +252,8 @@ class DefaultEngine(Engine):
 		return self.get_engine().name
 
 	def _read(self)->bytes:
-		return self.get_engine()._read()
+		line=self.get_engine()._read()
+		return line
 
 	def _write(self, s: bytes)->None:
 		self.get_engine().write(s)

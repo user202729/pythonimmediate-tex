@@ -29,7 +29,7 @@ def main():
 		type_, value, tb = sys.exc_info()
 
 		short_error = "".join(
-				traceback.format_exception_only(value) +
+				traceback.format_exception_only(type_, value) +
 				["--\n"] +
 				traceback.format_tb(tb, limit=-1)
 				).strip()

@@ -22,7 +22,11 @@ class Communicator(ABC):
 	character = typing.cast(str, None)
 
 	@abstractmethod
-	def send(self, data: bytes)->None: ...
+	def send(self, data: bytes)->None:
+		"""
+		Send data. This function is called in the textopy part.
+		"""
+		...
 
 	@staticmethod
 	@abstractmethod
@@ -131,3 +135,6 @@ class UnnamedPipeCommunicator(Communicator):
 class GlobalConfiguration:
 	debug: int
 	communicator: Communicator
+
+	def __post_init__(self)->None:
+		assert 0<=self.debug<=9

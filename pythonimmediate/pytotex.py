@@ -31,6 +31,7 @@ def get_parser()->argparse.ArgumentParser:
 	parser.add_argument("-m", "--mode", choices=list(communicator_by_name.keys()),
 					 help="The mode of communication.\n\n"
 					 "Refer to :mod:`pythonimmediate.communicate` for the detail on what each mode mean.")
+	parser.add_argument("-d", "--debug", type=int, default=0, help="Debug level. In [0..9].")
 	return parser
 
 if __name__ == "__main__":
@@ -55,7 +56,7 @@ if __name__ == "__main__":
 	from .communicate import GlobalConfiguration
 	communicator, listen_forwarder=communicator_by_name[mode].setup()
 	config=GlobalConfiguration(
-			debug=0,
+			debug=args.debug,
 			communicator=communicator
 			)
 
