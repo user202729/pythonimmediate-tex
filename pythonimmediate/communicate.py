@@ -135,6 +135,7 @@ class UnnamedPipeCommunicator(Communicator):
 class GlobalConfiguration:
 	debug: int
 	communicator: Communicator
+	sanity_check_extra_line: bool
 
 	def __post_init__(self)->None:
 		assert 0<=self.debug<=9

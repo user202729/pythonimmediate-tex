@@ -137,6 +137,7 @@ r"""
 
 \AtEndDocument{
 	\immediate\write \__write_file {r}
+	\immediate\closeout \__write_file
 }
 """)
 

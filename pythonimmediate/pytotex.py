@@ -32,6 +32,10 @@ def get_parser()->argparse.ArgumentParser:
 					 help="The mode of communication.\n\n"
 					 "Refer to :mod:`pythonimmediate.communicate` for the detail on what each mode mean.")
 	parser.add_argument("-d", "--debug", type=int, default=0, help="Debug level. In [0..9].")
+	parser.add_argument("--sanity-check-extra-line", action="store_true",
+					 help="Sanity check that there's no extra line printed from [TeX] process. "
+					 "Should never be necessary unless the package is buggy. "
+					 "Might not work on Windows/MikTeX.")
 	return parser
 
 if __name__ == "__main__":
@@ -57,7 +61,8 @@ if __name__ == "__main__":
 	communicator, listen_forwarder=communicator_by_name[mode].setup()
 	config=GlobalConfiguration(
 			debug=args.debug,
-			communicator=communicator
+			communicator=communicator,
+			sanity_check_extra_line=args.sanity_check_extra_line,
 			)
 
 	import pickle

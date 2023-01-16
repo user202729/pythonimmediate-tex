@@ -13,7 +13,8 @@ def main():
 		default_engine.set_engine(engine)
 		send_bootstrap_code(engine=engine)
 		run_main_loop(engine=engine)  # if this returns cleanly TeX has no error. Otherwise some readline() will reach eof and print out a stack trace
-		assert not engine._read(), "Internal error: TeX sends extra line"
+		if engine.config.sanity_check_extra_line:
+			assert not engine._read(), "Internal error: TeX sends extra line"
 
 	except:
 		# see also documentation of run_error_finish.
