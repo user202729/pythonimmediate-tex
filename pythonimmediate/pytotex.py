@@ -59,11 +59,7 @@ if __name__ == "__main__":
 
 	from .communicate import GlobalConfiguration
 	communicator, listen_forwarder=communicator_by_name[mode].setup()
-	config=GlobalConfiguration(
-			debug=args.debug,
-			communicator=communicator,
-			sanity_check_extra_line=args.sanity_check_extra_line,
-			)
+	config=GlobalConfiguration.from_args(args, communicator)
 
 	import pickle
 	import base64

@@ -2,14 +2,21 @@ from __future__ import annotations
 import traceback
 import os
 import sys
+import typing
 
 
-def main():
+def main()->None:
 	from .engine import ParentProcessEngine
 	from . import PTTBlock, PTTVerbatimLine, run_error_finish, default_engine, send_bootstrap_code, run_main_loop
+	from .pytotex import get_parser
+	from .communicate import GlobalConfiguration, Communicator
+
+	parser=get_parser()
+	args=parser.parse_args()
+	pseudo_config=GlobalConfiguration.from_args(args, typing.cast(Communicator, None))
 
 	try:
-		engine=ParentProcessEngine()
+		engine=ParentProcessEngine(pseudo_config)
 		default_engine.set_engine(engine)
 		send_bootstrap_code(engine=engine)
 		run_main_loop(engine=engine)  # if this returns cleanly TeX has no error. Otherwise some readline() will reach eof and print out a stack trace

@@ -10,6 +10,7 @@ import sys
 from typing import List, Any, Optional, Dict, Type, TypeVar, IO, Callable
 from dataclasses import dataclass
 from io import StringIO
+import argparse
 
 
 char_to_communicator: Dict[str, Type[Communicator]]={}
@@ -139,3 +140,11 @@ class GlobalConfiguration:
 
 	def __post_init__(self)->None:
 		assert 0<=self.debug<=9
+
+	@staticmethod
+	def from_args(args: argparse.Namespace, communicator: Communicator)->GlobalConfiguration:
+		return GlobalConfiguration(
+				debug=args.debug,
+				communicator=communicator,
+				sanity_check_extra_line=args.sanity_check_extra_line,
+				)

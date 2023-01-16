@@ -89,7 +89,10 @@
 	% tried this method, it seems to work except that it's buffered when stderr is redirected to a file...
 	\immediate\openout \_pythonimmediate_write_file=|"\_pythonimmediate_python_executable \space \_pythonimmediate_python_flags \space -m ~ pythonimmediate.copy_to_stderr"~
 } {
-	\immediate\openout \_pythonimmediate_write_file=|"\_pythonimmediate_python_executable \space \_pythonimmediate_python_flags \space -m ~ pythonimmediate.textopy"~
+	\immediate\openout \_pythonimmediate_write_file=|"\_pythonimmediate_python_executable \space \_pythonimmediate_python_flags \space -m ~ pythonimmediate.textopy ~ \_pythonimmediate_args"~
+	% this args is only used initially before establishing a connection
+	% after connection is made then the configuration object is sent over
+
 	% note that openout, even to shell, will append .tex if there's no dot in the command
 	% so we artificially add a dot here in `.textopy`
 

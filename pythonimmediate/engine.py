@@ -8,6 +8,9 @@ import sys
 import subprocess
 from dataclasses import dataclass
 
+from . import communicate
+from .communicate import GlobalConfiguration
+
 
 EngineName=Literal["pdftex", "xetex", "luatex"]
 engine_names: Tuple[EngineName, ...]=EngineName.__args__  # type: ignore
@@ -137,7 +140,7 @@ class ParentProcessEngine(Engine):
 
 	This should not be used directly. Only pythonimmediate.main module should use this.
 	"""
-	def __init__(self)->None:
+	def __init__(self, pseudo_config: GlobalConfiguration)->None:
 		super().__init__()
 
 		import threading
@@ -155,8 +158,6 @@ class ParentProcessEngine(Engine):
 		self._name=mark_to_engine_names[line[0]]
 		line=line[1:]
 
-		from . import communicate
-		from .communicate import GlobalConfiguration
 		#self.config: GlobalConfiguration=eval(line)  # this is not safe but there should not be anything except the TeX process writing here anyway
 		import base64
 		import pickle
