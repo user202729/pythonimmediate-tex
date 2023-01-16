@@ -1148,6 +1148,7 @@ def f1(s: str, globals: Optional[dict]=None, locals: Optional[dict]=None, escape
 		>>> f1.default_escape="!"
 		>>> f1("a=!a!")
 		'a=1'
+		>>> f1.default_escape="`"
 
 	It's even possible to use multiple characters as the delimiter::
 
