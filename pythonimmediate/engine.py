@@ -162,8 +162,9 @@ class ParentProcessEngine(Engine):
 			# create a daemon thread to copy the data from stdin to the pipe, by 4096-byte blocks.
 			def f()->None:
 				while True:
-					data=sys.stdin.buffer.read(4096)
+					data=sys.__stdin__.buffer.read(4096)
 					if not data: break
+					if pseudo_config.debug>=5: print("TeX → Python (buffered):", repr(data))
 					os.write(w, data)
 			debug_force_buffered_worker_thread=threading.Thread(target=f, daemon=True)
 			debug_force_buffered_worker_thread.start()

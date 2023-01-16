@@ -70,7 +70,13 @@ if __name__ == "__main__":
 	import base64
 	config_str=base64.b64encode(pickle.dumps(config)).decode('ascii')
 	assert "\n" not in config_str
-	sys.stdout.write(config_str+"\n")
+	config_str+="\n"
+	if config.naive_flush:
+		# prepend spaces until the length is one less than a multiple of 4096
+		# (note that spaces being appended will not be noticed by TeX)
+		config_str=config_str.rjust((len(config_str)+4096)//4096*4096-1)
+
+	sys.stdout.write(config_str)
 	sys.stdout.flush()
 
 	listen_forwarder()
