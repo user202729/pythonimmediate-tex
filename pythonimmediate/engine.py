@@ -148,8 +148,8 @@ class ParentProcessEngine(Engine):
 			"""
 			if not initialized:
 				raise RuntimeError("Cannot read anything from TeX!")
-		timeout=3
-		timer=threading.Timer(10, f)
+		timer=threading.Timer(3, f)
+		timer.start()
 
 
 		line=sys.__stdin__.buffer.readline().decode('u8')  # can't use _read() here, config is uninitialized
