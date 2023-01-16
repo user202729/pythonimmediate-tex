@@ -137,6 +137,7 @@ class GlobalConfiguration:
 	debug: int
 	communicator: Communicator
 	sanity_check_extra_line: bool
+	debug_force_buffered: bool
 
 	def __post_init__(self)->None:
 		assert 0<=self.debug<=9
@@ -147,4 +148,5 @@ class GlobalConfiguration:
 				debug=args.debug,
 				communicator=communicator,
 				sanity_check_extra_line=args.sanity_check_extra_line,
+				debug_force_buffered=args.debug_force_buffered,
 				)

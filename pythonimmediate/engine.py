@@ -152,7 +152,24 @@ class ParentProcessEngine(Engine):
 		timer=threading.Timer(3, f)
 		timer.start()
 
-		line=sys.__stdin__.buffer.readline().decode('u8')  # can't use _read() here, config is uninitialized
+		self.input_file=sys.stdin.buffer
+
+		if pseudo_config.debug_force_buffered:
+			import os
+			r, w=os.pipe()
+			self.input_file=os.fdopen(r, "rb")
+
+			# create a daemon thread to copy the data from stdin to the pipe, by 4096-byte blocks.
+			def f()->None:
+				while True:
+					data=sys.stdin.buffer.read(4096)
+					if not data: break
+					os.write(w, data)
+			debug_force_buffered_worker_thread=threading.Thread(target=f, daemon=True)
+			debug_force_buffered_worker_thread.start()
+
+
+		line=self.input_file.readline().decode('u8')  # can't use _read() here, config is uninitialized
 		timer.cancel()
 
 		self._name=mark_to_engine_names[line[0]]
@@ -168,7 +185,7 @@ class ParentProcessEngine(Engine):
 		# avoid user mistakenly read
 
 	def _read(self)->bytes:
-		line=sys.__stdin__.buffer.readline()
+		line=self.input_file.readline()
 		if self.config.debug>=5: print("TeX → Python:", repr(line))
 		if not line: self.exited=True
 		return line
