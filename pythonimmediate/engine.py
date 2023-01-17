@@ -197,7 +197,16 @@ class ParentProcessEngine(Engine):
 			debug_force_buffered_worker_thread.start()
 
 
-		line=self.input_file.readline().decode('u8')  # can't use _read() here, config is uninitialized
+		if pseudo_config.naive_flush:
+			content=bytearray()
+			while True:
+				content.extend(self.input_file.read(4096))
+				if content[-1]==ord("."): break
+			line=content.decode('u8')
+			self.ignore_first_line=True
+		else:
+			line=self.input_file.readline().decode('u8')  # can't use self._read() here, config is uninitialized
+			self.ignore_first_line=False
 		timer.cancel()
 
 		self._name=mark_to_engine_names[line[0]]
@@ -214,6 +223,10 @@ class ParentProcessEngine(Engine):
 
 	def _read(self)->bytes:
 		line=self.input_file.readline()
+		if self.ignore_first_line:
+			self.ignore_first_line=False
+			return self._read()
+
 		if self.config.debug>=5: print("TeX → Python: " + debug_possibly_shorten(line.decode('u8')))
 		if not line: self.exited=True
 		return line

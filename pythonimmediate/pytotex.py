@@ -77,11 +77,15 @@ if __name__ == "__main__":
 	import base64
 	config_str=base64.b64encode(pickle.dumps(config)).decode('ascii')
 	assert "\n" not in config_str
-	config_str+="\n"
 	if config.naive_flush:
-		# prepend spaces until the length is one less than a multiple of 4096
-		# (note that spaces being appended will not be noticed by TeX)
-		config_str=config_str.rjust((len(config_str)+4096)//4096*4096-1)
+		# append dots (note that dot is not used in base64 encoding) until the length is a multiple of 4096
+		# so after the final newline is added, it will be one more than a multiple of 4096 and the line (minus the final newline) will be flushed
+
+		# there must be a nonzero number of dots appended to specify where the actual base64 content ends
+
+		# (note that spaces being appended will not be noticed by TeX so we cannot use spaces)
+		config_str=config_str.ljust((len(config_str)//4096+1)*4096, ".")
+	config_str+="\n"
 
 	sys.stdout.write(config_str)
 	sys.stdout.flush()
