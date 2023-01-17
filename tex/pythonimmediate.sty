@@ -88,6 +88,14 @@
 	%\immediate\openout \_pythonimmediate_write_file=symlink-to-stderr.txt~
 	% tried this method, it seems to work except that it's buffered when stderr is redirected to a file...
 	\immediate\openout \_pythonimmediate_write_file=|"\_pythonimmediate_python_executable \space \_pythonimmediate_python_flags \space -m ~ pythonimmediate.copy_to_stderr"~
+
+	\cs_new_protected:Npn \_pythonimmediate_send_content:e #1 {
+		\immediate\write \_pythonimmediate_write_file { #1 }
+	}
+	\cs_new_protected:Npn \_pythonimmediate_close_write: {
+		\immediate\closeout \_pythonimmediate_write_file
+	}
+
 } {
 
 	\sys_if_engine_luatex:TF {

@@ -42,7 +42,7 @@ Things to do:
 * preprocess `pycode` to allow using inside command argument (with a few caveats, but still good)
 * restore `select.select` for unnamed pipe or `threading` to cancel the pipe on timeout
 * refactor serialization to allow passing more data in a structured way
-
+* Catch error from ChildProcessEngine
 
 `tex/` folder contains TeX-related files. The source code of the package is in `tex/pythonimmediate.sty`.
 
@@ -62,6 +62,13 @@ To autobuild the documentation
 ```
 cd docs
 sphinx-autobuild . /tmp/_build/ --watch ..
+```
+
+To create a tag
+
+```
+git tag 0.3.0
+git push --tags
 ```
 
 not that the output directory matters, just visit the documentation at `localhost:8000`.
