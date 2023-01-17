@@ -19,7 +19,7 @@
 	\tl_put_right:Nx\tmparg{~ --mode ~ \specifymode}
 \fi
 \ifdefined\testnaiveflush
-	\tl_put_right:Nx\tmparg{~ --debug-force-buffered ~ --naive-flush}
+	\tl_put_right:Nx\tmparg{~ --debug-force-buffered ~ --naive-flush ~ --no-sanity-check-extra-line}
 \fi
 \ifdefined\extraarg
 	\tl_put_right:Nx\tmparg{~\extraarg}

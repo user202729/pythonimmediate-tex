@@ -134,7 +134,7 @@ def naive_replace(code: str, x: Union[Engine, bool])->str:
 	code1=code
 	if (x.config.naive_flush if isinstance(x, Engine) else x):
 		code1=code1.replace("%naive_inline%", r"^^J \__naive_flush_data: ")
-		code1=code1.replace("%naive_flush%", r"\immediate\write \__write_file {\__naive_flush_data:}")
+		code1=code1.replace("%naive_flush%", r"\__send_content:e {\__naive_flush_data:}")
 		code1=code1.replace("%naive_send%", r"_naive_flush")
 	else:
 		code1=code1.replace("%naive_inline%", "")
@@ -154,7 +154,7 @@ def mark_bootstrap_naive_replace(code: str)->None:
 
 	- ``%naive_inline``: replaced with ``^^J \__naive_flush_data:``
 		if :attr:`Engine.config.naive_flush` is ``True``, else become empty
-	- ``%naive_flush%``: replaced with ``\immediate\write \__write_file {\__naive_flush_data:}``
+	- ``%naive_flush%``: replaced with ``\__send_content:e {\__naive_flush_data:}``
 		if :attr:`Engine.config.naive_flush` is ``True``
 	"""
 	bootstrap_code_functions.append(wrap_naive_replace(code))
@@ -173,7 +173,7 @@ r"""
 
 % read documentation of ``_peek`` commands for details what this command does.
 \cs_new_protected:Npn \pythonimmediatecontinue #1 {
-	\immediate\write \__write_file {r #1 %naive_inline% }
+	\__send_content:e {r #1 %naive_inline% }
 	\__read_do_one_command:
 }
 
@@ -182,7 +182,8 @@ r"""
 }
 
 \cs_new_protected:Npn \__send_content:e #1 {
-	\immediate\write \__write_file { #1 }
+	\immediate\write
+	\__write_file { #1 }
 }
 
 \cs_new_protected:Npn \__send_content:n #1 {
@@ -202,7 +203,7 @@ r"""
 % internal function. Just send an arbitrary block of data to Python.
 % this function only works properly when newlinechar = 10.
 \cs_new_protected:Npn \__send_block:e #1 {
-	\immediate\write \__write_file {
+	\__send_content:e {
 		#1 ^^J
 		pythonimm?""" + '"""' + r"""?'''?  % following character will be newline
 	}
@@ -213,7 +214,7 @@ r"""
 }
 
 \cs_new_protected:Npn \__send_block_naive_flush:e #1 {
-	\immediate\write \__write_file {
+	\__send_content:e {
 		#1 ^^J
 		pythonimm?""" + '"""' + r"""?'''?  % following character will be newline
 		%naive_inline%
@@ -228,7 +229,7 @@ r"""
 \cs_generate_variant:Nn \__send_block_naive_flush:n {V}
 
 \AtEndDocument{
-	\immediate\write \__write_file {r %naive_inline%}
+	\__send_content:e {r %naive_inline%}
 	\immediate\closeout \__write_file
 }
 """)
@@ -1705,16 +1706,16 @@ class TeXToPyData(ABC):
 
 
 class TTPRawLine(TeXToPyData, bytes):
-	send_code=r"\immediate \write \__write_file {{\unexpanded{{ {} }} %naive_inline% }}".format
-	send_code_var=r"\immediate \write \__write_file {{\unexpanded{{ {} }} %naive_inline% }}".format
+	send_code=r"\__send_content%naive_send%:n {{ {} }}".format
+	send_code_var=r"\__send_content%naive_send%:n {{ {} }}".format
 	@staticmethod
 	def read(engine: Engine)->"TTPRawLine":
 		line=engine.read()
 		return TTPRawLine(line)
 
 class TTPLine(TeXToPyData, str):
-	send_code=r"\immediate \write \__write_file {{\unexpanded{{ {} }} %naive_inline% }}".format
-	send_code_var=r"\immediate \write \__write_file {{\unexpanded{{ {} }} %naive_inline% }}".format
+	send_code=r"\__send_content%naive_send%:n {{ {} }}".format
+	send_code_var=r"\__send_content%naive_send%:n {{ {} }}".format
 	@staticmethod
 	def read(engine: Engine)->"TTPLine":
 		return TTPLine(readline(engine=engine))
@@ -1723,8 +1724,8 @@ class TTPELine(TeXToPyData, str):
 	"""
 	Same as TTPEBlock, but for a single line only.
 	"""
-	send_code=r"\__begingroup_setup_estr: \immediate \write \__write_file {{ {}  %naive_inline% }} \endgroup".format
-	send_code_var=r"\__begingroup_setup_estr: \immediate \write \__write_file {{ {}  %naive_inline% }} \endgroup".format
+	send_code=r"\__begingroup_setup_estr: \__send_content%naive_send%:e {{ {} }} \endgroup".format
+	send_code_var=r"\__begingroup_setup_estr: \__send_content%naive_send%:e {{ {} }} \endgroup".format
 	@staticmethod
 	def read(engine: Engine)->"TTPELine":
 		return TTPELine(readline(engine=engine))
@@ -1761,8 +1762,8 @@ class TTPEBlock(TeXToPyData, str):
 		return TTPEBlock(read_block(engine=engine))
 
 class TTPBalancedTokenList(TeXToPyData, BalancedTokenList):
-	send_code=r"\__tlserialize_nodot:Nn \__tmp {{ {} }} \immediate \write \__write_file {{\unexpanded\expandafter{{ \__tmp }} %naive_inline% }}".format
-	send_code_var=r"\__tlserialize_nodot:NV \__tmp {} \immediate \write \__write_file {{\unexpanded\expandafter{{ \__tmp }} %naive_inline% }}".format
+	send_code=r"\__tlserialize_nodot:Nn \__tmp {{ {} }} \__send_content%naive_send%:e {{\unexpanded\expandafter{{ \__tmp }} }}".format
+	send_code_var=r"\__tlserialize_nodot:NV \__tmp {} \__send_content%naive_send%:e {{\unexpanded\expandafter{{ \__tmp }} }}".format
 	@staticmethod
 	def read(engine: Engine)->"TTPBalancedTokenList":
 		if engine.is_unicode:
@@ -1942,9 +1943,9 @@ def define_TeX_call_Python(f: Callable[..., None], name: Optional[str]=None, arg
 
 	assert have_naive_replace(TeX_send_input_commands)
 
-	return wrap_naive_replace("""
-	\\cs_new_protected:Npn \\""" + name + TeX_argspec + r""" {
-		\immediate \write \__write_file { i """ + identifier + """ }
+	return wrap_naive_replace(r"""
+	\cs_new_protected:Npn """ + "\\"+name + TeX_argspec + r""" {
+		\__send_content:e { i """ + identifier + """ }
 		""" + TeX_send_input_commands + r"""
 		\__read_do_one_command:
 	}
@@ -2396,12 +2397,19 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 
 	if sync is None:
 		sync=pythonimmediate.debugging
-
+		assert not ttp_argtypes
 		TeX_code=template_substitute(TeX_code, "%optional_sync%",
-							   lambda _: r'\immediate\write\__write_file { r %naive_inline% }' if sync else '',)
+							   lambda _: r'\__send_content%naive_send%:e { r }' if sync else '',)
 
-	TeX_code=template_substitute(TeX_code, "%sync%",
-						   lambda _: r'\immediate\write\__write_file { r %naive_inline% }' if sync else '', optional=True)
+	if sync:
+		sync_code=r'\__send_content%naive_send%:e { r }'
+		if ttp_argtypes is not None:
+			# then don't need to sync here, can sync when the last argument is sent
+			sync_code=naive_replace(sync_code, False)
+	else:
+		sync_code=""
+
+	TeX_code=template_substitute(TeX_code, "%sync%", lambda _: sync_code, optional=True)
 
 	assert sync is not None
 	if ttp_argtypes: assert sync

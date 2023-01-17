@@ -38,7 +38,13 @@ def get_parser()->argparse.ArgumentParser:
 					 "Might not work on Windows/MikTeX.")
 	parser.add_argument("--no-sanity-check-extra-line", dest="sanity_check_extra_line", action="store_false")
 	parser.add_argument("--debug-force-buffered", action="store_true",
-					 help="Debug mode, simulate [TeX] writes being 4096-byte buffered. Don't use.")
+					 help="""Debug mode, simulate [TeX] writes being 4096-byte buffered. Don't use.
+
+					 "This may raise the error message
+					 ``Fatal Python error: could not acquire lock for <_io.BufferedReader name='<stdin>'> at interpreter shutdown, possibly due to daemon threads``
+					 because of how it's implemented (a daemon thread read from stdin and forward to a pipe), but this feature is only
+					 used for debugging anyway so it does not matter.
+					 """)
 	parser.add_argument("--naive-flush", action="store_true",
 					 help="Naively flush stdout by writing 4096 bytes to it when needed. "
 					 "Required in some [TeX] distribution that does not flush output.")

@@ -391,7 +391,7 @@ def get_multiline_verb_arg(engine: Engine=  default_engine)->str:
 		r"""
 		\precattl_exec:n {
 			\NewDocumentCommand %name% {+v} {
-				\immediate\write\__write_file { r }
+				\__send_content:e { r }
 				\str_set:Nn \l_tmpa_tl { #1 }
 				\str_replace_all:Nnn \l_tmpa_tl { \cO\^^M } { ^^J }
 				\__send_block%naive_send%:e { \l_tmpa_tl }
