@@ -36,6 +36,7 @@ def get_parser()->argparse.ArgumentParser:
 					 help="Sanity check that there's no extra line printed from [TeX] process. "
 					 "Should never be necessary unless the package is buggy. "
 					 "Might not work on Windows/MikTeX.")
+	parser.add_argument("--no-sanity-check-extra-line", dest="sanity_check_extra_line", action="store_false")
 	parser.add_argument("--debug-force-buffered", action="store_true",
 					 help="Debug mode, simulate [TeX] writes being 4096-byte buffered. Don't use.")
 	parser.add_argument("--naive-flush", action="store_true",

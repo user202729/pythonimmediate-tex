@@ -74,7 +74,9 @@ def surround_delimiter(block: str)->str:
 		if delimiter not in block: break
 	return delimiter + "\n" + block + "\n" + delimiter + "\n"
 
-bootstrap_code_functions: list[Callable[[Engine], str]]=[]
+EngineDependentCode=Callable[[Engine], str]
+
+bootstrap_code_functions: list[EngineDependentCode]=[]
 """
 Internal constant.
 Contains functions that takes an engine object and returns some code before :meth:`substitute_private` is applied on it.
@@ -91,6 +93,17 @@ def substitute_private(code: str)->str:
 
 def send_bootstrap_code(engine: Engine)->None:
 	send_raw(surround_delimiter(substitute_private(get_bootstrap_code(engine))), engine=engine)
+
+
+def postprocess_send_code(s: str, put_sync: bool)->str:
+	assert have_naive_replace(s)
+	if put_sync:
+		# keep the naive-sync operation
+		pass
+	else:
+		# remove it
+		s=naive_replace(s, False)
+	return s
 
 # ========
 
@@ -112,25 +125,39 @@ def _naive_flush_data_define(engine: Engine)->str:
 			"""
 	return ""
 
+@typing.overload
+def naive_replace(code: str, naive_flush: bool)->str: ...
+@typing.overload
+def naive_replace(code: str, engine: Engine)->str: ...
+
+def naive_replace(code: str, x: Union[Engine, bool])->str:
+	code1=code
+	if (x.config.naive_flush if isinstance(x, Engine) else x):
+		code1=code1.replace("%naive_inline%", r"^^J \__naive_flush_data: ")
+		code1=code1.replace("%naive_flush%", r"\immediate\write \__write_file {\__naive_flush_data:}")
+		code1=code1.replace("%naive_send%", r"_naive_flush")
+	else:
+		code1=code1.replace("%naive_inline%", "")
+		code1=code1.replace("%naive_flush%", "")
+		code1=code1.replace("%naive_send%", "")
+	return code1
+
+def have_naive_replace(code: str)->bool:
+	return naive_replace(code, False)!=code
+
+def wrap_naive_replace(code: str)->EngineDependentCode:
+	return functools.partial(naive_replace, code)
+
 def mark_bootstrap_naive_replace(code: str)->None:
 	r"""
 	Similar to :func:`mark_bootstrap`, but code may contain one of the following:
 
-		- ``%naive_inline``: replaced with ``^^J \__naive_flush_data:``
-			if :attr:`Engine.config.naive_flush` is ``True``, else become empty
-		- ``%naive_flush%``: replaced with ``\immediate\write \__write_file {\__naive_flush_data:}``
-			if :attr:`Engine.config.naive_flush` is ``True``
+	- ``%naive_inline``: replaced with ``^^J \__naive_flush_data:``
+		if :attr:`Engine.config.naive_flush` is ``True``, else become empty
+	- ``%naive_flush%``: replaced with ``\immediate\write \__write_file {\__naive_flush_data:}``
+		if :attr:`Engine.config.naive_flush` is ``True``
 	"""
-	def result(engine: Engine)->str:
-		code1=code
-		if engine.config.naive_flush:
-			code1=code1.replace("%naive_inline%", r"^^J \__naive_flush_data: ")
-			code1=code1.replace("%naive_flush%", r"\immediate\write \__write_file {\__naive_flush_data:}")
-		else:
-			code1=code1.replace("%naive_inline%", "")
-			code1=code1.replace("%naive_flush%", "")
-		return code1
-	bootstrap_code_functions.append(result)
+	bootstrap_code_functions.append(wrap_naive_replace(code))
 
 mark_bootstrap_naive_replace(
 r"""
@@ -154,13 +181,30 @@ r"""
 	\pythonimmediatecontinue {}
 }
 
+\cs_new_protected:Npn \__send_content:e #1 {
+	\immediate\write \__write_file { #1 }
+}
+
+\cs_new_protected:Npn \__send_content:n #1 {
+	\__send_content:e { \unexpanded{#1} }
+}
+
+\cs_new_protected:Npn \__send_content_naive_flush:e #1 {
+	\__send_content:e { #1 %naive_inline% }
+}
+
+\cs_new_protected:Npn \__send_content_naive_flush:n #1 {
+	\__send_content_naive_flush:e { \unexpanded{#1} }
+}
+
+% the names are such that \__send_content%naive_send%:n {something} results in the correct content
+
 % internal function. Just send an arbitrary block of data to Python.
 % this function only works properly when newlinechar = 10.
 \cs_new_protected:Npn \__send_block:e #1 {
 	\immediate\write \__write_file {
 		#1 ^^J
 		pythonimm?""" + '"""' + r"""?'''?  % following character will be newline
-		%naive_inline%
 	}
 }
 
@@ -168,8 +212,23 @@ r"""
 	\__send_block:e {\unexpanded{#1}}
 }
 
+\cs_new_protected:Npn \__send_block_naive_flush:e #1 {
+	\immediate\write \__write_file {
+		#1 ^^J
+		pythonimm?""" + '"""' + r"""?'''?  % following character will be newline
+		%naive_inline%
+	}
+}
+
+\cs_new_protected:Npn \__send_block_naive_flush:n #1 {
+	\__send_block_naive_flush:e {\unexpanded{#1}}
+}
+
+\cs_generate_variant:Nn \__send_block:n {V}
+\cs_generate_variant:Nn \__send_block_naive_flush:n {V}
+
 \AtEndDocument{
-	\immediate\write \__write_file {r}
+	\immediate\write \__write_file {r %naive_inline%}
 	\immediate\closeout \__write_file
 }
 """)
@@ -1646,16 +1705,16 @@ class TeXToPyData(ABC):
 
 
 class TTPRawLine(TeXToPyData, bytes):
-	send_code=r"\immediate \write \__write_file {{\unexpanded{{ {} }}}}".format
-	send_code_var=r"\immediate \write \__write_file {{\unexpanded{{ {} }}}}".format
+	send_code=r"\immediate \write \__write_file {{\unexpanded{{ {} }} %naive_inline% }}".format
+	send_code_var=r"\immediate \write \__write_file {{\unexpanded{{ {} }} %naive_inline% }}".format
 	@staticmethod
 	def read(engine: Engine)->"TTPRawLine":
 		line=engine.read()
 		return TTPRawLine(line)
 
 class TTPLine(TeXToPyData, str):
-	send_code=r"\immediate \write \__write_file {{\unexpanded{{ {} }}}}".format
-	send_code_var=r"\immediate \write \__write_file {{\unexpanded{{ {} }}}}".format
+	send_code=r"\immediate \write \__write_file {{\unexpanded{{ {} }} %naive_inline% }}".format
+	send_code_var=r"\immediate \write \__write_file {{\unexpanded{{ {} }} %naive_inline% }}".format
 	@staticmethod
 	def read(engine: Engine)->"TTPLine":
 		return TTPLine(readline(engine=engine))
@@ -1664,8 +1723,8 @@ class TTPELine(TeXToPyData, str):
 	"""
 	Same as TTPEBlock, but for a single line only.
 	"""
-	send_code=r"\__begingroup_setup_estr: \immediate \write \__write_file {{ {} }} \endgroup".format
-	send_code_var=r"\__begingroup_setup_estr: \immediate \write \__write_file {{ {} }} \endgroup".format
+	send_code=r"\__begingroup_setup_estr: \immediate \write \__write_file {{ {}  %naive_inline% }} \endgroup".format
+	send_code_var=r"\__begingroup_setup_estr: \immediate \write \__write_file {{ {}  %naive_inline% }} \endgroup".format
 	@staticmethod
 	def read(engine: Engine)->"TTPELine":
 		return TTPELine(readline(engine=engine))
@@ -1682,8 +1741,8 @@ class TTPEmbeddedLine(TeXToPyData, str):
 		raise RuntimeError("Must be manually handled")
 
 class TTPBlock(TeXToPyData, str):
-	send_code=r"\__send_block:n {{ {} }}".format
-	send_code_var=r"\__send_block:V {}".format
+	send_code=r"\__send_block:n {{ {} }} %naive_flush%".format
+	send_code_var=r"\__send_block:V {} %naive_flush%".format
 	@staticmethod
 	def read(engine: Engine)->"TTPBlock":
 		return TTPBlock(read_block(engine=engine))
@@ -1695,15 +1754,15 @@ class TTPEBlock(TeXToPyData, str):
 	Done by fully expand the argument in \escapechar=-1 and convert it to a string.
 	Additional precaution is needed, see the note above.
 	"""
-	send_code=r"\__begingroup_setup_estr: \__send_block:e {{ {} }} \endgroup".format
-	send_code_var=r"\__begingroup_setup_estr: \__send_block:e {} \endgroup".format
+	send_code=r"\__begingroup_setup_estr: \__send_block%naive_send%:e {{ {} }} \endgroup".format
+	send_code_var=r"\__begingroup_setup_estr: \__send_block%naive_send%:e {{ {} }} \endgroup".format
 	@staticmethod
 	def read(engine: Engine)->"TTPEBlock":
 		return TTPEBlock(read_block(engine=engine))
 
 class TTPBalancedTokenList(TeXToPyData, BalancedTokenList):
-	send_code=r"\__tlserialize_nodot:Nn \__tmp {{ {} }} \immediate \write \__write_file {{\unexpanded\expandafter{{ \__tmp }}}}".format
-	send_code_var=r"\__tlserialize_nodot:NV \__tmp {} \immediate \write \__write_file {{\unexpanded\expandafter{{ \__tmp }}}}".format
+	send_code=r"\__tlserialize_nodot:Nn \__tmp {{ {} }} \immediate \write \__write_file {{\unexpanded\expandafter{{ \__tmp }} %naive_inline% }}".format
+	send_code_var=r"\__tlserialize_nodot:NV \__tmp {} \immediate \write \__write_file {{\unexpanded\expandafter{{ \__tmp }} %naive_inline% }}".format
 	@staticmethod
 	def read(engine: Engine)->"TTPBalancedTokenList":
 		if engine.is_unicode:
@@ -1809,7 +1868,7 @@ def get_random_identifier()->str:
 	return next(random_identifier_iterable)
 
 
-def define_TeX_call_Python(f: Callable[..., None], name: Optional[str]=None, argtypes: Optional[List[Type[TeXToPyData]]]=None, identifier: Optional[str]=None)->str:
+def define_TeX_call_Python(f: Callable[..., None], name: Optional[str]=None, argtypes: Optional[List[Type[TeXToPyData]]]=None, identifier: Optional[str]=None)->EngineDependentCode:
 	r"""
 	This function setups some internal data structure, and
 	returns the [TeX]-code to be executed on the [TeX]-side to define the macro.
@@ -1844,6 +1903,8 @@ def define_TeX_call_Python(f: Callable[..., None], name: Optional[str]=None, arg
 
 	@functools.wraps(f)
 	def g(engine: Engine)->None:
+		if engine.config.debug>=5:
+			print("TeX macro", name, "called")
 		assert argtypes is not None
 		args=[argtype.read(engine=engine) for argtype in argtypes]
 
@@ -1874,16 +1935,20 @@ def define_TeX_call_Python(f: Callable[..., None], name: Optional[str]=None, arg
 	TeX_send_input_commands = ""
 	for i, argtype in enumerate(argtypes):
 		arg = f"#{i+1}"
-		TeX_send_input_commands += argtype.send_code(arg)
+		TeX_send_input_commands += postprocess_send_code(argtype.send_code(arg), put_sync=i==len(argtypes)-1)
 		TeX_argspec += arg
+	if not argtypes:
+		TeX_send_input_commands += "%naive_flush%"
 
-	return """
+	assert have_naive_replace(TeX_send_input_commands)
+
+	return wrap_naive_replace("""
 	\\cs_new_protected:Npn \\""" + name + TeX_argspec + r""" {
 		\immediate \write \__write_file { i """ + identifier + """ }
 		""" + TeX_send_input_commands + r"""
 		\__read_do_one_command:
 	}
-	"""
+	""")
 
 
 def define_internal_handler(f: Callable)->Callable:
@@ -1893,7 +1958,7 @@ def define_internal_handler(f: Callable)->Callable:
 	this does not define the specified function in any particular engine, just add them to the bootstrap_code.
 		essert self.process is not None, "process is already closed!"
 	"""
-	mark_bootstrap(define_TeX_call_Python(f))
+	bootstrap_code_functions.append(define_TeX_call_Python(f))
 	return f
 
 
@@ -2210,7 +2275,7 @@ def build_Python_call_TeX(T: Type, TeX_code: str, *, recursive: bool=True, sync:
 			code, result=define_Python_call_TeX(TeX_code=TeX_code, ptt_argtypes=[*extra.ptt_argtypes], ttp_argtypes=[*ttp_argtypes],
 																  recursive=recursive, sync=sync, finish=finish,
 																  )
-		mark_bootstrap(code)
+		bootstrap_code_functions.append(code)
 
 		def result2(*args):
 			engine=args[-1]
@@ -2270,12 +2335,13 @@ def scan_Python_call_TeX_module(name: str)->None:
 	assert name != "__main__"  # https://github.com/python/cpython/issues/86291
 	scan_Python_call_TeX(inspect.getsource(sys.modules[name]))
 
+
 def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]], ttp_argtypes: List[Type[TeXToPyData]],
 						   *,
 						   recursive: bool=True,
 						   sync: Optional[bool]=None,
 						   finish: bool=False,
-						   )->Tuple[str, PythonCallTeXFunctionType]:
+						   )->Tuple[EngineDependentCode, PythonCallTeXFunctionType]:
 	r"""
 	Internal function.
 
@@ -2292,6 +2358,9 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 		* %send_arg0(...)%, %send_arg1(...)%: will be expanded to code that sends the content.
 		* %send_arg0_var(\var_name)%, %send_arg1_var(...)%: will be expanded to code that sends the content in the variable.
 		* %optional_sync%: expanded to code that writes ``r`` (to sync), if ``sync`` is True.
+		* %naive_flush% and %naive_inline%: as explained in :func:`mark_bootstrap_naive_replace`.
+		  (although usually you don't need to explicitly write this, it's embedded in the ``send*()`` command
+		  of the last argument, or ``%sync%``)
 
 	ptt_argtypes: list of argument types to be sent from Python to TeX (i.e. input of the TeX function)
 
@@ -2329,10 +2398,10 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 		sync=pythonimmediate.debugging
 
 		TeX_code=template_substitute(TeX_code, "%optional_sync%",
-							   lambda _: r'\immediate\write\__write_file { r }' if sync else '',)
+							   lambda _: r'\immediate\write\__write_file { r %naive_inline% }' if sync else '',)
 
 	TeX_code=template_substitute(TeX_code, "%sync%",
-						   lambda _: r'\immediate\write\__write_file { r }' if sync else '', optional=True)
+						   lambda _: r'\immediate\write\__write_file { r %naive_inline% }' if sync else '', optional=True)
 
 	assert sync is not None
 	if ttp_argtypes: assert sync
@@ -2347,11 +2416,13 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 							   optional=True)
 
 	for i, argtype in enumerate(ttp_argtypes):
+
+
 		TeX_code=template_substitute(TeX_code, f"%send_arg{i}" + r"\(([^)]*)\)%",
-							   lambda match: argtype.send_code(match[1]),
+							   lambda match: postprocess_send_code(argtype.send_code(match[1]), i==len(ttp_argtypes)-1),
 							   optional=True)
 		TeX_code=template_substitute(TeX_code, f"%send_arg{i}_var" + r"\(([^)]*)\)%",
-							   lambda match: argtype.send_code_var(match[1]),
+							   lambda match: postprocess_send_code(argtype.send_code_var(match[1]), i==len(ttp_argtypes)-1),
 							   optional=True)
 
 	def f(*args, engine: Engine)->Optional[Tuple[TeXToPyData, ...]]:
@@ -2389,7 +2460,7 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 				result.append(argtype_.read(engine))
 		return tuple(result)
 
-	return TeX_code, f
+	return wrap_naive_replace(TeX_code), f
 
 scan_Python_call_TeX_module(__name__)
 
@@ -2510,8 +2581,7 @@ def peek_next_meaning(engine: Engine=  default_engine)->str:
 			\cs_new_protected:Npn \__peek_next_meaning_callback: {
 
 				\edef \__tmp {\meaning \__tmp}  % just in case ``\__tmp`` is outer, ``\write`` will not be able to handle it
-				%\immediate\write \__write_file { r \unexpanded\expandafter{\__tmp} }
-				\immediate\write \__write_file { r \__tmp }
+				\__send_content%naive_send%:e { r \__tmp }
 
 				\__read_do_one_command:
 			}

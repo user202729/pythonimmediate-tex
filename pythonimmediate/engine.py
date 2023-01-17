@@ -119,6 +119,9 @@ class Engine(ABC):
 			result=self._read()
 			if result.rstrip()!=b"pythonimmediate-naive-flush-line":
 				break
+			else:
+				# ignore this line
+				assert self.config.naive_flush
 		self.check_not_exited_after()
 		return result[:-1]
 
@@ -144,6 +147,12 @@ class Engine(ABC):
 		Because TeX can only read whole lines s should be newline-terminated.
 		"""
 		...
+
+
+def debug_possibly_shorten(line: str)->str:
+	if len(line)>=100:
+		return line[:100]+"..."
+	return line
 
 
 class ParentProcessEngine(Engine):
@@ -173,11 +182,17 @@ class ParentProcessEngine(Engine):
 
 			# create a daemon thread to copy the data from stdin to the pipe, by 4096-byte blocks.
 			def f()->None:
+				buffer=bytearray()
 				while True:
-					data=sys.__stdin__.buffer.read(4096)
-					if not data: break
-					if pseudo_config.debug>=5: print("TeX → Python (buffered):", repr(data))
-					os.write(w, data)
+					data=sys.__stdin__.buffer.readline()
+					if pseudo_config.debug>=5: print("TeX → Python (buffered): " + debug_possibly_shorten(data.decode('u8')))
+					if not data:
+						os.write(w, buffer)
+						break
+					buffer.extend(data)
+					while len(buffer)>=4096:
+						os.write(w, buffer[:4096])
+						buffer=buffer[4096:]
 			debug_force_buffered_worker_thread=threading.Thread(target=f, daemon=True)
 			debug_force_buffered_worker_thread.start()
 
@@ -199,12 +214,14 @@ class ParentProcessEngine(Engine):
 
 	def _read(self)->bytes:
 		line=self.input_file.readline()
-		if self.config.debug>=5: print("TeX → Python:", repr(line))
+		if self.config.debug>=5: print("TeX → Python: " + debug_possibly_shorten(line.decode('u8')))
 		if not line: self.exited=True
 		return line
 
 	def _write(self, s: bytes)->None:
-		if self.config.debug>=5: print("Python → TeX:", repr(s))
+		if self.config.debug>=5:
+			for line in s.splitlines():
+				print("Python → TeX: " + debug_possibly_shorten(line.decode('u8')))
 		self.config.communicator.send(s)
 
 

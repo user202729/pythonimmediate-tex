@@ -257,9 +257,9 @@ def get_arg_str(engine: Engine=  default_engine)->str:
 	return _replace_double_hash(typing.cast(Callable[[Engine], TTPEmbeddedLine], Python_call_TeX_local(
 		r"""
 		\cs_new_protected:Npn %name% #1 {
-			\immediate\write\__write_file { \unexpanded {
+			\__send_content%naive_send%:n {
 				r #1
-			}}
+			}
 			\__read_do_one_command:
 		}
 		""", recursive=False))(engine))
@@ -307,7 +307,7 @@ def get_optional_arg_str(engine: Engine=  default_engine)->Optional[str]:
 	result=typing.cast(Callable[[Engine], TTPLine], Python_call_TeX_local(
 		r"""
 		\NewDocumentCommand %name% {o} {
-			\immediate\write \__write_file {
+			\__send_content%naive_send%:e {
 				r ^^J
 				\IfNoValueTF {#1} {
 					0
@@ -370,10 +370,10 @@ def get_verb_arg(engine: Engine=  default_engine)->str:
 	return typing.cast(Callable[[Engine], TTPLine], Python_call_TeX_local(
 		r"""
 		\NewDocumentCommand %name% {v} {
-			\immediate\write\__write_file { \unexpanded {
+			\__send_content%naive_send%:n {
 				r ^^J
 				#1
-			}}
+			}
 			\__read_do_one_command:
 		}
 		""", recursive=False))(engine)
@@ -394,7 +394,7 @@ def get_multiline_verb_arg(engine: Engine=  default_engine)->str:
 				\immediate\write\__write_file { r }
 				\str_set:Nn \l_tmpa_tl { #1 }
 				\str_replace_all:Nnn \l_tmpa_tl { \cO\^^M } { ^^J }
-				\__send_block:e { \l_tmpa_tl }
+				\__send_block%naive_send%:e { \l_tmpa_tl }
 				\__read_do_one_command:
 			}
 		}
@@ -527,7 +527,7 @@ def newcommand(name: str, f: Callable, engine: Engine)->None:
 				%read_arg0(\__line)%
 				%read_arg1(\__identifier)%
 				\cs_new_protected:cpx {\__line} {
-					\unexpanded{\immediate\write \__write_file} { i \__identifier }
+					\__send_content%naive_send%:e { i \__identifier }
 					\unexpanded{\__read_do_one_command:}
 				}
 			\endgroup
@@ -558,7 +558,7 @@ def renewcommand(name: str, f: Callable, engine: Engine)->None:
 				\readline \__read_file to \__line
 				\readline \__read_file to \__identifier
 				\exp_args:Ncx \renewcommand {\__line} {
-					\unexpanded{\immediate\write \__write_file} { i \__identifier }
+					\__send_content%naive_send%:e { i \__identifier }
 					\unexpanded{\__read_do_one_command:}
 				}
 				\exp_args:Nc \MakeRobust {\__line}  % also make the command global
@@ -602,7 +602,7 @@ def define_char(char: str, engine: Engine=  default_engine)->Callable[[T2], T2]:
 		identifier=get_random_identifier()
 		_code=define_TeX_call_Python(
 				lambda engine: run_code_redirect_print_TeX(f, engine=engine),
-				"__unused", argtypes=[], identifier=identifier)
+				f"(char: {char})", argtypes=[], identifier=identifier)
 		# ignore _code, already executed something equivalent while running the TeX command below
 
 		if not engine.is_unicode and ord(char)>127:
@@ -615,7 +615,7 @@ def define_char(char: str, engine: Engine=  default_engine)->Callable[[T2], T2]:
 						\readline \__read_file to \__line
 						\readline \__read_file to \__identifier
 						\cs_gset_protected:cpx {u8:\__line} {
-							\unexpanded{\immediate\write \__write_file} { i \__identifier }
+							\__send_content%naive_send%:e { i \__identifier }
 							\unexpanded{\__read_do_one_command:}
 						}
 					\endgroup
@@ -636,7 +636,7 @@ def define_char(char: str, engine: Engine=  default_engine)->Callable[[T2], T2]:
 							\protected \gdef
 							\expandafter \expandafter \expandafter \noexpand \char_generate:nn{\expandafter`\__line}{13}
 							{
-								\unexpanded{\immediate\write \__write_file} { i \__identifier }
+								\__send_content%naive_send%:e { i \__identifier }
 								\unexpanded{\__read_do_one_command:}
 							}
 						}
@@ -810,11 +810,11 @@ def newenvironment(name: str, f: Callable, engine: Engine)->None:
 				\noexpand\newenvironment
 					{\__line}
 					{
-						\unexpanded{\immediate\write \__write_file} { i \__begin_identifier }
+						\__send_content%naive_send%:e { i \__begin_identifier }
 						\unexpanded{\__read_do_one_command:}
 					}
 					{
-						\unexpanded{\immediate\write \__write_file} { i \__end_identifier }
+						\__send_content%naive_send%:e { i \__end_identifier }
 						\unexpanded{\__read_do_one_command:}
 					}
 			}
@@ -841,10 +841,10 @@ def newenvironment(name: str, f: Callable, engine: Engine)->None:
 
 	_code=define_TeX_call_Python(
 			lambda engine: run_code_redirect_print_TeX(begin_f, engine=engine),
-			"__unused", argtypes=[], identifier=begin_identifier)
+			f"(begin environment: {name})", argtypes=[], identifier=begin_identifier)
 	_code=define_TeX_call_Python(
 			lambda engine: run_code_redirect_print_TeX(end_f, engine=engine),
-			"__unused", argtypes=[], identifier=end_identifier)
+			f"(end environment: {name})", argtypes=[], identifier=end_identifier)
 	# ignore _code, already executed something equivalent in the TeX command
 
 @_export
@@ -897,8 +897,8 @@ def newenvironment_verb(name: str, f: Callable[[str], None], engine: Engine)->No
 				\noexpand\newenvironment
 					{\__line}
 					{
-						\immediate\write \noexpand\__write_file { i \__identifier }
-						\noexpand\__read_do_one_command:
+						\__send_content%naive_send%:e { i \__identifier }
+						\__read_do_one_command:
 					}
 					{}
 			}
@@ -913,7 +913,7 @@ def newenvironment_verb(name: str, f: Callable[[str], None], engine: Engine)->No
 			\cs_new_protected:Npn %name% {
 				\saveenvreinsert \__tmp {
 					%sync%
-					\__send_block:e {\__tmp}
+					%send_arg0_var(\__tmp)%
 					\__read_do_one_command:
 				}
 			}
@@ -922,7 +922,7 @@ def newenvironment_verb(name: str, f: Callable[[str], None], engine: Engine)->No
 
 	_code=define_TeX_call_Python(
 			lambda engine: run_code_redirect_print_TeX(f1, engine=engine),
-			"__unused", argtypes=[], identifier=identifier)
+			f"(verb environment: {name})", argtypes=[], identifier=identifier)
 
 @_export
 def fully_expand(content: str, engine: Engine=  default_engine)->str:

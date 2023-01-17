@@ -14,6 +14,8 @@ is_unicode: bool=default_engine.is_unicode
 
 y=None
 
+need_speed_up=default_engine.config.naive_flush
+
 class Test(unittest.TestCase):
 	def test_simple_run_tokenized_line_local(self)->None:
 		pythonimmediate.run_tokenized_line_local(r'\testa {123} {456}')
@@ -186,7 +188,7 @@ class Test(unittest.TestCase):
 	def test_tokens_control_chars(self)->None:
 		for s in [
 				chr(i)
-				for i in range(0, 700)
+				for i in range(0, 700, (50 if need_speed_up else 1))
 				]:
 			for t in [
 				Catcode.active(s),

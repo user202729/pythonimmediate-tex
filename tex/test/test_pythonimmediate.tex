@@ -18,6 +18,12 @@
 \ifdefined\specifymode
 	\tl_put_right:Nx\tmparg{~ --mode ~ \specifymode}
 \fi
+\ifdefined\testnaiveflush
+	\tl_put_right:Nx\tmparg{~ --debug-force-buffered ~ --naive-flush}
+\fi
+\ifdefined\extraarg
+	\tl_put_right:Nx\tmparg{~\extraarg}
+\fi
 \tl_put_right:Nx\tmp{args={\tmparg},}
 
 \tl_put_right:Nn\tmp{python-executable={PYTHONPATH=/home/user202729/TeX/pythonimmediate/ ~ python3.8},}
