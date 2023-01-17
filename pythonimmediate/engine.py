@@ -190,7 +190,7 @@ class ParentProcessEngine(Engine):
 						os.write(w, buffer)
 						break
 					buffer.extend(data)
-					while len(buffer)>=4096:
+					while len(buffer)>4096:
 						os.write(w, buffer[:4096])
 						buffer=buffer[4096:]
 			debug_force_buffered_worker_thread=threading.Thread(target=f, daemon=True)
