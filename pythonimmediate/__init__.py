@@ -181,10 +181,6 @@ r"""
 	\pythonimmediatecontinue {}
 }
 
-\cs_new_protected:Npn \__send_content:e #1 {
-	\immediate\write
-	\__write_file { #1 }
-}
 
 \cs_new_protected:Npn \__send_content:n #1 {
 	\__send_content:e { \unexpanded{#1} }
@@ -230,7 +226,7 @@ r"""
 
 \AtEndDocument{
 	\__send_content:e {r %naive_inline%}
-	\immediate\closeout \__write_file
+	\__close_write:
 }
 """)
 # the last one don't need to flush because will close anyway (right?)

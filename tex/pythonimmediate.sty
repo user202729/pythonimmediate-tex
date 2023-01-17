@@ -83,18 +83,40 @@
 
 
 % ======== setup write file ========
-\newwrite \_pythonimmediate_write_file
 \bool_if:NTF \_pythonimmediate_child_process {
+	\newwrite \_pythonimmediate_write_file
 	%\immediate\openout \_pythonimmediate_write_file=symlink-to-stderr.txt~
 	% tried this method, it seems to work except that it's buffered when stderr is redirected to a file...
 	\immediate\openout \_pythonimmediate_write_file=|"\_pythonimmediate_python_executable \space \_pythonimmediate_python_flags \space -m ~ pythonimmediate.copy_to_stderr"~
 } {
-	\immediate\openout \_pythonimmediate_write_file=|"\_pythonimmediate_python_executable \space \_pythonimmediate_python_flags \space -m ~ pythonimmediate.textopy ~ \_pythonimmediate_args"~
-	% this args is only used initially before establishing a connection
+
+	\sys_if_engine_luatex:TF {
+		% use lua's io.popen
+		% the other method works as well, but this one allows explicit flushing because on some TeX distribution it does not work
+
+		\directlua{
+			(require "pythonimmediate_helper")(
+				"\luaescapestring{ \_pythonimmediate_python_executable \space \_pythonimmediate_python_flags \space -m ~ pythonimmediate.textopy ~ \_pythonimmediate_args }"
+				)
+		}
+	} {
+		\newwrite \_pythonimmediate_write_file
+
+		\cs_new_protected:Npn \_pythonimmediate_send_content:e #1 {
+			\immediate\write \_pythonimmediate_write_file { #1 }
+		}
+		\cs_new_protected:Npn \_pythonimmediate_close_write: {
+			\immediate\closeout \_pythonimmediate_write_file
+		}
+
+		\immediate\openout \_pythonimmediate_write_file=|"\_pythonimmediate_python_executable \space \_pythonimmediate_python_flags \space -m ~ pythonimmediate.textopy ~ \_pythonimmediate_args"~
+		% note that openout, even to shell, will append .tex if there's no dot in the command
+		% so we artificially add a dot here in `.textopy`
+	}
+	% the command-line arguments passed to textopy above are only used initially before establishing a connection
 	% after connection is made then the configuration object is sent over
 
-	% note that openout, even to shell, will append .tex if there's no dot in the command
-	% so we artificially add a dot here in `.textopy`
+
 
 	% both processes must be before the \readline below so that the 2 Python processes are started "in parallel"
 	\_pythonimmediate_str_get:N \_pythonimmediate_line  % read one line from pytotex half, forward to textopy half
@@ -110,7 +132,7 @@
 	\str_const:Nn \_pythonimmediate_engine_mark_xetex  {x}
 	\str_const:Nn \_pythonimmediate_engine_mark_luatex {l}
 
-	\immediate\write\_pythonimmediate_write_file {
+	\_pythonimmediate_send_content:e {
 		\use:c {_pythonimmediate_engine_mark_ \c_sys_engine_str}
 		\_pythonimmediate_line
 	}
