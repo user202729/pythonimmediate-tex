@@ -1099,7 +1099,7 @@ class F1Protocol(Protocol):
 f1: F1Protocol
 
 @_export  # type: ignore
-def f1(s: str, globals: Optional[dict]=None, locals: Optional[dict]=None, escape: Optional[Union[Tuple[str, ...], str]]=None)->str:
+def f1(s: str, *, globals: Optional[dict]=None, locals: Optional[dict]=None, escape: Optional[Union[Tuple[str, ...], str]]=None)->str:
 	"""
 	Helper function to construct a string from Python expression parts,
 	similar to f-strings, but allow using arbitrary delimiters.
