@@ -2490,9 +2490,13 @@ r"""
 	%read_arg1(\__summary)%
 	\wlog{^^JPython~error~traceback:^^J\__data^^J}
     \msg_error:nnx {pythonimmediate} {python-error} {\__summary}
+	\__close_write:
 }
 """, finish=True, sync=False))
 
+# normally the close_write above is not necessary but sometimes error can be skipped through
+# in which case we must make sure the pipe is not written to anymore
+# https://github.com/user202729/pythonimmediate-tex/issues/1
 
 
 #@export_function_to_module

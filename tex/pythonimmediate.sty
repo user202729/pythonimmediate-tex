@@ -83,18 +83,23 @@
 
 
 % ======== setup write file ========
+\cs_new_protected:Npn \_pythonimmediate_send_content:e #1 {
+	\immediate\write \_pythonimmediate_write_file { #1 }
+}
+
+\cs_new_protected:Npn \_pythonimmediate_close_write: {
+	\immediate\closeout \_pythonimmediate_write_file
+	% safeguard, in some mode e.g. nonstopmode after a Python error TeX might continue
+	\cs_gset_eq:Nc \_pythonimmediate_write_file {m@ne}
+	\cs_gset_protected:Npn \_pythonimmediate_send_content:e ##1 {}
+}
+
 \bool_if:NTF \_pythonimmediate_child_process {
 	\newwrite \_pythonimmediate_write_file
 	%\immediate\openout \_pythonimmediate_write_file=symlink-to-stderr.txt~
 	% tried this method, it seems to work except that it's buffered when stderr is redirected to a file...
 	\immediate\openout \_pythonimmediate_write_file=|"\_pythonimmediate_python_executable \space \_pythonimmediate_python_flags \space -m ~ pythonimmediate.copy_to_stderr"~
 
-	\cs_new_protected:Npn \_pythonimmediate_send_content:e #1 {
-		\immediate\write \_pythonimmediate_write_file { #1 }
-	}
-	\cs_new_protected:Npn \_pythonimmediate_close_write: {
-		\immediate\closeout \_pythonimmediate_write_file
-	}
 
 } {
 
@@ -109,13 +114,6 @@
 		}
 	} {
 		\newwrite \_pythonimmediate_write_file
-
-		\cs_new_protected:Npn \_pythonimmediate_send_content:e #1 {
-			\immediate\write \_pythonimmediate_write_file { #1 }
-		}
-		\cs_new_protected:Npn \_pythonimmediate_close_write: {
-			\immediate\closeout \_pythonimmediate_write_file
-		}
 
 		\immediate\openout \_pythonimmediate_write_file=|"\_pythonimmediate_python_executable \space \_pythonimmediate_python_flags \space -m ~ pythonimmediate.textopy ~ \_pythonimmediate_args"~
 		% note that openout, even to shell, will append .tex if there's no dot in the command

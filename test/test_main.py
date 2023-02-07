@@ -55,6 +55,23 @@ class Test:
 				cwd=tempfile.gettempdir(),
 				)
 
+	@pytest.mark.parametrize("engine_name", engine_names)
+	def test_nonstopmode_subprocess(self, engine_name: EngineName)->None:
+		# https://github.com/user202729/pythonimmediate-tex/issues/1
+		process=subprocess.run(
+				[
+					engine_name_to_latex_executable[engine_name], "-shell-escape", "-interaction=nonstopmode",
+					r'\documentclass{article}\usepackage{pythonimmediate}\py{1/0}\py{print(1)}\begin{document}\end{document}',
+					],
+				check=False,
+				cwd=tempfile.gettempdir(),
+				stdout=subprocess.PIPE,
+				)
+		content=process.stdout
+		assert process.returncode == 1
+		assert b"ZeroDivisionError" in content
+		assert b"Transcript written on" in content
+
 	def test_python_flags(self):
 		"""
 		pass -O to the Python executable and check if assertions are disabled
