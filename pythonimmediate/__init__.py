@@ -1999,7 +1999,7 @@ def py(code: TTPEBlock, engine: Engine)->None:
 def pyfile(filename: TTPELine, engine: Engine)->None:
 	with open(filename, "r") as f:
 		source=f.read()
-	exec(compile(source, filename, "exec"), user_scope)
+	run_code_redirect_print_TeX(lambda: exec(compile(source, filename, "exec"), user_scope), engine=engine)
 
 
 class RedirectPrintTeX:
