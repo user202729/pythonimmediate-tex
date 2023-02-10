@@ -1987,7 +1987,13 @@ def eval_with_linecache(code: str, globals: Dict[str, Any])->Any:
 
 @define_internal_handler
 def py(code: TTPEBlock, engine: Engine)->None:
-	pythonimmediate.run_block_finish(str(eval_with_linecache(code, user_scope))+"%", engine=engine)
+	pythonimmediate.run_block_finish(str(eval_with_linecache(
+		code.lstrip(),
+		user_scope))+"%", engine=engine)
+	# note we use code.lstrip() here because otherwise
+	# \py{
+	# 1+1}
+	# would give IndentationError
 
 @define_internal_handler
 def pyfile(filename: TTPELine, engine: Engine)->None:
