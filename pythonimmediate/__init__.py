@@ -2150,17 +2150,16 @@ def __pycodex(code: TTPBlock, lineno_: TTPLine, filename: TTPLine, fileabspath: 
 					debug(f"different {file_line!r} {code_line!r}")
 		raise RuntimeError(f"Source file not found! (cwd={os.getcwd()}, attempted {(fileabspath, filename)})")
 
-	with io.StringIO() as t:
-		with RedirectPrintTeX(t):
-			if target_filename:
-				code_=''.join(file_lines)  # restore missing trailing spaces
-			code_="\n"*(lineno-len(code_lines)-1)+code_
-			if target_filename:
-				compiled_code=compile(code_, target_filename, "exec")
-				exec(compiled_code, user_scope)
-			else:
-				exec(code_, user_scope)
-		run_block_finish(t.getvalue(), engine=engine)
+	def tmp()->None:
+		if target_filename:
+			code_=''.join(file_lines)  # restore missing trailing spaces
+		code_="\n"*(lineno-len(code_lines)-1)+code_
+		if target_filename:
+			compiled_code=compile(code_, target_filename, "exec")
+			exec(compiled_code, user_scope)
+		else:
+			exec(code_, user_scope)
+	run_code_redirect_print_TeX(tmp, engine=engine)
 
 # ======== Python-call-TeX functions
 # ======== additional functions...
