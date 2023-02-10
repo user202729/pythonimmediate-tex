@@ -2003,6 +2003,14 @@ def pyfile(filename: TTPELine, engine: Engine)->None:
 
 
 class RedirectPrintTeX:
+	"""
+	A context manager. Use like this, where ``t`` is some file object::
+
+		with RedirectPrintTeX(t):
+			pass  # some code
+
+	Then all :meth:`print_TeX` function calls will be redirected to ``t``.
+	"""
 	def __init__(self, t)->None:
 		self.t=t
 
@@ -2018,6 +2026,12 @@ class RedirectPrintTeX:
 			del pythonimmediate.file
 
 def run_code_redirect_print_TeX(f: Callable[[], Any], engine: Engine)->None:
+	"""
+	Extension of :class:`RedirectPrintTeX`, where the resulting code while the code
+	is executed will be interpreted as [TeX] code to be executed when the function returns.
+
+	Also, any return value of function ``f`` will be appended to the result.
+	"""
 	with io.StringIO() as t:
 		with RedirectPrintTeX(t):
 			result=f()
