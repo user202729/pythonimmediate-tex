@@ -1,4 +1,4 @@
-\ProvidesFile{pythonimmediate.tex}[2023/01/09 0.1.0 Library to run Python code]
+\ProvidesFile{pythonimmediate.tex}[2023/03/07 0.4.0 Library to run Python code]
 \RequirePackage{fvextra}
 \documentclass{l3doc}
 \usepackage{tikz}
@@ -57,7 +57,7 @@ In addition to the \LaTeX\ package, you need the Python \pkg{pythonimmediate-tex
 installation instruction can be found at \url{https://pypi.org/project/pythonimmediate-tex/}.
 
 Note that not all \TeX\ package versions are compatible with all Python package versions.
-This \TeX\ package is compatible with Python package version |0.1.2|.
+This \TeX\ package is compatible with Python package version |0.4.0|.
 
 Remember to enable unrestricted\footnote{
 	There's little point in supporting restricted mode, since it's possible to execute arbitrary shell commands in Python anyway.
@@ -80,9 +80,10 @@ Instruction:
 			\item \file{saveenv.sty}
 			\item \file{precattl.sty}
 			\item \file{pythonimmediate.sty}
-			\item \file{pythonimmediate-tex-0.1.2.zip}
+			\item \file{pythonimmediate_helper.lua}
+			\item \file{pythonimmediate-tex-0.4.0.zip}
 		\end{itemize}
-		The |0.1.2| part should be replaced with the desired version
+		The |0.4.0| part should be replaced with the desired version
 		of the Python package.
 
 		The |.sty| files can be downloaded from CTAN at 
@@ -97,9 +98,9 @@ Instruction:
 	\item Write the following in the preamble:
 \begin{verbatim}
 \usepackage[abspath]{currfile}
-\usepackage[python-executable={PYTHONPATH=pythonimmediate-tex-0.1.2.zip/pythonimmediate-tex-0.1.2/ python3},args={--mode=unnamed-pipe}]{pythonimmediate}
+\usepackage[python-executable={PYTHONPATH=pythonimmediate-tex-0.4.0.zip/pythonimmediate-tex-0.4.0/ python3},args={--mode=unnamed-pipe}]{pythonimmediate}
 \end{verbatim}
-As above, replace both occurrences of |0.1.2| with the downloaded version specified in the zip file above.
+As above, replace both occurrences of |0.4.0| with the downloaded version specified in the zip file above.
 
 Refer to \ref{troubleshoot-source-file-not-found} for explanation of the |abspath| option.
 \end{itemize}
