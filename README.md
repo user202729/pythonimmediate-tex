@@ -27,23 +27,6 @@ Description of the TeX package follows.
 
 ### Internal note
 
-Things to do:
-
-* implement thread-local engine setting for `default_engine`
-* make sure everything are defined globally (a bit difficult, e.g. https://tex.stackexchange.com/q/357869/250119)
-* Make `newenvironment_verb` not strip spaces at the end of the line
-* Define an environment that gobbles the body in `str`-type tokenization
-* Get arguments delimited
-* Get pair-delimited argument (`d`-type and `D`-type argument in xparse)
-* Function to write to log file (why?)
-* Function to parse log file for things such as `\showoutput` (very hacky...)
-* Expandable functions for Lua
-* `pysub` environments, `evalz()` in Python, etc.
-* preprocess `pycode` to allow using inside command argument (with a few caveats, but still good)
-* restore `select.select` for unnamed pipe or `threading` to cancel the pipe on timeout
-* refactor serialization to allow passing more data in a structured way
-* Catch error from ChildProcessEngine
-
 `tex/` folder contains TeX-related files. The source code of the package is in `tex/pythonimmediate.sty`.
 
 To create the documentation:
