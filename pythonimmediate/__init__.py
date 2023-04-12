@@ -2001,6 +2001,13 @@ def pyfile(filename: TTPELine, engine: Engine)->None:
 		source=f.read()
 	run_code_redirect_print_TeX(lambda: exec(compile(source, filename, "exec"), user_scope), engine=engine)
 
+@define_internal_handler
+def pyfilekpse(filename: TTPELine, engine: Engine)->None:
+	import subprocess
+	filepath=subprocess.run(["kpsewhich", str(filename)], stdout=subprocess.PIPE, check=True).stdout.decode('u8').rstrip("\n")
+	with open(filepath, "r") as f:
+		source=f.read()
+	run_code_redirect_print_TeX(lambda: exec(compile(source, filepath, "exec"), {"__file__": filepath, "user_scope": user_scope}), engine=engine)
 
 class RedirectPrintTeX:
 	"""
