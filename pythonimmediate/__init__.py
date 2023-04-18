@@ -383,14 +383,14 @@ class NToken(ABC):
 		"""
 		return NTokenList([T.ifx, self, other, Catcode.other("1"), T["else"], Catcode.other("0"), T.fi]).expand_x(engine=engine).bool()
 
-	def str_unicode(self)->str:
+	def token_code(self)->int:
 		"""
 		``self`` must represent a character of a [TeX] string. (i.e. equal to itself when detokenized)
 
-		:return: the string content.
+		:return: the character code.
 
 		.. note::
-			See :meth:`NTokenList.str_unicode`.
+			See :meth:`NTokenList.token_codes`.
 		"""
 		# default implementation, might not be correct. Subclass overrides as needed.
 		raise ValueError("Token does not represent a string!")
@@ -991,11 +991,11 @@ class CharacterToken(Token):
 			return -1
 		else:
 			return 0
-	def str_unicode(self)->str:
+	def token_code(self)->int:
 		catcode=Catcode.space if self.index==32 else Catcode.other
 		if catcode!=self.catcode:
 			raise ValueError("this CharacterToken does not represent a string!")
-		return self.chr
+		return self.index
 	def simple_detokenize(self, get_catcode: Callable[[int], Catcode])->str:
 		return self.chr
 
@@ -1419,14 +1419,17 @@ class TokenList(TokenListBaseClass):
 		"""
 		return NTokenList(self).bool()
 
-	def str_unicode(self)->str:
+	def token_codes(self)->int:
 		"""
-		See :meth:`NTokenList.str_unicode`.
+		See :meth:`NTokenList.token_codes`.
 		"""
-		return NTokenList(self).str_unicode()
+		return NTokenList(self).token_codes()
 
 	def simple_detokenize(self, get_catcode: Callable[[int], Catcode])->str:
 		return "".join(token.simple_detokenize(get_catcode) for token in self)
+
+	def str_if_unicode(self, unicode: bool=True)->str:
+		return NTokenList(self).str_if_unicode(unicode)
 
 	def str(self, engine: Engine=default_engine)->str:
 		"""
@@ -1623,7 +1626,7 @@ class NTokenList(NTokenListBaseClass):
 		NTokenList([T.edef, P.tmp, bgroup, *self, egroup]).execute(engine=engine)
 		return BalancedTokenList([P.tmp]).expand_o(engine=engine)
 
-	def str_unicode(self)->str:
+	def token_codes(self)->list[int]:
 		"""
 		``self`` must represent a [TeX] string. (i.e. equal to itself when detokenized)
 
@@ -1635,7 +1638,7 @@ class NTokenList(NTokenListBaseClass):
 			UTF-8 characters with character code ``>=0x80`` will be represented by multiple
 			characters in the returned string.
 		"""
-		return "".join(t.str_unicode() for t in self)
+		return [t.token_code() for t in self]
 
 	def str(self, engine: Engine)->str:
 		"""
@@ -1643,10 +1646,18 @@ class NTokenList(NTokenListBaseClass):
 
 		:return: the string content.
 		"""
-		if engine.is_unicode:
-			return self.str_unicode()
+		return self.str_if_unicode(engine.is_unicode)
+
+	def str_if_unicode(self, unicode: bool=True)->str:
+		"""
+		Assume this token list represents a string in a (Unicode/non-Unicode) engine, return the string content.
+
+		If the engine is not Unicode, assume the string is encoded in UTF-8.
+		"""
+		if unicode:
+			return "".join(map(chr, self.token_codes()))
 		else:
-			return bytes(ord(ch) for ch in self.str_unicode()).decode('u8')
+			return bytes(self.token_codes()).decode('u8')
 
 	def bool(self)->bool:
 		"""
@@ -1654,8 +1665,8 @@ class NTokenList(NTokenListBaseClass):
 
 		:return: the boolean represented by the string.
 		"""
-		s=self.str_unicode()
-		return {"0": False, "1": True}[s]
+		s=self.token_codes()
+		return {b"0": False, b"1": True}[bytes(s)]
 
 
 class TeXToPyData(ABC):
