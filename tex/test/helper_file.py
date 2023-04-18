@@ -164,6 +164,16 @@ class Test(unittest.TestCase):
 		''')
 		self.assertEqual(x, 1)
 
+	def test_get_until(self)->None:
+		TokenList.e3(r'abc{}\test def').put_next()
+		assert BalancedTokenList.get_until(BalancedTokenList.e3(r'ef')) == TokenList.e3(r'abc{}\test d')
+
+		TokenList.e3(r'{abc{}\test d}ef').put_next()
+		assert BalancedTokenList.get_until(BalancedTokenList.e3(r'ef')) == TokenList.e3(r'abc{}\test d')
+
+		TokenList.e3(r'{abc{}\test d}ef').put_next()
+		assert BalancedTokenList.get_until(BalancedTokenList.e3(r'ef'), remove_braces=False) == TokenList.e3(r'{abc{}\test d}')
+
 	def test_tokens2(self)->None:
 		for t in [
 				frozen_relax_token,

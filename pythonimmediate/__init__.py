@@ -1081,6 +1081,9 @@ TokenListType = typing.TypeVar("TokenListType", bound="TokenList")
 
 if typing.TYPE_CHECKING:
 	TokenListBaseClass = collections.UserList[Token]
+	# these are just for type-checking purposes...
+	_Bool = bool
+	_Str = str
 else:  # Python 3.8 compatibility
 	TokenListBaseClass = collections.UserList
 
@@ -1419,7 +1422,7 @@ class TokenList(TokenListBaseClass):
 		"""
 		return NTokenList(self).bool()
 
-	def token_codes(self)->int:
+	def token_codes(self)->list[int]:
 		"""
 		See :meth:`NTokenList.token_codes`.
 		"""
@@ -1428,7 +1431,7 @@ class TokenList(TokenListBaseClass):
 	def simple_detokenize(self, get_catcode: Callable[[int], Catcode])->str:
 		return "".join(token.simple_detokenize(get_catcode) for token in self)
 
-	def str_if_unicode(self, unicode: bool=True)->str:
+	def str_if_unicode(self, unicode: _Bool=True)->str:
 		return NTokenList(self).str_if_unicode(unicode)
 
 	def str(self, engine: Engine=default_engine)->str:
@@ -1529,6 +1532,69 @@ class BalancedTokenList(TokenList):
 				\__read_do_one_command:
 			}
 			""", recursive=False))(engine)
+
+	@staticmethod
+	def _get_until_raw(delimiter: BalancedTokenList, engine: Engine=default_engine)->"BalancedTokenList":
+		"""
+		Internal function.
+
+		Get a delimited argument from the [TeX] input stream, delimited by `delimiter`.
+
+		This works the same way as delimited argument, so in particular the argument must be balanced,
+		and the delimiter must not contain any ``#`` or braces.
+		No error-checking is done.
+
+		The delimiter itself will also be removed.
+
+		As a special case, delimiter can be a token list consist of a single ``#``, in which case the corresponding [TeX] behavior
+		will be used and it takes from the input stream until a ``{``, and the ``{`` itself will not be removed.
+		"""
+		assert delimiter, "Delimiter cannot be empty!"
+		return typing.cast(Callable[[PTTBalancedTokenList, Engine], TTPBalancedTokenList], Python_call_TeX_local(
+			r"""
+			\cs_new_protected:Npn \__get_until_tmp #1 {
+				\def \__delimit_tmpii ##1 #1 {
+					%sync%
+					%send_arg0(##1)%
+					\__read_do_one_command:
+				}
+				\__delimit_tmpii
+			}
+			\cs_new_protected:Npn %name% {
+				%read_arg0(\__delimit)%
+				\expandafter \__get_until_tmp \expandafter { \__delimit }
+			}
+			""", recursive=False))(PTTBalancedTokenList(delimiter), engine)
+
+	@staticmethod
+	def get_until(delimiter: BalancedTokenList, remove_braces: bool=True, engine: Engine=default_engine)->"BalancedTokenList":
+		r"""
+		Get a delimited argument from the [TeX] input stream, delimited by `delimiter`.
+
+		The delimiter itself will also be removed from the input stream.
+		"""
+		assert delimiter, "Delimiter cannot be empty!"
+		for t in delimiter:
+			if isinstance(t, CharacterToken):
+				assert t.catcode not in [Catcode.bgroup, Catcode.egroup, Catcode.param], f"A token with catcode {t.catcode} cannot be a delimiter!"
+
+		if not remove_braces:
+			auxiliary_token = T.empty
+			if delimiter[0]==auxiliary_token: auxiliary_token = T.relax
+			auxiliary_token.put_next()
+		result = BalancedTokenList._get_until_raw(delimiter)
+		if not remove_braces:
+			assert result[0]==auxiliary_token
+			del result[1]
+
+		return result
+
+	@staticmethod
+	def get_until_brace(engine: Engine=default_engine)->"BalancedTokenList":
+		r"""
+		Get a TokenList from the input stream delimited by ``{``. The brace is not removed from the input stream.
+		"""
+		return BalancedTokenList._get_until_raw(BalancedTokenList([Catcode.param("#")]))
 
 	def detokenize(self, engine: Engine=  default_engine)->str:
 		r"""
@@ -1648,7 +1714,7 @@ class NTokenList(NTokenListBaseClass):
 		"""
 		return self.str_if_unicode(engine.is_unicode)
 
-	def str_if_unicode(self, unicode: bool=True)->str:
+	def str_if_unicode(self, unicode: bool=True)->_Str:
 		"""
 		Assume this token list represents a string in a (Unicode/non-Unicode) engine, return the string content.
 
