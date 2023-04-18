@@ -66,7 +66,7 @@ import re
 from dataclasses import dataclass
 
 import pythonimmediate
-from . import scan_Python_call_TeX_module, PTTTeXLine, PTTVerbatimLine, PTTTeXLine, Python_call_TeX_local, check_line, Token, TTPEBlock, TTPEmbeddedLine, get_random_identifier, CharacterToken, define_TeX_call_Python, parse_meaning_str, peek_next_meaning, run_block_local, run_code_redirect_print_TeX, TTPBlock, TTPLine, BalancedTokenList, TokenList, ControlSequenceToken, doc_catcode_table, Catcode
+from . import scan_Python_call_TeX_module, PTTTeXLine, PTTVerbatimLine, PTTTeXLine, Python_call_TeX_local, check_line, Token, TTPEBlock, TTPEmbeddedLine, get_random_Python_identifier, CharacterToken, define_TeX_call_Python, parse_meaning_str, peek_next_meaning, run_block_local, run_code_redirect_print_TeX, TTPBlock, TTPLine, BalancedTokenList, TokenList, ControlSequenceToken, doc_catcode_table, Catcode
 from .engine import Engine, default_engine
 
 if not typing.TYPE_CHECKING:
@@ -176,7 +176,7 @@ def put_next(arg: str, engine: Engine=  default_engine)->None:
 		r"""
 		\cs_new_protected:Npn \__put_next_tmpa {
 			%optional_sync%
-			\__read_do_one_command:
+			\pythonimmediatelisten
 		}
 		\cs_new_protected:Npn %name% {
 			%read_arg0(\__target)%
@@ -251,7 +251,7 @@ def get_arg_str(engine: Engine=  default_engine)->str:
 			\__send_content%naive_send%:n {
 				r #1
 			}
-			\__read_do_one_command:
+			\pythonimmediatelisten
 		}
 		""", recursive=False))(engine)))
 
@@ -283,7 +283,7 @@ def get_arg_estr(engine: Engine=  default_engine)->str:
 		\cs_new_protected:Npn %name% #1 {
 			%sync%
 			%send_arg0(#1)%
-			\__read_do_one_command:
+			\pythonimmediatelisten
 		}
 		""", recursive=False))(engine)
 
@@ -306,7 +306,7 @@ def get_optional_arg_str(engine: Engine=  default_engine)->Optional[str]:
 					\unexpanded{1 #1}
 				}
 			}
-			\__read_do_one_command:
+			\pythonimmediatelisten
 		}
 		""", recursive=False))(engine)
 	result_=str(result)
@@ -328,7 +328,7 @@ def get_optional_arg_estr(engine: Engine=  default_engine)->Optional[str]:
 			} {
 				%send_arg0(1 #1)%
 			}
-			\__read_do_one_command:
+			\pythonimmediatelisten
 		}
 		""", recursive=False))(engine)
 	result_=str(result)
@@ -365,7 +365,7 @@ def get_verb_arg(engine: Engine=  default_engine)->str:
 				r ^^J
 				#1
 			}
-			\__read_do_one_command:
+			\pythonimmediatelisten
 		}
 		""", recursive=False))(engine)
 
@@ -386,7 +386,7 @@ def get_multiline_verb_arg(engine: Engine=  default_engine)->str:
 				\str_set:Nn \l_tmpa_tl { #1 }
 				\str_replace_all:Nnn \l_tmpa_tl { \cO\^^M } { ^^J }
 				\__send_block%naive_send%:e { \l_tmpa_tl }
-				\__read_do_one_command:
+				\pythonimmediatelisten
 			}
 		}
 		""", recursive=False))(engine)  # we cannot set newlinechar=13 because otherwise \__send_block:e does not work properly
@@ -508,7 +508,7 @@ def newcommand(name: str, f: Callable, engine: Engine)->None:
 
 	"""
 	_check_name(name)
-	identifier=get_random_identifier()
+	identifier=get_random_Python_identifier()
 
 	typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
 		r"""
@@ -519,11 +519,11 @@ def newcommand(name: str, f: Callable, engine: Engine)->None:
 				%read_arg1(\__identifier)%
 				\cs_new_protected:cpx {\__line} {
 					\__send_content%naive_send%:e { i \__identifier }
-					\unexpanded{\__read_do_one_command:}
+					\unexpanded{\pythonimmediatelisten}
 				}
 			\endgroup
 			%optional_sync%
-			\__read_do_one_command:
+			\pythonimmediatelisten
 		}
 		""", recursive=False))(PTTVerbatimLine(name), PTTVerbatimLine(identifier), engine)
 
@@ -539,7 +539,7 @@ def renewcommand(name: str, f: Callable, engine: Engine)->None:
 	Redefine a [TeX]-command. Usage is similar to :func:`newcommand`.
 	"""
 	_check_name(name)
-	identifier=get_random_identifier()
+	identifier=get_random_Python_identifier()
 
 	typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
 		r"""
@@ -550,12 +550,12 @@ def renewcommand(name: str, f: Callable, engine: Engine)->None:
 				\readline \__read_file to \__identifier
 				\exp_args:Ncx \renewcommand {\__line} {
 					\__send_content%naive_send%:e { i \__identifier }
-					\unexpanded{\__read_do_one_command:}
+					\unexpanded{\pythonimmediatelisten}
 				}
 				\exp_args:Nc \MakeRobust {\__line}  % also make the command global
 			\endgroup
 			%optional_sync%
-			\__read_do_one_command:
+			\pythonimmediatelisten
 		}
 		""", recursive=False))(PTTVerbatimLine(name), PTTVerbatimLine(identifier), engine)
 	# TODO remove the redundant entry from TeX_handlers (although technically is not very necessary, just cause slight memory leak)
@@ -590,7 +590,7 @@ def define_char(char: str, engine: Engine=  default_engine)->Callable[[T2], T2]:
 	"""
 	def result(f: T2)->T2:
 		assert len(char)==1
-		identifier=get_random_identifier()
+		identifier=get_random_Python_identifier()
 		_code=define_TeX_call_Python(
 				lambda engine: run_code_redirect_print_TeX(f, engine=engine),
 				f"(char: {char})", argtypes=[], identifier=identifier)
@@ -607,11 +607,11 @@ def define_char(char: str, engine: Engine=  default_engine)->Callable[[T2], T2]:
 						\readline \__read_file to \__identifier
 						\cs_gset_protected:cpx {u8:\__line} {
 							\__send_content%naive_send%:e { i \__identifier }
-							\unexpanded{\__read_do_one_command:}
+							\unexpanded{\pythonimmediatelisten}
 						}
 					\endgroup
 					%optional_sync%
-					\__read_do_one_command:
+					\pythonimmediatelisten
 				}
 				""", recursive=False))(PTTVerbatimLine(char), PTTVerbatimLine(identifier), engine)
 		else:
@@ -628,12 +628,12 @@ def define_char(char: str, engine: Engine=  default_engine)->Callable[[T2], T2]:
 							\expandafter \expandafter \expandafter \noexpand \char_generate:nn{\expandafter`\__line}{13}
 							{
 								\__send_content%naive_send%:e { i \__identifier }
-								\unexpanded{\__read_do_one_command:}
+								\unexpanded{\pythonimmediatelisten}
 							}
 						}
 					\endgroup
 					%optional_sync%
-					\__read_do_one_command:
+					\pythonimmediatelisten
 				}
 				""", recursive=False))(PTTVerbatimLine(char), PTTVerbatimLine(identifier), engine)
 		return f
@@ -657,7 +657,7 @@ def undefine_char(char: str, engine: Engine=  default_engine)->None:
 					\cs_undefine:c {u8:\__line}
 				\endgroup
 				%optional_sync%
-				\__read_do_one_command:
+				\pythonimmediatelisten
 			}
 			""", recursive=False))(PTTVerbatimLine(char), engine)
 	else:
@@ -678,7 +678,7 @@ def undefine_char(char: str, engine: Engine=  default_engine)->None:
 						}
 					}
 					%optional_sync%
-					\__read_do_one_command:
+					\pythonimmediatelisten
 				}
 			}
 			""", recursive=False))(PTTVerbatimLine(char), engine)
@@ -788,8 +788,8 @@ def newenvironment(name: str, f: Callable, engine: Engine)->None:
 
 	It can be used either as a decorator or a function, see :func:`newcommand` for details.
 	"""
-	begin_identifier=get_random_identifier()
-	end_identifier=get_random_identifier()
+	begin_identifier=get_random_Python_identifier()
+	end_identifier=get_random_Python_identifier()
 
 	typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
 		r"""
@@ -802,15 +802,15 @@ def newenvironment(name: str, f: Callable, engine: Engine)->None:
 					{\__line}
 					{
 						\__send_content%naive_send%:e { i \__begin_identifier }
-						\unexpanded{\__read_do_one_command:}
+						\unexpanded{\pythonimmediatelisten}
 					}
 					{
 						\__send_content%naive_send%:e { i \__end_identifier }
-						\unexpanded{\__read_do_one_command:}
+						\unexpanded{\pythonimmediatelisten}
 					}
 			}
 			%optional_sync%
-			\__read_do_one_command:
+			\pythonimmediatelisten
 		}
 		""", recursive=False))(PTTVerbatimLine(name), PTTVerbatimLine(begin_identifier), PTTVerbatimLine(end_identifier), engine)
 
@@ -877,7 +877,7 @@ def newenvironment_verb(name: str, f: Callable[[str], None], engine: Engine)->No
 	.. note::
 		For advanced users: unlike a typical environment, the code will not be executed in a new [TeX] *group*.
 	"""
-	identifier=get_random_identifier()
+	identifier=get_random_Python_identifier()
 
 	typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
 		r"""
@@ -889,12 +889,12 @@ def newenvironment_verb(name: str, f: Callable[[str], None], engine: Engine)->No
 					{\__line}
 					{
 						\__send_content%naive_send%:e { i \__identifier }
-						\__read_do_one_command:
+						\pythonimmediatelisten
 					}
 					{}
 			}
 			%optional_sync%
-			\__read_do_one_command:
+			\pythonimmediatelisten
 		}
 		""", recursive=False))(PTTVerbatimLine(name), PTTVerbatimLine(identifier), engine)
 
@@ -905,7 +905,7 @@ def newenvironment_verb(name: str, f: Callable[[str], None], engine: Engine)->No
 				\saveenvreinsert \__tmp {
 					%sync%
 					%send_arg0_var(\__tmp)%
-					\__read_do_one_command:
+					\pythonimmediatelisten
 				}
 			}
 			""", recursive=False))(engine)
@@ -1256,7 +1256,7 @@ class VarManager:
 				%read_arg1(\__value)%
 				\tl_set_eq:cN {\__line} \__value
 				%optional_sync%
-				\__read_do_one_command:
+				\pythonimmediatelisten
 			}
 			""", recursive=False, sync=None))(PTTVerbatimLine(key), PTTTeXLine(val), self.engine)
 

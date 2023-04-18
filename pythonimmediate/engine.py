@@ -387,7 +387,7 @@ class ChildProcessEngine(Engine):
 		self.process=subprocess.Popen(
 				[
 					engine_name_to_latex_executable[engine_name], "-shell-escape",
-						*args, r"\RequirePackage[child-process]{pythonimmediate}\pythonimmediatechildprocessmainloop\stop"],
+						*args, r"\RequirePackage[child-process]{pythonimmediate}\pythonimmediatelisten\stop"],
 				stdin=subprocess.PIPE,
 				#stdout=subprocess.PIPE,  # we don't need the stdout
 				stdout=subprocess.DEVNULL,
@@ -397,10 +397,7 @@ class ChildProcessEngine(Engine):
 
 		from . import surround_delimiter, send_raw, substitute_private, get_bootstrap_code
 		send_raw(surround_delimiter(substitute_private(
-			get_bootstrap_code(self) + 
-			r"""
-			\cs_new_eq:NN \pythonimmediatechildprocessmainloop \__read_do_one_command:
-			"""
+			get_bootstrap_code(self)
 			)), engine=self)
 
 	def get_process(self)->subprocess.Popen:

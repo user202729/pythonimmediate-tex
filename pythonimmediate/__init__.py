@@ -23,6 +23,7 @@ T1 = typing.TypeVar("T1")
 def user_documentation(x: T1)->T1:
 	return x
 
+is_sphinx_build = "SPHINX_BUILD" in os.environ
 
 
 #debug_file=open(Path(tempfile.gettempdir())/"pythonimmediate_debug_textopy.txt", "w", encoding='u8', buffering=2)
@@ -161,7 +162,7 @@ def mark_bootstrap_naive_replace(code: str)->None:
 
 mark_bootstrap_naive_replace(
 r"""
-\cs_new_protected:Npn \__read_do_one_command: {
+\cs_new_protected:Npn \pythonimmediatelisten {
 	\begingroup
 		\endlinechar=-1~
 		\readline \__read_file to \__line
@@ -170,11 +171,14 @@ r"""
 		\csname __run_ \__line :\endcsname
 }
 
+\cs_new_protected:Npn \pythonimmediatecallhandler #1 {
+	\__send_content:e {r #1 %naive_inline% }
+}
 
 % read documentation of ``_peek`` commands for details what this command does.
 \cs_new_protected:Npn \pythonimmediatecontinue #1 {
 	\__send_content:e {r #1 %naive_inline% }
-	\__read_do_one_command:
+	\pythonimmediatelisten
 }
 
 \cs_new_protected:Npn \pythonimmediatecontinuenoarg {
@@ -234,8 +238,80 @@ r"""
 
 # ========
 
-# when 'i⟨string⟩' is sent from TeX to Python, the function with index ⟨string⟩ in this dict is called
-TeX_handlers: Dict[str, Callable[[Engine], None]]={}
+_handlers: Dict[str, Callable[[Engine], None]]={}
+
+def add_handler(f: Callable[[Engine], None])->str:
+	r"""
+	This function provides the facility to efficiently call Python code from [TeX]
+	and without polluting the global namespace.
+
+	First, note that with :func:`.pyc` you can do the following::
+
+		def myfunction():
+			print(1)
+		execute(r"\def \test {\py{myfunction()}}")
+
+	However, this pollutes the global namespace as well as parsing the string
+	``myfunction()`` into Python code every time it's called.
+
+	With this dictionary, you can do the following::
+
+		def myfunction(engine):
+			print(1)
+		identifier = add_handler(myfunction)
+		execute(r"\def\test{\pythonimmediatecallhandler{" + identifier + "}}")
+
+	The returned value, `identifier`, is a string consist of only English alphabetical letters,
+	which should be used to pass into ``\pythonimmediatecallhandler`` [TeX] command
+	and :func:`remove_handler`.
+
+	The handlers must follow a very specific format:
+
+	* It must takes a single argument of type :class:`Engine`, as input, and returns nothing.
+	* Within the function, **it must not send anything to [TeX].**
+	* It **must not cause a Python error**, otherwise the error reporting facility
+	  may not work properly (does not print the correct [TeX] traceback).
+
+	In order to allow the Python function to call [TeX], it's necessary to
+	"listen" for callbacks on [TeX] side as well -- as [TeX] does not have the capability
+	to execute multiple threads, it's necessary to explicitly listen for instructions from the Python side.
+	To do that::
+
+		def myfunction(engine):
+			print(1)
+			execute("hello world")  # it's possible to execute TeX code here
+			run_none_finish()
+		identifier = add_handler(myfunction)
+		execute(r"\def\test{\pythonimmediatecallhandler{" + identifier + r"}\pythonimmediatelisten}")
+
+	At the end of the Python function, :func:`run_none_finish` **must be called**
+	in order to stop the listening on the [TeX] side.
+
+	.. note::
+		Internally, ``\pythonimmediatecallhandler{abc}``
+		sends ``i⟨string⟩`` from [TeX] to Python
+		(optionally flushes the output),
+		and the function with index ``⟨string⟩`` in this dict is called.
+
+	.. seealso::
+		:func:`remove_handler`.
+	"""
+	identifier=get_random_Python_identifier()
+	assert identifier not in _handlers
+	_handlers[identifier]=f
+	return identifier
+
+def remove_handler(identifier: str)->None:
+	"""
+	Remove a handler with the given `identifier`.
+
+	Note that even if the corresponding [TeX] command is deleted, the command might have been
+	copied to another command, so use this function with care.
+
+	.. seealso::
+		:func:`add_handler`.
+	"""
+	del _handlers[identifier]
 
 TeXToPyObjectType=Optional[str]
 
@@ -245,7 +321,7 @@ def run_main_loop(engine: Engine)->TeXToPyObjectType:
 		if not line: return None
 
 		if line[0]=="i":
-			TeX_handlers[line[1:]](engine)
+			_handlers[line[1:]](engine)
 		elif line[0]=="r":
 			return line[1:]
 		else:
@@ -301,7 +377,10 @@ def check_line(line: str, *, braces: bool, newline: bool, continue_: Optional[bo
 	elif continue_==False: assert "pythonimmediatecontinue" not in line
 
 
-user_scope: Dict[str, Any]={}  # consist of user's local variables etc.
+user_scope: Dict[str, Any]={}
+"""
+This is the global namespace where codes in :func:`.py`, :func:`.pyc`, :func:`.pycode` etc. runs in.
+"""
 
 def readline(engine: Engine)->str:
 	line=engine.read().decode('u8')
@@ -830,7 +909,7 @@ r"""
 
 enable_get_attribute=True
 
-if os.environ.get("SPHINX_BUILD"):
+if is_sphinx_build:
 	enable_get_attribute=False  # otherwise it conflicts with sphinx-autodoc's mechanism to inspect the objects
 
 class ControlSequenceTokenMaker:
@@ -1060,7 +1139,7 @@ class BlueToken(NToken):
 			r"""
 			\cs_new_protected:Npn \__put_next_blue_tmp {
 				%optional_sync%
-				\expandafter \__read_do_one_command: \noexpand
+				\expandafter \pythonimmediatelisten \noexpand
 			}
 			\cs_new_protected:Npn %name% {
 				%read_arg0(\__target)%
@@ -1505,7 +1584,7 @@ class BalancedTokenList(TokenList):
 				\exp_args:NNV \tl_set:No \__data \__data
 				%sync%
 				%send_arg0_var(\__data)%
-				\__read_do_one_command:
+				\pythonimmediatelisten
 			}
 			""", recursive=expansion_only_can_call_Python))(PTTBalancedTokenList(self), engine)
 
@@ -1517,7 +1596,7 @@ class BalancedTokenList(TokenList):
 			\tl_set:Nx \__data {\__data}
 			%sync%
 			%send_arg0_var(\__data)%
-			\__read_do_one_command:
+			\pythonimmediatelisten
 		}
 		""", recursive=expansion_only_can_call_Python))(PTTBalancedTokenList(self), engine)
 
@@ -1528,7 +1607,7 @@ class BalancedTokenList(TokenList):
 				%read_arg0(\__data)%
 				\__data
 				%optional_sync%
-				\__read_do_one_command:
+				\pythonimmediatelisten
 			}
 			"""))(PTTBalancedTokenList(self), engine)
 
@@ -1537,7 +1616,7 @@ class BalancedTokenList(TokenList):
 			r"""
 			\cs_new_protected:Npn \__put_next_tmp {
 				%optional_sync%
-				\__read_do_one_command:
+				\pythonimmediatelisten
 			}
 			\cs_new_protected:Npn %name% {
 				%read_arg0(\__target)%
@@ -1555,7 +1634,7 @@ class BalancedTokenList(TokenList):
 			\cs_new_protected:Npn %name% #1 {
 				%sync%
 				%send_arg0(#1)%
-				\__read_do_one_command:
+				\pythonimmediatelisten
 			}
 			""", recursive=False))(engine)
 
@@ -1582,7 +1661,7 @@ class BalancedTokenList(TokenList):
 				\def \__delimit_tmpii ##1 #1 {
 					%sync%
 					%send_arg0(##1)%
-					\__read_do_one_command:
+					\pythonimmediatelisten
 				}
 				\__delimit_tmpii
 			}
@@ -1947,7 +2026,7 @@ class PTTBalancedTokenList(PyToTeXData):
 import itertools
 import string
 
-def random_identifiers()->Iterator[str]:  # do this to avoid TeX hash collision while keeping the length short
+def random_TeX_identifiers()->Iterator[str]:  # do this to avoid TeX hash collision while keeping the length short
 	for len_ in itertools.count(0):
 		for value in range(1<<len_):
 			for initial in string.ascii_letters:
@@ -1956,10 +2035,16 @@ def random_identifiers()->Iterator[str]:  # do this to avoid TeX hash collision 
 					identifier += f"{value:0{len_}b}".translate({ord("0"): "a", ord("1"): "b"})
 				yield identifier
 
-random_identifier_iterable=random_identifiers()
+def random_Python_identifiers()->Iterator[str]:  # these are used for keys in
+	for len_ in itertools.count(0):
+		for s in itertools.product(string.ascii_letters, repeat=len_):
+			yield "".join(s)
 
-def get_random_identifier()->str:
-	return next(random_identifier_iterable)
+random_TeX_identifier_iterable=random_TeX_identifiers()
+random_Python_identifier_iterable=random_Python_identifiers()
+
+def get_random_TeX_identifier()->str: return next(random_TeX_identifier_iterable)
+def get_random_Python_identifier()->str: return next(random_Python_identifier_iterable)
 
 
 def define_TeX_call_Python(f: Callable[..., None], name: Optional[str]=None, argtypes: Optional[List[Type[TeXToPyData]]]=None, identifier: Optional[str]=None)->EngineDependentCode:
@@ -1971,6 +2056,7 @@ def define_TeX_call_Python(f: Callable[..., None], name: Optional[str]=None, arg
 		It should take some arguments plus a keyword argument ``engine`` and eventually (optionally) call one of the ``_finish`` functions.
 	:param name: the macro name on the [TeX]-side. This should only consist of letter characters in ``expl3`` catcode regime.
 	:param argtypes: list of argument types. If it's None it will be automatically deduced from the function ``f``'s signature.
+	:param identifier: should be obtained by :func:`get_random_Python_identifier`.
 	:returns: some code (to be executed in ``expl3`` catcode regime) as explained above.
 	"""
 	if argtypes is None:
@@ -1989,8 +2075,8 @@ def define_TeX_call_Python(f: Callable[..., None], name: Optional[str]=None, arg
 
 	if name is None: name=f.__name__
 
-	if identifier is None: identifier=get_random_identifier()
-	assert identifier not in TeX_handlers, identifier
+	if identifier is None: identifier=get_random_Python_identifier()
+	assert identifier not in _handlers, identifier
 
 	@functools.wraps(f)
 	def g(engine: Engine)->None:
@@ -2019,8 +2105,7 @@ def define_TeX_call_Python(f: Callable[..., None], name: Optional[str]=None, arg
 		
 			engine.action_done=old_action_done
 
-
-	TeX_handlers[identifier]=g
+	_handlers[identifier]=g
 
 	TeX_argspec = ""
 	TeX_send_input_commands = ""
@@ -2037,7 +2122,7 @@ def define_TeX_call_Python(f: Callable[..., None], name: Optional[str]=None, arg
 	\cs_new_protected:Npn """ + "\\"+name + TeX_argspec + r""" {
 		\__send_content:e { i """ + identifier + """ }
 		""" + TeX_send_input_commands + r"""
-		\__read_do_one_command:
+		\pythonimmediatelisten
 	}
 	""")
 
@@ -2143,6 +2228,8 @@ def normalize_line(line: str)->str:
 
 def can_be_mangled_to(original: str, mangled: str)->bool:
 	r"""
+	Internal functions, used to implemented :func:`.pycode` environment.
+
 	If *original* is put in a [TeX] file, read in other catcode regime (possibly drop trailing spaces/tabs),
 	and then sent through ``\write`` (possibly convert control characters to ``^^``-notation),
 	is it possible that the written content is equal to *mangled*?
@@ -2365,7 +2452,7 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 	* do the following if ``sync``:
 	  * send ``r`` to Python (equivalently write %sync%)
 	  * send whatever needed for the output (as in ``ttp_argtypes``)
-	* call ``\__read_do_one_command:`` iff not ``finish``.
+	* call ``\pythonimmediatelisten`` iff not ``finish``.
 
 	This is allowed to contain the following:
 	
@@ -2390,7 +2477,7 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 		This should be left to be the default None most of the time. (which will make it always sync if ``debugging``,
 		otherwise only sync if needed i.e. there's some output)
 
-	:param finish: Include this if and only if ``\__read_do_one_command:`` is omitted.
+	:param finish: Include this if and only if ``\pythonimmediatelisten`` is omitted.
 		Normally this is not needed, but it can be used as a slight optimization; and it's needed internally to implement
 		``run_none_finish`` among others.
 		For each TeX-call-Python layer, \emph{exactly one} ``finish`` call can be made. If the function itself doesn't call
@@ -2430,7 +2517,7 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 	assert sync is not None
 	if ttp_argtypes: assert sync
 	assert ttp_argtypes.count(TTPEmbeddedLine)<=1
-	identifier=get_random_identifier()  # TODO to be fair it isn't necessary to make the identifier both ways distinct, can reuse
+	identifier=get_random_TeX_identifier()
 
 	TeX_code=template_substitute(TeX_code, "%name%", lambda _: r"\__run_" + identifier + ":")
 
@@ -2546,7 +2633,7 @@ def run_block_local(block: str, engine: Engine=  default_engine)->None:
 			% trick described in https://tex.stackexchange.com/q/640274 to scantokens the code with \newlinechar=10
 
 			%optional_sync%
-			\__read_do_one_command:
+			\pythonimmediatelisten
 		}
 		"""))(PTTBlock(block), engine)
 
@@ -2557,7 +2644,7 @@ def continue_until_passed_back_str(engine: Engine=  default_engine)->str:
 	Usage:
 
 	First put some tokens in the input stream that includes ``\pythonimmediatecontinue{...}``
-	(or ``%sync% \__read_do_one_command:``), then call ``continue_until_passed_back()``.
+	(or ``%sync% \pythonimmediatelisten``), then call ``continue_until_passed_back()``.
 
 	The function will only return when the ``\pythonimmediatecontinue`` is called.
 	"""
@@ -2648,7 +2735,7 @@ def peek_next_meaning(engine: Engine=  default_engine)->str:
 				\edef \__tmp {\meaning \__tmp}  % just in case ``\__tmp`` is outer, ``\write`` will not be able to handle it
 				\__send_content%naive_send%:e { r \__tmp }
 
-				\__read_do_one_command:
+				\pythonimmediatelisten
 			}
 			\cs_new_protected:Npn %name% {
 				\futurelet \__tmp \__peek_next_meaning_callback:
