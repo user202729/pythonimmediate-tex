@@ -20,14 +20,6 @@ pythonimmediate.copy\_to\_stderr module
    :undoc-members:
    :show-inheritance:
 
-pythonimmediate.decode\_8bit module
------------------------------------
-
-.. automodule:: pythonimmediate.decode_8bit
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 pythonimmediate.engine module
 -----------------------------
 
@@ -48,6 +40,14 @@ pythonimmediate.simple module
 -----------------------------
 
 .. automodule:: pythonimmediate.simple
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pythonimmediate.texcmds module
+------------------------------
+
+.. automodule:: pythonimmediate.texcmds
    :members:
    :undoc-members:
    :show-inheritance:

@@ -111,7 +111,7 @@ def postprocess_send_code(s: str, put_sync: bool)->str:
 # as the name implies, this reads one "command" from Python side and execute it.
 # the command might do additional tasks e.g. read more [TeX]-code.
 #
-# e.g. if `block' is read from the communication channel, run ``\__run_block:``.
+# e.g. if ``block`` is read from the communication channel, run ``\__run_block:``.
 
 @bootstrap_code_functions.append
 def _naive_flush_data_define(engine: Engine)->str:
@@ -1718,7 +1718,7 @@ class TTPLine(TeXToPyData, str):
 
 class TTPELine(TeXToPyData, str):
 	"""
-	Same as TTPEBlock, but for a single line only.
+	Same as :class:`TTPEBlock`, but for a single line only.
 	"""
 	send_code=r"\__begingroup_setup_estr: \__send_content%naive_send%:e {{ {} }} \endgroup".format
 	send_code_var=r"\__begingroup_setup_estr: \__send_content%naive_send%:e {{ {} }} \endgroup".format
@@ -1747,9 +1747,12 @@ class TTPBlock(TeXToPyData, str):
 class TTPEBlock(TeXToPyData, str):
 	r"""
 	A kind of argument that interprets "escaped string" and fully expand anything inside.
-	For example, {\\} sends a single backslash to Python, {\{} sends a single '{' to Python.
-	Done by fully expand the argument in \escapechar=-1 and convert it to a string.
-	Additional precaution is needed, see the note above.
+	For example, ``{\\}`` sends a single backslash to Python, ``{\{}`` sends a single ``{`` to Python.
+
+	Done by fully expand the argument in ``\escapechar=-1`` and convert it to a string.
+	Additional precaution is needed, see the note above (TODO write documentation).
+
+	Refer to :ref:`estr-expansion` for more details.
 	"""
 	send_code=r"\__begingroup_setup_estr: \__send_block%naive_send%:e {{ {} }} \endgroup".format
 	send_code_var=r"\__begingroup_setup_estr: \__send_block%naive_send%:e {{ {} }} \endgroup".format
@@ -1871,7 +1874,7 @@ def define_TeX_call_Python(f: Callable[..., None], name: Optional[str]=None, arg
 	returns the [TeX]-code to be executed on the [TeX]-side to define the macro.
 
 	f: the Python function to be executed.
-	It should take some arguments plus a keyword argument `engine` and eventually (optionally) call one of the ``_finish`` functions.
+	It should take some arguments plus a keyword argument ``engine`` and eventually (optionally) call one of the ``_finish`` functions.
 
 	name: the macro name on the [TeX]-side. This should only consist of letter characters in ``expl3`` catcode regime.
 
@@ -1985,30 +1988,6 @@ def eval_with_linecache(code: str, globals: Dict[str, Any])->Any:
 	return exec_or_eval_with_linecache(code, globals, "eval")
 
 
-@define_internal_handler
-def py(code: TTPEBlock, engine: Engine)->None:
-	pythonimmediate.run_block_finish(str(eval_with_linecache(
-		code.lstrip(),
-		user_scope))+"%", engine=engine)
-	# note we use code.lstrip() here because otherwise
-	# \py{
-	# 1+1}
-	# would give IndentationError
-
-@define_internal_handler
-def pyfile(filename: TTPELine, engine: Engine)->None:
-	with open(filename, "r") as f:
-		source=f.read()
-	run_code_redirect_print_TeX(lambda: exec(compile(source, filename, "exec"), user_scope), engine=engine)
-
-@define_internal_handler
-def pyfilekpse(filename: TTPELine, engine: Engine)->None:
-	import subprocess
-	filepath=subprocess.run(["kpsewhich", str(filename)], stdout=subprocess.PIPE, check=True).stdout.decode('u8').rstrip("\n")
-	with open(filepath, "r") as f:
-		source=f.read()
-	run_code_redirect_print_TeX(lambda: exec(compile(source, filepath, "exec"), {"__file__": filepath, "user_scope": user_scope}), engine=engine)
-
 class RedirectPrintTeX:
 	"""
 	A context manager. Use like this, where ``t`` is some file object::
@@ -2055,41 +2034,10 @@ def run_code_redirect_print_TeX(f: Callable[[], Any], engine: Engine)->None:
 			content+="%"
 		run_block_finish(content, engine=engine)
 
-@define_internal_handler
-def pyc(code: TTPEBlock, engine: Engine)->None:
-	run_code_redirect_print_TeX(lambda: exec_with_linecache(code, user_scope), engine=engine)
-
-@define_internal_handler
-def pycq(code: TTPEBlock, engine: Engine)->None:
-	with RedirectPrintTeX(None):
-		exec_with_linecache(code, user_scope)
-	run_none_finish(engine)
-
-mark_bootstrap(
-r"""
-\NewDocumentCommand\pyv{v}{\py{#1}}
-\NewDocumentCommand\pycv{v}{\pyc{#1}}
-""")
-
-# ======== implementation of ``pycode`` environment
-mark_bootstrap(
-r"""
-\NewDocumentEnvironment{pycode}{}{
-	\saveenvreinsert \__code {
-		\exp_last_unbraced:Nx \__pycodex {{\__code} {\the\inputlineno} {
-			\ifdefined\currfilename \currfilename \fi
-		} {
-			\ifdefined\currfileabspath \currfileabspath \fi
-		}}
-	}
-}{
-	\endsaveenvreinsert
-}
-""")
 
 """
 In some engine, when -8bit option is not enabled, the code will be escaped before being sent to Python.
-So for example if the original code contains a literal tab character, `^^I` might be sent to Python instead.
+So for example if the original code contains a literal tab character, ``^^I`` might be sent to Python instead.
 This do a fuzzy-normalization over these so that the sourcecode can be correctly matched.
 """
 potentially_escaped_characters=str.maketrans({
@@ -2134,53 +2082,6 @@ def can_be_mangled_to(original: str, mangled: str)->bool:
 	"""
 	return normalize_line(original)==normalize_line(mangled)
 
-@define_internal_handler
-def __pycodex(code: TTPBlock, lineno_: TTPLine, filename: TTPLine, fileabspath: TTPLine, engine: Engine)->None:
-	"""
-	Auxiliary function to execute TeX_code in a `pycode` environment.
-	The `code` is not executed immediately, instead we search for the source TeX file that contains the code
-	(it must be found), then read the sowed from that file.
-	TeX might mangle the code a bit before passing it to Python, as such we use `can_be_mangled_to`
-	(might return some false positive)
-	to compare it with the code read from the sourcecode.
-	"""
-	if not code: return
-
-	lineno=int(lineno_)
-	# find where the code comes from... (for easy meaningful traceback)
-	target_filename: Optional[str] = None
-
-	code_lines=code.splitlines(keepends=True)
-	file_lines=[]
-
-	for f in (fileabspath, filename):
-		if not f: continue
-		p=Path(f)
-		if not p.is_file(): continue
-		file_lines=p.read_text(encoding='u8').splitlines(keepends=True)[lineno-len(code_lines)-1:lineno-1]
-		if len(file_lines)==len(code_lines) and all(
-			can_be_mangled_to(file_line, code_line) for file_line, code_line in zip(file_lines, code_lines)
-			):
-			target_filename=f
-			break
-
-	if not target_filename:
-		if len(file_lines)==len(code_lines):
-			for file_line, code_line in zip(file_lines, code_lines):
-				if not can_be_mangled_to(file_line, code_line):
-					debug(f"different {file_line!r} {code_line!r}")
-		raise RuntimeError(f"Source file not found! (cwd={os.getcwd()}, attempted {(fileabspath, filename)})")
-
-	def tmp()->None:
-		if target_filename:
-			code_=''.join(file_lines)  # restore missing trailing spaces
-		code_="\n"*(lineno-len(code_lines)-1)+code_
-		if target_filename:
-			compiled_code=compile(code_, target_filename, "exec")
-			exec(compiled_code, user_scope)
-		else:
-			exec(code_, user_scope)
-	run_code_redirect_print_TeX(tmp, engine=engine)
 
 # ======== Python-call-TeX functions
 # ======== additional functions...
@@ -2656,3 +2557,5 @@ def get_bootstrap_code(engine: Engine)->str:
 	return "\n".join(
 			f(engine)
 			for f in bootstrap_code_functions)
+
+from . import texcmds

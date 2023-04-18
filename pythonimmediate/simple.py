@@ -79,19 +79,6 @@ def _export(f: T2)->T2:
 	return f
 
 @_export
-def run_tokenized_line_local(line: str, *, check_braces: bool=True, check_newline: bool=True, check_continue: bool=True, engine: Engine=  default_engine)->None:
-	check_line(line, braces=check_braces, newline=check_newline, continue_=(False if check_continue else None))
-	typing.cast(Callable[[PTTTeXLine, Engine], None], Python_call_TeX_local(
-		r"""
-		\cs_new_protected:Npn %name% {
-			%read_arg0(\__data)%
-			\__data
-			%optional_sync%
-			\__read_do_one_command:
-		}
-		"""))(PTTTeXLine(line), engine)
-
-@_export
 def peek_next_char(engine: Engine=  default_engine)->str:
 	r"""
 	Get the character of the following token, or empty string if it's not a character.
@@ -200,6 +187,9 @@ def put_next(arg: str, engine: Engine=  default_engine)->None:
 def _replace_double_hash(s: str)->str:
 	return s.replace("##", "#")
 
+def _replace_par_to_crcr(s: str)->str:
+	return s.replace("\\par ", "\n\n")
+
 @_export
 def get_arg_str(engine: Engine=  default_engine)->str:
 	r"""
@@ -231,7 +221,8 @@ def get_arg_str(engine: Engine=  default_engine)->str:
 		- the ``^^xx`` or ``^^xxxx`` etc. notation is replaced by the character itself, or vice versa -- literal tab character might get replaced with ``^^I``
 		- multiple space characters may be collapsed into one
 		- newline character may become space character
-		- double-newline character may become ``\par``
+		- literally-typed ``\par`` in the source code may become double-newline character. (however you should never literally type ``\\par`` in the source code anyway he)
+		- Even something like ``\\par`` in the source code may become double-newline character. (this is rare)
 
 		For example, ``\*\hell^^6F{  }`` may become the string ``r"\*\hello { }"`` in Python.
 
@@ -254,7 +245,7 @@ def get_arg_str(engine: Engine=  default_engine)->str:
 		Refer to :meth:`BalancedTokenList.get_next()` for a more advanced API.
 
 	"""
-	return _replace_double_hash(typing.cast(Callable[[Engine], TTPEmbeddedLine], Python_call_TeX_local(
+	return _replace_par_to_crcr(_replace_double_hash(typing.cast(Callable[[Engine], TTPEmbeddedLine], Python_call_TeX_local(
 		r"""
 		\cs_new_protected:Npn %name% #1 {
 			\__send_content%naive_send%:n {
@@ -262,7 +253,7 @@ def get_arg_str(engine: Engine=  default_engine)->str:
 			}
 			\__read_do_one_command:
 		}
-		""", recursive=False))(engine))
+		""", recursive=False))(engine)))
 
 @_export
 def get_arg_estr(engine: Engine=  default_engine)->str:

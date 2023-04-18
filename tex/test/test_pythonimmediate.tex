@@ -1,12 +1,7 @@
 %! TEX program = pdflatex
 \documentclass[a5paper]{article}
 \errorcontextlines=5
-\usepackage{prettytok}
-\prettyinitterm
-
-\ifdefined\prettyinittermcat
-	\prettyinittermcat
-\fi
+\usepackage[mode=term-shell]{prettytok}
 
 \ExplSyntaxOn
 \pretty:n{going to load}
@@ -50,7 +45,7 @@ print("======== test stderr ========", file=sys.stderr)
 
 #print=pythonimmediate.print
 printT=pythonimmediate.print_TeX
-pythonimmediate.run_tokenized_line_local(r'\pretty:n {2.a}')
+pythonimmediate.execute(r'\pretty:n {2.a}')
 \end{pycode}
 
 \pycv|pythonimmediate.run_block_local(r'\pretty:n {3.xxx~ =~ ' + x + '}')|
@@ -58,7 +53,7 @@ pythonimmediate.run_tokenized_line_local(r'\pretty:n {2.a}')
 \begin{pycode}
 pythonimmediate.run_block_local(r'''
 \pretty:n {4.}
-\pycv|pythonimmediate.run_tokenized_line_local(r'\pretty:n{5.}')|
+\pycv|pythonimmediate.execute(r'\pretty:n{5.}')|
 \pretty:n {6.}
 ''')
 \end{pycode}
@@ -76,7 +71,7 @@ assert x==456
 content=pythonimmediate.run_tokenized_line_peek(r'\pythonimmediatecontinue {abc~~def}')
 assert "abc def"==content, content
 
-pythonimmediate.run_tokenized_line_local(
+pythonimmediate.execute(
 r'\pretty:n{9.}'
 )
 \end{pycode}

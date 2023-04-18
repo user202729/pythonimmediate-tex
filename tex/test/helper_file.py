@@ -18,12 +18,12 @@ need_speed_up=default_engine.config.naive_flush
 
 class Test(unittest.TestCase):
 	def test_simple_run_tokenized_line_local(self)->None:
-		pythonimmediate.run_tokenized_line_local(r'\testa {123} {456}')
+		pythonimmediate.execute(r'\testa {123} {456}')
 		self.assertEqual(x, "123")
 		self.assertEqual(y, "456")
 
 	def test_renewcommand_non_Python_defined(self)->None:
-		pythonimmediate.run_tokenized_line_local(r'\def \testb {}')
+		pythonimmediate.execute(r'\def \testb {}')
 
 		@pythonimmediate.renewcommand
 		def testb()->None: pass
@@ -38,7 +38,7 @@ class Test(unittest.TestCase):
 			x=2
 
 		self.assertEqual(x, 1)
-		pythonimmediate.run_tokenized_line_local(r'\testa')
+		pythonimmediate.execute(r'\testa')
 		self.assertEqual(x, 2)
 
 	def test_unicode_str(self)->None:
@@ -94,7 +94,7 @@ class Test(unittest.TestCase):
 			x=3
 
 		self.assertEqual(x, 2)
-		pythonimmediate.run_tokenized_line_local(r'\testd')
+		pythonimmediate.execute(r'\testd')
 		self.assertEqual(x, 3)
 
 		@pythonimmediate.renewcommand  # type: ignore
@@ -115,12 +115,12 @@ class Test(unittest.TestCase):
 			pythonimmediate.print_TeX("123", end="")
 			return "456"
 
-		pythonimmediate.run_tokenized_line_local("789%")
-		pythonimmediate.run_tokenized_line_local("789%")
+		pythonimmediate.execute("789%")
+		pythonimmediate.execute("789%")
 
-		pythonimmediate.run_block_local(r"""\testc {ab} [cd]|ef|{gh}|ijk""" + "\n" + r"""lm|%""")
+		pythonimmediate.execute(r"""\testc {ab} [cd]|ef|{gh}|ijk""" + "\n" + r"""lm|%""")
 
-		pythonimmediate.run_tokenized_line_local("789%")
+		pythonimmediate.execute("789%")
 
 
 	def test_tokens(self)->None:
@@ -158,7 +158,7 @@ class Test(unittest.TestCase):
 
 
 		self.assertEqual(x, 0)
-		pythonimmediate.run_block_local(
+		pythonimmediate.execute(
 		r'''
 		\precattlExec{ \testd {{ab\cC {}\cC{123}\relax\cFrozenRelax {}\cP*$^_ \cS\a}} }
 		''')
