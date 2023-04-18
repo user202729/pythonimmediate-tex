@@ -16,8 +16,10 @@ For example, the argument of :func:`py` has annotated type :class:`.TTPEBlock`, 
 
 and the Python code ``1+2`` will be executed and ``3`` printed in [TeX].
 
-Some command are not documented here, refer to :func:`.add_handler`
-for ``\pythonimmediatecallhandler`` and ``\pythonimmediatelisten``.
+Some command are not documented here, refer to:
+* :func:`.add_handler` for ``\pythonimmediatecallhandler`` and ``\pythonimmediatelisten``.
+* :func:`.continue_until_passed_back` and :func:`.continue_until_passed_back_str`
+  for ``\pythonimmediatecontinue`` and ``\pythonimmediatecontinuenoarg``.
 
 """
 

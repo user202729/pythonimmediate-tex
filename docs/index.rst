@@ -23,10 +23,8 @@ There are different sections of the documentation:
 
 - Some properties of the parent TeX interpreter can be accessed from :const:`~pythonimmediate.engine.default_engine`.
 
-- The rest: contain functions to control the precise category codes of the tokens.
-
-  Read :func:`~pythonimmediate.expand_once`
-  and :class:`~pythonimmediate.NTokenList` for some examples.
+- The rest: contain functions that controls TeX in a more "low-level" way.
+  Start with reading the module documentation :mod:`pythonimmediate`.
 
 - See the documentation of :class:`pythonimmediate.engine.ChildProcessEngine` for ways to create a TeX engine from inside Python,
   and explanation of the ``engine=`` optional argument for most functions.

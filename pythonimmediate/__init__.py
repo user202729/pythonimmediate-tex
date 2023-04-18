@@ -1,4 +1,71 @@
 #!/bin/python3
+r"""
+The main module. Contains Pythonic wrappers for much of [TeX]'s API.
+
+Refer to :mod:`~pythonimmediate.simple` for the "simple" API -- which allows users to avoid the need to
+know [TeX] internals such as category codes.
+
+The fundamental data of [TeX] is a token, this is represented by Python's :class:`Token` object.
+A list of tokens is represented by :class:`TokenList` object. If it's balanced,
+:class:`BalancedTokenList` should be used.
+
+With that, you can manipulate the [TeX] input stream with :meth:`BalancedTokenList.get_next`,
+:meth:`BalancedTokenList.get_until`, :meth:`TokenList.put_next`.
+
+Furthermore, executing [TeX] code is possible using :func:`continue_until_passed_back`.
+For example, the following code::
+
+	TokenList(r"\typeout{123}\pythonimmediatecontinuenoarg").put_next()
+	continue_until_passed_back()
+
+will just use [TeX] to execute the code ``\typeout{123}``.
+
+With the 3 functions above, you can do *everything* that can be done in [TeX]
+(although maybe not very conveniently or quickly). Some other functions are provided,
+and for educational purposes, the way to implement it using the primitive functions are discussed.
+
+* :func:`expand_once`: ``TokenList(r"\expandafter\pythonimmediatecontinuenoarg").put_next(); continue_until_passed_back()``
+* :meth:`BalancedTokenList.expand_o`: ``TokenList(r"\expandafter\pythonimmediatecontinuenoarg\expandafter", self).put_next(); continue_until_passed_back(); return BalancedTokenList.get_next()``
+
+  For example, if the current token list is `\test`, the lines above will:
+
+  * put ``\expandafter\pythonimmediatecontinuenoarg\expandafter{\test}`` following in the input stream,
+  * pass control to [TeX],
+  * after one expansion step, the input stream becomes ``\pythonimmediatecontinuenoarg{⟨content of \test⟩}``,
+  * ``\pythonimmediatecontinuenoarg`` is executed, and execution is returned to Python,
+  * finally :func:`BalancedTokenList.get_next` gets the content of ``\test``, as desired.
+
+* :meth:`TokenList.execute`: ``(self+TokenList(r"\pythonimmediatecontinuenoarg")).put_next(); continue_until_passed_back()``
+* :func:`NToken.put_next`: ``TokenList("\expandafter\pythonimmediatecontinuenoarg\noexpand\abc").put_next(); continue_until_passed_back()`` (as an example of putting a blue ``\abc`` token following in the input stream)
+* etc.
+
+This is a table of [TeX] primitives, and their Python wrapper:
+
+.. list-table::
+	:header-rows: 1
+
+	* - :math:`TeX`
+	  - Python
+	* - ``\let``
+	  - :meth:`Token.assign_equal`
+	* - ``\futurelet``
+	  - :meth:`Token.assign_future`, :meth:`Token.futurenext`
+	* - ``\def``
+	  - :meth:`Token.assign_value` (no parameter)
+	* - ``\edef``
+	  - :meth:`BalancedTokenList.expand_x`
+	* - Get undelimited argument
+	  - :meth:`BalancedTokenList.get_next`
+	* - Get delimited argument
+	  - :meth:`BalancedTokenList.get_until`, :meth:`BalancedTokenList.get_until_brace`
+	* - ``\catcode``
+	  - :func:`catcode`
+	* - ``\detokenize``
+	  - :meth:`BalancedTokenList.detokenize`
+
+
+"""
+
 from __future__ import annotations
 import sys
 import os
@@ -17,7 +84,6 @@ import traceback
 import re
 import collections
 import enum
-
 
 T1 = typing.TypeVar("T1")
 def user_documentation(x: T1)->T1:
@@ -534,7 +600,7 @@ class Token(NToken):
 		"""
 		...
 
-	def assign(self, other: "NToken", engine: Engine=default_engine)->None:
+	def assign_equal(self, other: "NToken", engine: Engine=default_engine)->None:
 		"""
 		Assign the meaning of this token to be equivalent to that of the other token.
 		"""
@@ -2656,7 +2722,11 @@ def continue_until_passed_back_str(engine: Engine=  default_engine)->str:
 #@export_function_to_module
 def continue_until_passed_back(engine: Engine=  default_engine)->None:
 	"""
-	Same as ``continue_until_passed_back_str()`` but nothing can be returned from TeX to Python.
+	Same as ``continue_until_passed_back_str()`` but nothing can be returned from [TeX] to Python.
+
+	So, this resumes the execution of [TeX] code until ``\pythonimmediatecontinuenoarg`` is executed.
+
+	See :mod:`pythonimmediate` for some usage examples.
 	"""
 	result=continue_until_passed_back_str()
 	assert not result
