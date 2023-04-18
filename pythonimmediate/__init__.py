@@ -349,11 +349,11 @@ def add_handler(f: Callable[[Engine], None])->str:
 		def myfunction(engine):
 			print(1)
 			execute("hello world")  # it's possible to execute TeX code here
-			run_none_finish()
+			finish_listen()
 		identifier = add_handler(myfunction)
 		execute(r"\def\test{\pythonimmediatecallhandler{" + identifier + r"}\pythonimmediatelisten}")
 
-	At the end of the Python function, :func:`run_none_finish` **must be called**
+	At the end of the Python function, :func:`finish_listen` **must be called**
 	in order to stop the listening on the [TeX] side.
 
 	.. note::
@@ -1024,7 +1024,9 @@ class ControlSequenceTokenMaker:
 	if enable_get_attribute:
 		def __getattribute__(self, a: str)->"ControlSequenceToken":
 			return ControlSequenceToken(object.__getattribute__(self, "prefix")+a)
-	def __getitem__(self, a: str)->"ControlSequenceToken":
+	def __getitem__(self, a: str|bytes)->"ControlSequenceToken":
+		if isinstance(a, bytes):
+			a="".join(map(chr, a))
 		return ControlSequenceToken(object.__getattribute__(self, "prefix")+a)
 
 
@@ -1739,7 +1741,7 @@ class BalancedTokenList(TokenList):
 			""", recursive=False))(engine)
 
 	@staticmethod
-	def _get_until_raw(delimiter: BalancedTokenList, engine: Engine=default_engine)->"BalancedTokenList":
+	def _get_until_raw(delimiter: BalancedTokenList, long: bool, engine: Engine=default_engine)->"BalancedTokenList":
 		"""
 		Internal function.
 
@@ -1756,9 +1758,10 @@ class BalancedTokenList(TokenList):
 		"""
 		assert delimiter, "Delimiter cannot be empty!"
 		return typing.cast(Callable[[PTTBalancedTokenList, Engine], TTPBalancedTokenList], Python_call_TeX_local(
+			# '#1' is either \long or [], '#2' is the delimiter
 			r"""
-			\cs_new_protected:Npn \__get_until_tmp #1 {
-				\def \__delimit_tmpii ##1 #1 {
+			\cs_new_protected:Npn \__get_until_tmp #1 #2 {
+				#1 \def \__delimit_tmpii ##1 #2 {
 					%sync%
 					%send_arg0(##1)%
 					\pythonimmediatelisten
@@ -1766,17 +1769,20 @@ class BalancedTokenList(TokenList):
 				\__delimit_tmpii
 			}
 			\cs_new_protected:Npn %name% {
-				%read_arg0(\__delimit)%
-				\expandafter \__get_until_tmp \expandafter { \__delimit }
+				%read_arg0(\__arg)%
+				\expandafter \__get_until_tmp \__arg
 			}
-			""", recursive=False))(PTTBalancedTokenList(delimiter), engine)
+			""", recursive=False))(PTTBalancedTokenList(BalancedTokenList([r"\long" if long else [], delimiter])), engine)
 
 	@staticmethod
-	def get_until(delimiter: BalancedTokenList, remove_braces: bool=True, engine: Engine=default_engine)->"BalancedTokenList":
+	def get_until(delimiter: BalancedTokenList, remove_braces: bool=True, long: bool=True, engine: Engine=default_engine)->"BalancedTokenList":
 		r"""
 		Get a delimited argument from the [TeX] input stream, delimited by `delimiter`.
 
 		The delimiter itself will also be removed from the input stream.
+
+		:param long: Works the same as ``\long`` primitive in [TeX] -- if this is ``False``
+			then [TeX] fatal error ``Runaway argument`` will be raised if there's a ``\par`` token in the argument.
 		"""
 		assert delimiter, "Delimiter cannot be empty!"
 		for t in delimiter:
@@ -1787,7 +1793,7 @@ class BalancedTokenList(TokenList):
 			auxiliary_token = T.empty
 			if delimiter[0]==auxiliary_token: auxiliary_token = T.relax
 			auxiliary_token.put_next()
-		result = BalancedTokenList._get_until_raw(delimiter)
+		result = BalancedTokenList._get_until_raw(delimiter, long=long)
 		if not remove_braces:
 			assert result[0]==auxiliary_token
 			del result[0]
@@ -1795,11 +1801,11 @@ class BalancedTokenList(TokenList):
 		return result
 
 	@staticmethod
-	def get_until_brace(engine: Engine=default_engine)->"BalancedTokenList":
+	def get_until_brace(long: bool=True, engine: Engine=default_engine)->"BalancedTokenList":
 		r"""
 		Get a TokenList from the input stream delimited by ``{``. The brace is not removed from the input stream.
 		"""
-		return BalancedTokenList._get_until_raw(BalancedTokenList([Catcode.param("#")]))
+		return BalancedTokenList._get_until_raw(BalancedTokenList("#"), long=long)
 
 	def detokenize(self, engine: Engine=  default_engine)->str:
 		r"""
@@ -2679,6 +2685,21 @@ run_none_finish=typing.cast(Callable[[Engine], None], Python_call_TeX_local(
 r"""
 \cs_new_eq:NN %name% \relax
 """, finish=True, sync=False))
+
+
+
+_finish_listen_identifier=get_random_TeX_identifier()
+mark_bootstrap(
+		r"\cs_new_eq:NN \__run_"+_finish_listen_identifier+r": \relax"
+		)
+
+def finish_listen(engine: Engine=default_engine):
+	# define_Python_call_TeX is hopelessly complicated, will figure out later
+	"""
+	Refer to the documentation of :func:`add_handler`.
+	"""
+	engine.write((_finish_listen_identifier+"\n").encode('u8'))
+
 
 
 """
