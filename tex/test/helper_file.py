@@ -1,7 +1,7 @@
 import unittest
 import pythonimmediate
 from typing import Any
-from pythonimmediate import Token, TokenList, BalancedTokenList, Catcode, ControlSequenceToken, frozen_relax_token, BlueToken, NTokenList, catcode, remove_handler
+from pythonimmediate import Token, TokenList, BalancedTokenList, Catcode, ControlSequenceToken, frozen_relax_token, BlueToken, NTokenList, catcode, remove_handler, group
 from pythonimmediate import Catcode as C
 from pythonimmediate import default_engine, simple
 T=ControlSequenceToken.make
@@ -424,7 +424,7 @@ class Test(unittest.TestCase):
 				Catcode.active("a").blue.meaning_str(),
 				[r"\relax", r"[unknown command code! (0, 1)]"])
 
-	def test_assign_func(self)->None:
+	def test_assign_func_and_group(self)->None:
 		a=1
 		def f():
 			nonlocal a
@@ -436,15 +436,14 @@ class Test(unittest.TestCase):
 		self.assertEqual(a, 2)
 
 		for global_ in [False, True]:
-			TokenList(r"\begingroup").execute()
-			def g():
-				nonlocal a
-				a=3
-			handler_g=T.abc.assign_func(g, global_=global_)
-			a=1
-			TokenList(r"\abc").execute()
-			self.assertEqual(a, 3)
-			TokenList(r"\endgroup").execute()
+			with group:
+				def g():
+					nonlocal a
+					a=3
+				handler_g=T.abc.assign_func(g, global_=global_)
+				a=1
+				TokenList(r"\abc").execute()
+				self.assertEqual(a, 3)
 
 			a=1
 			TokenList(r"\abc").execute()

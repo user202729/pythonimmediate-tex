@@ -63,6 +63,8 @@ This is a table of [TeX] primitives, and their Python wrapper:
 	  - :func:`catcode`
 	* - ``\detokenize``
 	  - :meth:`BalancedTokenList.detokenize`
+	* - ``\begingroup``, ``\endgroup``
+	  - :const:`group`
 
 
 """
@@ -796,6 +798,7 @@ r"""
 		\char_generate:nn {\__index} {2}
 }
 """, recursive=False, sync=True))(PTTInt(self.index), engine)
+
 
 
 
@@ -2752,7 +2755,7 @@ def continue_until_passed_back_str(engine: Engine=  default_engine)->str:
 
 #@export_function_to_module
 def continue_until_passed_back(engine: Engine=  default_engine)->None:
-	"""
+	r"""
 	Same as ``continue_until_passed_back_str()`` but nothing can be returned from [TeX] to Python.
 
 	So, this resumes the execution of [TeX] code until ``\pythonimmediatecontinuenoarg`` is executed.
@@ -2782,16 +2785,43 @@ def _get_charcode(x: str|int)->int:
 	assert len(x)==1
 	return ord(x)
 
+_TeXManagerSubclass = typing.TypeVar("_TeXManagerSubclass", bound="_TeXManager")
+
 @dataclass
-class CatcodeManager:
-	engine: Engine
+class _TeXManager:
+	"""
+	Internal base class to create object instances to manage something on TeX side.
+	Derive from this base class to allow instance to be bound to an engine with ``(engine)`` notation.
+	"""
+	engine: Engine=default_engine
 
-	def __call__(self, engine: Engine)->CatcodeManager:
-		"""
-		Shorthand to bind to another engine.
-		"""
-		return CatcodeManager(engine)
+	def __call__(self: _TeXManagerSubclass, engine: Engine)->_TeXManagerSubclass:
+		return type(self)(engine)
 
+
+class _GroupManager(_TeXManager):
+	def begin(self):
+		TokenList(r"\begingroup").execute()
+	def __enter__(self)->None:
+		self.begin()
+	def end(self):
+		TokenList(r"\endgroup").execute()
+	def __exit__(self, _exc_type, _exc_value, _traceback)->None:
+		self.end()
+
+group=_GroupManager()
+r"""
+Create a semi-simple group.
+
+Use as ``group.begin()`` and ``group.end()``, or as a context manager::
+
+	with group:
+		...
+
+Can be bound to an engine similar to :const:`catcode`.
+"""
+
+class _CatcodeManager(_TeXManager):
 	def __getitem__(self, x: str|int)->Catcode:
 		return Catcode.lookup(int(
 			BalancedTokenList([r"\the\catcode" + str(_get_charcode(x))]).expand_o(self.engine).str_if_unicode()
@@ -2801,7 +2831,7 @@ class CatcodeManager:
 		BalancedTokenList([r"\catcode" + str(_get_charcode(x)) + "=" + str(catcode.value)]).execute(self.engine)
 
 
-catcode=CatcodeManager(default_engine)
+catcode=_CatcodeManager()
 r"""
 Python interface to manage the category code. Example usage::
 
