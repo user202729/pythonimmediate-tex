@@ -1967,14 +1967,11 @@ def define_TeX_call_Python(f: Callable[..., None], name: Optional[str]=None, arg
 	This function setups some internal data structure, and
 	returns the [TeX]-code to be executed on the [TeX]-side to define the macro.
 
-	f: the Python function to be executed.
-	It should take some arguments plus a keyword argument ``engine`` and eventually (optionally) call one of the ``_finish`` functions.
-
-	name: the macro name on the [TeX]-side. This should only consist of letter characters in ``expl3`` catcode regime.
-
-	argtypes: list of argument types. If it's None it will be automatically deduced from the function ``f``'s signature.
-
-	Returns: some code (to be executed in ``expl3`` catcode regime) as explained above.
+	:param f: the Python function to be executed.
+		It should take some arguments plus a keyword argument ``engine`` and eventually (optionally) call one of the ``_finish`` functions.
+	:param name: the macro name on the [TeX]-side. This should only consist of letter characters in ``expl3`` catcode regime.
+	:param argtypes: list of argument types. If it's None it will be automatically deduced from the function ``f``'s signature.
+	:returns: some code (to be executed in ``expl3`` catcode regime) as explained above.
 	"""
 	if argtypes is None:
 		argtypes=[p.annotation for p in inspect.signature(f).parameters.values()]
@@ -2047,10 +2044,9 @@ def define_TeX_call_Python(f: Callable[..., None], name: Optional[str]=None, arg
 
 def define_internal_handler(f: Callable)->Callable:
 	"""
-	define a TeX function with TeX name = f.__name__ that calls f().
+	Define a TeX function with TeX name = ``f.__name__`` that calls f().
 
-	this does not define the specified function in any particular engine, just add them to the bootstrap_code.
-		essert self.process is not None, "process is already closed!"
+	This does not define the specified function in any particular engine, just add them to the :const:`bootstrap_code`.
 	"""
 	bootstrap_code_functions.append(define_TeX_call_Python(f))
 	return f
@@ -2364,49 +2360,52 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 	Internal function.
 
 	``TeX_code`` should be some expl3 code that defines a function with name ``%name%`` that when called should:
-		* run some [TeX]-code (which includes reading the arguments, if any)
-		* do the following if ``sync``:
-			* send ``r`` to Python (equivalently write %sync%)
-			* send whatever needed for the output (as in ``ttp_argtypes``)
-		* call ``\__read_do_one_command:`` iff not ``finish``.
 
-		This is allowed to contain the following:
-		* %name%: the name of the function to be defined as explained above.
-		* %read_arg0(\var_name)%, %read_arg1(...)%: will be expanded to code that reads the input.
-		* %send_arg0(...)%, %send_arg1(...)%: will be expanded to code that sends the content.
-		* %send_arg0_var(\var_name)%, %send_arg1_var(...)%: will be expanded to code that sends the content in the variable.
-		* %optional_sync%: expanded to code that writes ``r`` (to sync), if ``sync`` is True.
-		* %naive_flush% and %naive_inline%: as explained in :func:`mark_bootstrap_naive_replace`.
-		  (although usually you don't need to explicitly write this, it's embedded in the ``send*()`` command
-		  of the last argument, or ``%sync%``)
+	* run some [TeX]-code (which includes reading the arguments, if any)
+	* do the following if ``sync``:
+	  * send ``r`` to Python (equivalently write %sync%)
+	  * send whatever needed for the output (as in ``ttp_argtypes``)
+	* call ``\__read_do_one_command:`` iff not ``finish``.
 
-	ptt_argtypes: list of argument types to be sent from Python to TeX (i.e. input of the TeX function)
+	This is allowed to contain the following:
+	
+	* %name%: the name of the function to be defined as explained above.
+	* %read_arg0(\var_name)%, %read_arg1(...)%: will be expanded to code that reads the input.
+	* %send_arg0(...)%, %send_arg1(...)%: will be expanded to code that sends the content.
+	* %send_arg0_var(\var_name)%, %send_arg1_var(...)%: will be expanded to code that sends the content in the variable.
+	* %optional_sync%: expanded to code that writes ``r`` (to sync), if ``sync`` is True.
+	* %naive_flush% and %naive_inline%: as explained in :func:`mark_bootstrap_naive_replace`.
+	  (although usually you don't need to explicitly write this, it's embedded in the ``send*()`` command
+	  of the last argument, or ``%sync%``)
 
-	ttp_argtypes: list of argument types to be sent from TeX to Python (i.e. output of the TeX function)
+	:param ptt_argtypes: list of argument types to be sent from Python to TeX (i.e. input of the TeX function)
 
-	recursive: whether the TeX_code might call another Python function. Default to True.
+	:param ttp_argtypes: list of argument types to be sent from TeX to Python (i.e. output of the TeX function)
+
+	:param recursive: whether the TeX_code might call another Python function. Default to True.
 		It does not hurt to always specify True, but performance would be a bit slower.
 
-	sync: whether the Python function need to wait for the TeX function to finish.
+	:param sync: whether the Python function need to wait for the TeX function to finish.
 		Required if ``ttp_argtypes`` is not empty.
 		This should be left to be the default None most of the time. (which will make it always sync if ``debugging``,
 		otherwise only sync if needed i.e. there's some output)
 
-	finish: Include this if and only if ``\__read_do_one_command:`` is omitted.
+	:param finish: Include this if and only if ``\__read_do_one_command:`` is omitted.
 		Normally this is not needed, but it can be used as a slight optimization; and it's needed internally to implement
 		``run_none_finish`` among others.
 		For each TeX-call-Python layer, \emph{exactly one} ``finish`` call can be made. If the function itself doesn't call
 		any ``finish`` call (which happens most of the time), then the wrapper will call ``run_none_finish``.
 
-	Return some TeX code to be executed, and a Python function object that when called will call the TeX function
-	on the passed-in TeX engine and return the result.
+	:returns: some TeX code to be executed, and a Python function object that when called will call the TeX function
+		on the passed-in TeX engine and return the result.
 
 	Note that the TeX_code must eventually be executed on the corresponding engine for the program to work correctly.
 
 	Possible optimizations:
-		* the ``r`` is not needed if not recursive and ``ttp_argtypes`` is nonempty
-			(the output itself tells Python when the [TeX]-code finished)
-		* the first line of the output may be on the same line as the ``r`` itself (done, use :class:`TTPEmbeddedLine` type, although a bit hacky)
+
+	* the ``r`` is not needed if not recursive and ``ttp_argtypes`` is nonempty
+	  (the output itself tells Python when the [TeX]-code finished)
+	* the first line of the output may be on the same line as the ``r`` itself (done, use :class:`TTPEmbeddedLine` type, although a bit hacky)
 	"""
 	if ttp_argtypes!=[]:
 		assert sync!=False
