@@ -381,7 +381,7 @@ class NToken(ABC):
 
 		Note that two tokens might have different meaning despite having equal :meth:`meaning_str`.
 		"""
-		return NTokenList([T.ifx, self, other, Catcode.other("1"), T["else"], Catcode.other("0"), T.fi]).expand_x(engine=engine).bool()
+		return bool(NTokenList([T.ifx, self, other, Catcode.other("1"), T.fi]).expand_x(engine=engine))
 
 	def token_code(self)->int:
 		"""
@@ -584,6 +584,14 @@ class Token(NToken):
 		t=Token.get_next(engine=engine)
 		t.put_next(engine=engine)
 		return t
+
+	def defined(self)->bool:
+		"""
+		Return whether this token is defined, that is, its meaning is not ``undefined``.
+		"""
+		assert self.assignable
+		return not BalancedTokenList([T.ifx, self, T["@undefined"], Catcode.other("1"), T.fi]).expand_x()
+
 
 	def put_next(self, engine: Engine=  default_engine)->None:
 		d=self.degree()
@@ -1087,6 +1095,8 @@ if typing.TYPE_CHECKING:
 else:  # Python 3.8 compatibility
 	TokenListBaseClass = collections.UserList
 
+def TokenList_e3(s: str)->TokenList: return TokenList.e3(s)
+
 #@export_function_to_module
 class TokenList(TokenListBaseClass):
 	r"""
@@ -1103,15 +1113,33 @@ class TokenList(TokenListBaseClass):
 	Token list construction
 	-----------------------
 
-	There are some functions to quickly construct token lists, see :meth:`from_string`
-	and :meth:`__init__`.
+	:meth:`__init__` is the constructor of the class, and it accepts parameters in various different forms to allow convenient
+	construction of token lists.
 
-	:meth:`__init__` is the constructor of the class, for a :class:`TokenList` it can be used as follows:
+	Most generally, you can construct a token list from any iterable consist of (recursively) iterables,
+	or tokens, or strings. For example::
 
-	- Given an existing token list, construct a copy (this usage is identical to that of the Python list constructor)::
+		a = TokenList([Catcode.letter("a"), "bc", [r"def\gh"]])
 
-		a=TokenList.doc("hello world")
-		b=TokenList(a)
+	This will make `a` be the token list with value ``abc{def\gh }``.
+
+	Note that the list that is recursively nested inside is used to represent a nesting level.
+
+	As a special case, you can construct from a string::
+
+		a = TokenList("\let \a \b")
+
+	The constructor of other classes such as :class:`BalancedTokenList` and :class:`NTokenList`
+	works the same way.
+
+	The above working implies that:
+
+	- If you construct a token list from an existing token list, it will be copied (because a :class:`TokenList`
+	  is a ``UserList`` of tokens, and iterating over it gives :class:`Token` objects),
+	  similar to how you can copy a list with the ``list`` constructor::
+
+		a = TokenList(["hello world"])
+		b = TokenList(a)
 
 	- Construct a token list from a list of tokens::
 
@@ -1122,22 +1150,21 @@ class TokenList(TokenListBaseClass):
 
 	  See also :class:`Catcode` for the explanation of the ``Catcode.letter("a")`` form.
 
-	- Construct a token list, using lists to represent nesting levels::
 
-		a=TokenList([T.edef, T.a, [T.x, T.y]])
-
-	  The above creates a token list with content ``\edef\a{\x\y}``.
-
-	The constructor of other classes such as :class:`BalancedTokenList` and :class:`NTokenList`
-	works the same way.
-
+	By default, strings will be converted to token lists using :meth:`TokenList.e3`, although you can customize it by passing
+	the second argument to the constructor.
 	"""
 
 	@staticmethod
-	def force_token_list(a: Iterable)->Iterable[Token]:
+	def force_token_list(a: Iterable, string_tokenizer: Callable[[str], TokenList])->Iterable[Token]:
+		if isinstance(a, str):
+			yield from string_tokenizer(a)
+			return
 		for x in a:
 			if isinstance(x, Token):
 				yield x
+			elif isinstance(x, str):
+				yield from string_tokenizer(x)
 			elif isinstance(x, Sequence):
 				yield bgroup
 				child=BalancedTokenList(x)
@@ -1226,12 +1253,6 @@ class TokenList(TokenListBaseClass):
 		"""
 		return BalancedTokenList(self)
 
-	def __init__(self, a: Iterable=())->None:
-		"""
-		Refer to :class:`TokenList` on how to use this function.
-		"""
-		super().__init__(TokenList.force_token_list(a))
-
 	@staticmethod
 	def iterable_from_string(s: str, get_catcode: Callable[[int], Catcode])->Iterable[Token]:
 		"""
@@ -1295,7 +1316,6 @@ class TokenList(TokenListBaseClass):
 		"""
 		return cls(TokenList.iterable_from_string(s, get_catcode))
 
-
 	@classmethod
 	def e3(cls: Type[TokenListType], s: str)->TokenListType:
 		r"""
@@ -1325,6 +1345,12 @@ class TokenList(TokenListBaseClass):
 		"""
 		return cls.from_string(s, lambda x: doc_catcode_table.get(x, Catcode.other))
 
+	def __init__(self, a: Iterable=(), string_tokenizer: "Callable[[str], TokenList]"=TokenList_e3)->None:
+		"""
+		Refer to :class:`TokenList` on how to use this function.
+		"""
+		super().__init__(TokenList.force_token_list(a, string_tokenizer))
+		
 	def serialize(self)->str:
 		return "".join(t.serialize() for t in self)
 
@@ -1416,12 +1442,6 @@ class TokenList(TokenListBaseClass):
 		"""
 		return NTokenList(self).expand_x(engine=engine)
 
-	def bool(self)->bool:
-		"""
-		See :meth:`NTokenList.bool`.
-		"""
-		return NTokenList(self).bool()
-
 	def token_codes(self)->list[int]:
 		"""
 		See :meth:`NTokenList.token_codes`.
@@ -1457,13 +1477,13 @@ class BalancedTokenList(TokenList):
 		use :meth:`~TokenList.is_balanced()` method explicitly if you need to check.
 	"""
 
-	def __init__(self, a: Iterable=())->None:
+	def __init__(self, a: Iterable=(), string_tokenizer: Callable[[str], TokenList]=TokenList.e3)->None:
 		"""
 		Constructor.
 
 		:raises ValueError: if the token list is not balanced.
 		"""
-		super().__init__(a)
+		super().__init__(a, string_tokenizer)
 		self.check_balanced()
 
 	def expand_o(self, engine: Engine=  default_engine)->"BalancedTokenList":
@@ -1585,7 +1605,7 @@ class BalancedTokenList(TokenList):
 		result = BalancedTokenList._get_until_raw(delimiter)
 		if not remove_braces:
 			assert result[0]==auxiliary_token
-			del result[1]
+			del result[0]
 
 		return result
 
@@ -1633,7 +1653,7 @@ class NTokenList(NTokenListBaseClass):
 			else:
 				raise RuntimeError(f"Cannot make NTokenList from object {x} of type {type(x)}")
 
-	def __init__(self, a: Iterable=())->None:
+	def __init__(self, a: Iterable=(), string_tokenizer: Callable[[str], TokenList]=TokenList.e3)->None:
 		super().__init__(NTokenList.force_token_list(a))
 
 	def is_balanced(self)->bool:
@@ -1724,15 +1744,6 @@ class NTokenList(NTokenListBaseClass):
 			return "".join(map(chr, self.token_codes()))
 		else:
 			return bytes(self.token_codes()).decode('u8')
-
-	def bool(self)->bool:
-		"""
-		Internal function. ``self`` must represent a [TeX] string either equal to "0" or "1".
-
-		:return: the boolean represented by the string.
-		"""
-		s=self.token_codes()
-		return {b"0": False, b"1": True}[bytes(s)]
 
 
 class TeXToPyData(ABC):

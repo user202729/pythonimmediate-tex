@@ -172,7 +172,7 @@ class Test(unittest.TestCase):
 		assert BalancedTokenList.get_until(BalancedTokenList.e3(r'ef')) == TokenList.e3(r'abc{}\test d')
 
 		TokenList.e3(r'{abc{}\test d}ef').put_next()
-		assert BalancedTokenList.get_until(BalancedTokenList.e3(r'ef'), remove_braces=False) == TokenList.e3(r'{abc{}\test d}')
+		self.assertEqual(BalancedTokenList.get_until(BalancedTokenList.e3(r'ef'), remove_braces=False), TokenList.e3(r'{abc{}\test d}'))
 
 	def test_tokens2(self)->None:
 		for t in [
@@ -299,6 +299,27 @@ class Test(unittest.TestCase):
 				  ControlSequenceToken("test"),
 				  C.letter("a"),
 				  ]))
+		self.assertEqual(TokenList([C.letter("a"), "bc", ["def{", r"}\test\test"]]),
+				   TokenList([
+					   C.letter("a"),
+					   C.letter("b"),
+					   C.letter("c"),
+					   C.bgroup("{"),
+					   C.letter("d"),
+					   C.letter("e"),
+					   C.letter("f"),
+					   C.bgroup("{"),
+					   C.egroup("}"),
+					   T["test"],
+					   T["test"],
+					   C.egroup("}"),
+					   ]))
+		self.assertEqual(TokenList(r"\tl_set:Nn \a \b"),
+				   TokenList([
+					   T["tl_set:Nn"],
+					   T["a"],
+					   T["b"],
+					   ]))
 
 	def test_balanced_parts(self)->None:
 		for s in [
