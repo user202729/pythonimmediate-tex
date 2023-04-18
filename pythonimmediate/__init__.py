@@ -51,7 +51,8 @@ This is a table of [TeX] primitives, and their Python wrapper:
 	* - ``\futurelet``
 	  - :meth:`Token.assign_future`, :meth:`Token.futurenext`
 	* - ``\def``
-	  - :meth:`Token.assign_value` (no parameter)
+	  - :meth:`Token.assign_value` (no parameter),
+	    :meth:`Token.assign_func` (define function to do some task)
 	* - ``\edef``
 	  - :meth:`BalancedTokenList.expand_x`
 	* - Get undelimited argument
@@ -238,7 +239,7 @@ r"""
 }
 
 \cs_new_protected:Npn \pythonimmediatecallhandler #1 {
-	\__send_content:e {r #1 %naive_inline% }
+	\__send_content:e {i #1 %naive_inline% }
 }
 
 % read documentation of ``_peek`` commands for details what this command does.
@@ -645,11 +646,41 @@ class Token(NToken):
 			}
 			""" , sync=True))(PTTBalancedTokenList(BalancedTokenList([self])), engine)
 
-	def assign_value(self, content: "BalancedTokenList")->None:
+	def assign_value(self, content: "BalancedTokenList", global_: bool=False, engine: Engine=default_engine)->None:
 		"""
 		Given ``self`` is an expl3 ``tl``-variable, assign *content* to it locally.
 		"""
-		BalancedTokenList([T.edef, self, [T.unexpanded, content]]).execute()
+		TokenList([T.xdef if global_ else T.edef, self, [T.unexpanded, content]]).execute(engine)
+
+	def assign_func(self, f: Callable[[], None], global_: bool=False, engine: Engine=default_engine)->str:
+		"""
+		Assign this token to call the Python function `f` when executed.
+
+		Returns an identifier, as described in :func:`add_handler`.
+		"""
+		@functools.wraps(f)
+		def g(engine: Engine)->None:
+			old_action_done=engine.action_done
+			engine.action_done=False
+			try:
+				f()
+			except:
+				if engine.action_done:
+					# error occurred after 'finish' is called, cannot signal the error to TeX, will just ignore (after printing out the traceback)...
+					pass
+				else:
+					# TODO what should be done here? What if the error raised below is caught
+					engine.action_done=True
+				raise
+			finally:
+				if not engine.action_done:
+					run_none_finish(engine)
+				engine.action_done=old_action_done
+		identifier = add_handler(g)
+		TokenList([T.gdef if global_ else r"\def", self, r"{"
+			 r"\pythonimmediatecallhandler{"+identifier+r"}\pythonimmediatelisten"
+			 r"}"]).execute()
+		return identifier
 
 	def value(self, engine: Engine=  default_engine)->"BalancedTokenList":
 		"""

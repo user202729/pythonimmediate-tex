@@ -1,7 +1,7 @@
 import unittest
 import pythonimmediate
 from typing import Any
-from pythonimmediate import Token, TokenList, BalancedTokenList, Catcode, ControlSequenceToken, frozen_relax_token, BlueToken, NTokenList, catcode
+from pythonimmediate import Token, TokenList, BalancedTokenList, Catcode, ControlSequenceToken, frozen_relax_token, BlueToken, NTokenList, catcode, remove_handler
 from pythonimmediate import Catcode as C
 from pythonimmediate import default_engine, simple
 T=ControlSequenceToken.make
@@ -424,6 +424,36 @@ class Test(unittest.TestCase):
 				Catcode.active("a").blue.meaning_str(),
 				[r"\relax", r"[unknown command code! (0, 1)]"])
 
+	def test_assign_func(self)->None:
+		a=1
+		def f():
+			nonlocal a
+			a=2
+		handler_f=T.abc.assign_func(f)
+
+		self.assertEqual(a, 1)
+		TokenList(r"\abc").execute()
+		self.assertEqual(a, 2)
+
+		for global_ in [False, True]:
+			TokenList(r"\begingroup").execute()
+			def g():
+				nonlocal a
+				a=3
+			handler_g=T.abc.assign_func(g, global_=global_)
+			a=1
+			TokenList(r"\abc").execute()
+			self.assertEqual(a, 3)
+			TokenList(r"\endgroup").execute()
+
+			a=1
+			TokenList(r"\abc").execute()
+			if global_: self.assertEqual(a, 3)
+			else: self.assertEqual(a, 2)
+			remove_handler(handler_g)
+
+		remove_handler(handler_f)
+
 	def test_cannot_blue_tokens(self)->None:
 		for t in [
 				Catcode.letter("a"),
@@ -454,14 +484,14 @@ class Test(unittest.TestCase):
 	def test_assign(self)->None:
 		for t in [T.ifx, T.ifx.blue, C.other("="), C.space(' '), T.empty, T.relax, T.empty.blue]:
 			with self.subTest(t=t):
-				T.aaa.assign(t)
+				T.aaa.assign_equal(t)
 				self.assertTrue(T.aaa.meaning_equal(t))
 
 				t.put_next()
 				T.aaa.assign_future()
 				self.assertTrue(T.aaa.meaning_equal(t))
 
-				T.aaa.assign(T.empty)
+				T.aaa.assign_equal(T.empty)
 
 				T.empty.put_next()
 				T.aaa.assign_futurenext()
@@ -470,7 +500,7 @@ class Test(unittest.TestCase):
 				assert Token.get_next()==T.empty
 				assert Token.get_next()==t.no_blue
 
-				T.aaa.assign(T.empty)
+				T.aaa.assign_equal(T.empty)
 
 				NTokenList([T.empty, t]).put_next()
 				T.aaa.assign_futurenext()
