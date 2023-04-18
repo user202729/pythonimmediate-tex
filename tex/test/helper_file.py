@@ -1,7 +1,7 @@
 import unittest
 import pythonimmediate
 from typing import Any
-from pythonimmediate import Token, TokenList, BalancedTokenList, Catcode, ControlSequenceToken, frozen_relax_token, BlueToken, NTokenList
+from pythonimmediate import Token, TokenList, BalancedTokenList, Catcode, ControlSequenceToken, frozen_relax_token, BlueToken, NTokenList, catcode
 from pythonimmediate import Catcode as C
 from pythonimmediate import default_engine, simple
 T=ControlSequenceToken.make
@@ -173,6 +173,13 @@ class Test(unittest.TestCase):
 
 		TokenList.e3(r'{abc{}\test d}ef').put_next()
 		self.assertEqual(BalancedTokenList.get_until(BalancedTokenList.e3(r'ef'), remove_braces=False), TokenList.e3(r'{abc{}\test d}'))
+
+	def test_catcode(self)->None:
+		assert catcode["a"] == Catcode.letter
+		assert catcode[ord("a")] == Catcode.letter
+		catcode["a"] = Catcode.other
+		assert catcode[ord("a")] == Catcode.other
+		catcode["a"] = Catcode.letter
 
 	def test_tokens2(self)->None:
 		for t in [

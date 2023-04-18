@@ -954,6 +954,12 @@ class Catcode(enum.Enum):
 		if isinstance(ch, str): ch=ord(ch)
 		return CharacterToken(ch, self)
 
+	@staticmethod
+	def lookup(x: int)->Catcode:
+		return _catcode_value_to_member[x]
+
+_catcode_value_to_member = {item.value: item for item in Catcode}
+
 C=Catcode
 
 #@export_function_to_module
@@ -2583,6 +2589,43 @@ def expand_once(engine: Engine=  default_engine)->None:
 		\cs_new_protected:Npn %name% { \expandafter \pythonimmediatecontinuenoarg }
 		""", recursive=False, sync=True))(engine)
 
+
+def _get_charcode(x: str|int)->int:
+	if isinstance(x, int): return x
+	assert len(x)==1
+	return ord(x)
+
+@dataclass
+class CatcodeManager:
+	engine: Engine
+
+	def __call__(self, engine: Engine)->CatcodeManager:
+		"""
+		Shorthand to bind to another engine.
+		"""
+		return CatcodeManager(engine)
+
+	def __getitem__(self, x: str|int)->Catcode:
+		return Catcode.lookup(int(
+			BalancedTokenList([r"\the\catcode" + str(_get_charcode(x))]).expand_o(self.engine).str_if_unicode()
+			))
+
+	def __setitem__(self, x: str|int, catcode: Catcode)->None:
+		BalancedTokenList([r"\catcode" + str(_get_charcode(x)) + "=" + str(catcode.value)]).execute(self.engine)
+
+
+catcode=CatcodeManager(default_engine)
+r"""
+Python interface to manage the category code. Example usage::
+
+	catcode["a"] = Catcode.letter
+	catcode[97] = Catcode.letter
+	assert catcode["a"] == Catcode.letter
+
+Similar to :const:`~pythonimmediate.simple.var`, you can also bind it to an engine other than :const:`~pythonimmediate.engine.default_engine`::
+
+	catcode(engine)["a"] = Catcode.letter
+"""
 
 
 # ========
