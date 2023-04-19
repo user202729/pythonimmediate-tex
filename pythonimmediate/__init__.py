@@ -824,7 +824,7 @@ r"""
 \def \cC{__tldeserialize_8} #1        #2 { \char_generate:nn {`#1} {8}                                                   \csname #2 \endcsname }
 \def \__tldeserialize_A #1        #2 { \char_generate:nn {`#1} {10}                                                  \csname #2 \endcsname }
 \def \__tldeserialize_B #1        #2 { \char_generate:nn {`#1} {11}                                                  \csname #2 \endcsname }
-\def \__tldeserialize_C #1        #2 { \char_generate:nn {`#1} {12}                                                  \csname #2 \endcsname }
+\def \__tldeserialize_C #1        #2 { #1                                                   \csname #2 \endcsname }
 \def \__tldeserialize_D #1        #2 { \expandafter \expandafter \expandafter \noexpand \char_generate:nn {`#1} {13} \csname #2 \endcsname }
 \def \__tldeserialize_R #1            { \cFrozenRelax                                                                  \csname #1 \endcsname }
 
