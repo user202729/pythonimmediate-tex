@@ -804,37 +804,56 @@ r"""
 
 # TeX code for serializing and deserializing a token list.
 # Convert a token list from/to a string.
+# functions moved outside in commit 37888c65ecd96f636ea41cf5cacd1763258eff4c.
+# Probably a better idea but doesn't seem to be much faster.
 mark_bootstrap(
 r"""
 \precattl_exec:n {
 
+\def \__tldeserialize_start #1 { \csname #1 \endcsname }
+\def \cC{__tldeserialize_\^} #1 #2        { \csname #1 \expandafter \expandafter \expandafter \endcsname \char_generate:nn {`#2-64} {12} }
+\def \cC{__tldeserialize_\>} #1 #2 \cO\   { \csname #1 \endcsname #2  \cU\  }
+\def \cC{__tldeserialize_\*} #1 #2 \cO\  #3 { \csname #1 \endcsname #2  \char_generate:nn {`#3-64} {12} }
+\def \cC{__tldeserialize_\\} #1 \cO\   #2 { \expandafter \noexpand \csname #1 \endcsname                                  \csname #2 \endcsname }
+\def \cC{__tldeserialize_1} #1        #2 { \char_generate:nn {`#1} {1}                                                   \csname #2 \endcsname }
+\def \cC{__tldeserialize_2} #1        #2 { \char_generate:nn {`#1} {2}                                                   \csname #2 \endcsname }
+\def \cC{__tldeserialize_3} #1        #2 { \char_generate:nn {`#1} {3}                                                   \csname #2 \endcsname }
+\def \cC{__tldeserialize_4} #1        #2 { \char_generate:nn {`#1} {4}                                                   \csname #2 \endcsname }
+\def \cC{__tldeserialize_6} #1        #2 { ## \char_generate:nn {`#1} {6}                                              \csname #2 \endcsname }
+\def \cC{__tldeserialize_7} #1        #2 { \char_generate:nn {`#1} {7}                                                   \csname #2 \endcsname }
+\def \cC{__tldeserialize_8} #1        #2 { \char_generate:nn {`#1} {8}                                                   \csname #2 \endcsname }
+\def \__tldeserialize_A #1        #2 { \char_generate:nn {`#1} {10}                                                  \csname #2 \endcsname }
+\def \__tldeserialize_B #1        #2 { \char_generate:nn {`#1} {11}                                                  \csname #2 \endcsname }
+\def \__tldeserialize_C #1        #2 { \char_generate:nn {`#1} {12}                                                  \csname #2 \endcsname }
+\def \__tldeserialize_D #1        #2 { \expandafter \expandafter \expandafter \noexpand \char_generate:nn {`#1} {13} \csname #2 \endcsname }
+\def \__tldeserialize_R #1            { \cFrozenRelax                                                                  \csname #1 \endcsname }
+
 % here #1 is the target token list to store the result to, #2 is a string with the final '.'.
 \cs_new_protected:Npn \__tldeserialize_dot:Nn #1 #2 {
 	\begingroup
-		\tl_gset:Nn \__gtmp {#2}
-		\tl_greplace_all:Nnn \__gtmp {~} {\cO\ }
+		%\tl_gset:Nn \__gtmp {#2}
+		%\tl_greplace_all:Nnn \__gtmp {~} {\cO\ }
+		\tl_gset:Nx \__gtmp {\cC{_ _kernel_str_to_other_fast:n}{#2}}
 
-		\def \start ##1 { \csname ##1 \endcsname }
-
-		\def \^ ##1 ##2        { \csname ##1 \expandafter \expandafter \expandafter \endcsname \char_generate:nn {`##2-64} {12} }
-		\def \> ##1 ##2 \cO\   { \csname ##1 \endcsname ##2  \cU\  }
-		\def \* ##1 ##2 \cO\  ##3 { \csname ##1 \endcsname ##2  \char_generate:nn {`##3-64} {12} }
-		\def \\ ##1 \cO\   ##2 { \expandafter \noexpand \csname ##1 \endcsname                                  \csname ##2 \endcsname }
-		\def \1 ##1        ##2 { \char_generate:nn {`##1} {1}                                                   \csname ##2 \endcsname }
-		\def \2 ##1        ##2 { \char_generate:nn {`##1} {2}                                                   \csname ##2 \endcsname }
-		\def \3 ##1        ##2 { \char_generate:nn {`##1} {3}                                                   \csname ##2 \endcsname }
-		\def \4 ##1        ##2 { \char_generate:nn {`##1} {4}                                                   \csname ##2 \endcsname }
-		\def \6 ##1        ##2 { #### \char_generate:nn {`##1} {6}                                              \csname ##2 \endcsname }
-		\def \7 ##1        ##2 { \char_generate:nn {`##1} {7}                                                   \csname ##2 \endcsname }
-		\def \8 ##1        ##2 { \char_generate:nn {`##1} {8}                                                   \csname ##2 \endcsname }
-		\def \A ##1        ##2 { \char_generate:nn {`##1} {10}                                                  \csname ##2 \endcsname }
-		\def \B ##1        ##2 { \char_generate:nn {`##1} {11}                                                  \csname ##2 \endcsname }
-		\def \C ##1        ##2 { \char_generate:nn {`##1} {12}                                                  \csname ##2 \endcsname }
-		\def \D ##1        ##2 { \expandafter \expandafter \expandafter \noexpand \char_generate:nn {`##1} {13} \csname ##2 \endcsname }
-		\def \R ##1            { \cFrozenRelax                                                                  \csname ##1 \endcsname }
+		\let \^ \cC{__tldeserialize_\^}
+		\let \> \cC{__tldeserialize_\>}
+		\let \* \cC{__tldeserialize_\*}
+		\let \\ \cC{__tldeserialize_\\}
+		\let \1 \cC{__tldeserialize_1}
+		\let \2 \cC{__tldeserialize_2}
+		\let \3 \cC{__tldeserialize_3}
+		\let \4 \cC{__tldeserialize_4}
+		\let \6 \cC{__tldeserialize_6}
+		\let \7 \cC{__tldeserialize_7}
+		\let \8 \cC{__tldeserialize_8}
+		\let \A \__tldeserialize_A 
+		\let \B \__tldeserialize_B 
+		\let \C \__tldeserialize_C 
+		\let \D \__tldeserialize_D 
+		\let \R \__tldeserialize_R 
 
 		\let \. \empty
-		\tl_gset:Nx \__gtmp {\expandafter \start \__gtmp}
+		\tl_gset:Nx \__gtmp {\expandafter \__tldeserialize_start \__gtmp}
 	\endgroup
 	\tl_set_eq:NN #1 \__gtmp
 }
