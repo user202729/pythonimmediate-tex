@@ -1486,9 +1486,9 @@ class TokenList(TokenListBaseClass):
 		return BalancedTokenList(self)
 
 	@staticmethod
-	def iterable_from_string(s: str, get_catcode: Callable[[int], Catcode])->Iterable[Token]:
+	def _iterable_from_string(s: str, get_catcode: Callable[[int], Catcode])->Iterable[Token]:
 		"""
-		refer to documentation of from_string() for details.
+		Refer to documentation of :meth:`from_string` for details.
 		"""
 		i=0
 		while i<len(s):
@@ -1524,7 +1524,7 @@ class TokenList(TokenListBaseClass):
 							i+=1
 
 	@classmethod
-	def from_string(cls: Type[TokenListType], s: str, get_catcode: Callable[[int], Catcode])->TokenListType:
+	def from_string(cls: Type[TokenListType], s: str, get_catcode: Callable[[int], Catcode], endlinechar: str)->TokenListType:
 		"""
 		Approximate tokenizer implemented in Python.
 
@@ -1546,7 +1546,8 @@ class TokenList(TokenListBaseClass):
 
 		:param get_catcode: A function that given a character code, return its desired category code.
 		"""
-		return cls(TokenList.iterable_from_string(s, get_catcode))
+		assert len(endlinechar)<=1
+		return cls(TokenList._iterable_from_string(s.replace('\n', endlinechar), get_catcode))
 
 	@classmethod
 	def e3(cls: Type[TokenListType], s: str)->TokenListType:
@@ -1560,7 +1561,7 @@ class TokenList(TokenListBaseClass):
 			BalancedTokenList.e3(r'\cs_new_protected:Npn \__mymodule_myfunction:n #1 { #1 #1 }')
 			# returns an instance of BalancedTokenList with the expected content
 		"""
-		return cls.from_string(s, lambda x: e3_catcode_table.get(x, Catcode.other))
+		return cls.from_string(s, lambda x: e3_catcode_table.get(x, Catcode.other), ' ')
 
 	@classmethod
 	def doc(cls: Type[TokenListType], s: str)->TokenListType:
@@ -1575,7 +1576,9 @@ class TokenList(TokenListBaseClass):
 			BalancedTokenList.doc('}')  # raises an error
 			TokenList.doc('}')  # returns an instance of TokenList with the expected content
 		"""
-		return cls.from_string(s, lambda x: doc_catcode_table.get(x, Catcode.other))
+		if "\n\n" in s:
+			raise NotImplementedError(r"Double-newline to \par not implemented yet!")
+		return cls.from_string(s, lambda x: doc_catcode_table.get(x, Catcode.other), ' ')
 
 	def __init__(self, a: Iterable=(), string_tokenizer: "Callable[[str], TokenList]"=TokenList_e3)->None:
 		"""
