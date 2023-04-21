@@ -8,7 +8,7 @@ T=ControlSequenceToken.make
 
 assert default_engine.name in ["pdftex", "xetex", "luatex"]
 
-assert default_engine.name==T.c_sys_engine_str.value_str()
+assert default_engine.name==T.c_sys_engine_str.val_str()
 
 is_unicode: bool=default_engine.is_unicode
 
@@ -40,6 +40,12 @@ class Test(unittest.TestCase):
 		self.assertEqual(x, 1)
 		pythonimmediate.execute(r'\testa')
 		self.assertEqual(x, 2)
+
+	def test_meaning_eq(self)->None:
+		assert T["@firstoftwo"].meaning_eq(T["use_i:nn"])
+		assert T["@secondoftwo"].meaning_eq(T["use_ii:nn"])
+		assert not T["@secondoftwo"].meaning_eq(T["use_i:nn"])
+		assert T["@firstofone"].meaning_eq(T["use:n"])
 
 	def test_unicode_str(self)->None:
 		s='Æ²×⁴ℝ𝕏'

@@ -48,8 +48,10 @@ This is a table of [TeX] primitives, and their Python wrapper:
 	  - Python
 	* - ``\let``
 	  - :meth:`Token.set_eq`
+	* - ``\ifx``
+	  - :meth:`Token.meaning_eq`
 	* - ``\futurelet``
-	  - :meth:`Token.set_future`, :meth:`Token.futurenext`
+	  - :meth:`Token.set_future`, :meth:`Token.set_future2`
 	* - ``\def``
 	  - :meth:`Token.set_val` (no parameter),
 	    :meth:`Token.set_func` (define function to do some task)
@@ -640,6 +642,12 @@ class Token(NToken):
 		assert self.assignable
 		NTokenList([T.let, self, C.other("="), C.space(' '), other]).execute(engine=engine)
 
+	def meaning_eq(self, other: NToken, engine: Engine=default_engine)->bool:
+		r"""
+		Check if the meaning of this token is equivalent to the other token. Equivalent to [TeX] ``\ifx``.
+		"""
+		return bool(len(NTokenList([T.ifx, self, other, C.other("1"), T.fi]).expand_x(engine=engine)))
+
 	def set_future(self, engine: Engine=  default_engine)->None:
 		r"""
 		Assign the meaning of this token to be equivalent to that of the following token in the input stream.
@@ -696,17 +704,17 @@ class Token(NToken):
 			 r"}"]).execute()
 		return identifier
 
-	def value(self, engine: Engine=  default_engine)->"BalancedTokenList":
+	def val(self, engine: Engine=  default_engine)->"BalancedTokenList":
 		"""
 		given ``self`` is a expl3 ``tl``-variable, return the content.
 		"""
 		return BalancedTokenList([self]).expand_o(engine=engine)
 
-	def value_str(self, engine: Engine=  default_engine)->str:
+	def val_str(self, engine: Engine=  default_engine)->str:
 		"""
 		given ``self`` is a expl3 ``str``-variable, return the content.
 		"""
-		return self.value(engine=engine).str(engine=engine)
+		return self.val(engine=engine).str(engine=engine)
 
 	def e3bool(self, engine: Engine=default_engine)->bool:
 		"""
