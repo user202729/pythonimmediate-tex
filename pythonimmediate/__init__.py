@@ -47,12 +47,12 @@ This is a table of [TeX] primitives, and their Python wrapper:
 	* - :math:`TeX`
 	  - Python
 	* - ``\let``
-	  - :meth:`Token.assign_equal`
+	  - :meth:`Token.set_eq`
 	* - ``\futurelet``
-	  - :meth:`Token.assign_future`, :meth:`Token.futurenext`
+	  - :meth:`Token.set_future`, :meth:`Token.futurenext`
 	* - ``\def``
-	  - :meth:`Token.assign_value` (no parameter),
-	    :meth:`Token.assign_func` (define function to do some task)
+	  - :meth:`Token.set_val` (no parameter),
+	    :meth:`Token.set_func` (define function to do some task)
 	* - ``\edef``
 	  - :meth:`BalancedTokenList.expand_x`
 	* - Get undelimited argument
@@ -633,14 +633,14 @@ class Token(NToken):
 		"""
 		...
 
-	def assign_equal(self, other: "NToken", engine: Engine=default_engine)->None:
+	def set_eq(self, other: "NToken", engine: Engine=default_engine)->None:
 		"""
 		Assign the meaning of this token to be equivalent to that of the other token.
 		"""
 		assert self.assignable
 		NTokenList([T.let, self, C.other("="), C.space(' '), other]).execute(engine=engine)
 
-	def assign_future(self, engine: Engine=  default_engine)->None:
+	def set_future(self, engine: Engine=  default_engine)->None:
 		r"""
 		Assign the meaning of this token to be equivalent to that of the following token in the input stream.
 
@@ -659,7 +659,7 @@ class Token(NToken):
 			}
 			""" , sync=True))(PTTBalancedTokenList(BalancedTokenList([self])), engine)
 
-	def assign_futurenext(self, engine: Engine=  default_engine)->None:
+	def set_future2(self, engine: Engine=  default_engine)->None:
 		r"""
 		Assign the meaning of this token to be equivalent to that of the second-next token in the input stream.
 
@@ -678,13 +678,13 @@ class Token(NToken):
 			}
 			""" , sync=True))(PTTBalancedTokenList(BalancedTokenList([self])), engine)
 
-	def assign_value(self, content: "BalancedTokenList", global_: bool=False, engine: Engine=default_engine)->None:
+	def set_val(self, content: "BalancedTokenList", global_: bool=False, engine: Engine=default_engine)->None:
 		"""
 		Given ``self`` is an expl3 ``tl``-variable, assign *content* to it locally.
 		"""
 		TokenList([T.xdef if global_ else T.edef, self, [T.unexpanded, content]]).execute(engine)
 
-	def assign_func(self, f: Callable[[], None], global_: bool=False, engine: Engine=default_engine)->str:
+	def set_func(self, f: Callable[[], None], global_: bool=False, engine: Engine=default_engine)->str:
 		"""
 		Assign this token to call the Python function `f` when executed.
 

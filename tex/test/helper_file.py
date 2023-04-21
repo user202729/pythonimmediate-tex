@@ -417,19 +417,19 @@ class Test(unittest.TestCase):
 				T.empty.blue.meaning_str(),
 				[r"\relax", r"[unknown command code! (0, 1)]"])
 
-		Catcode.active("a").assign_value(BalancedTokenList.doc("abc"))
+		Catcode.active("a").set_val(BalancedTokenList.doc("abc"))
 
 		self.assertEqual(Catcode.active("a").meaning_str(), "macro:->abc")
 		self.assertIn(
 				Catcode.active("a").blue.meaning_str(),
 				[r"\relax", r"[unknown command code! (0, 1)]"])
 
-	def test_assign_func_and_group(self)->None:
+	def test_set_func_and_group(self)->None:
 		a=1
 		def f():
 			nonlocal a
 			a=2
-		handler_f=T.abc.assign_func(f)
+		handler_f=T.abc.set_func(f)
 
 		self.assertEqual(a, 1)
 		TokenList(r"\abc").execute()
@@ -440,7 +440,7 @@ class Test(unittest.TestCase):
 				def g():
 					nonlocal a
 					a=3
-				handler_g=T.abc.assign_func(g, global_=global_)
+				handler_g=T.abc.set_func(g, global_=global_)
 				a=1
 				TokenList(r"\abc").execute()
 				self.assertEqual(a, 3)
@@ -469,7 +469,7 @@ class Test(unittest.TestCase):
 		self.assertTrue(T.relax.blue.meaning_equal(T.relax))
 		self.assertTrue(T.empty.blue.meaning_equal(T.empty.blue))
 
-	def test_assign_to_blue(self)->None:
+	def test_set_to_blue(self)->None:
 		NTokenList([T.let, T.aaa.blue, T.ifx]).execute()
 		self.assertTrue(T.aaa.meaning_equal(T.ifx))
 
@@ -480,29 +480,29 @@ class Test(unittest.TestCase):
 		with self.assertRaises(RuntimeError):
 			TokenList([T.aaa.blue])
 
-	def test_assign(self)->None:
+	def test_set(self)->None:
 		for t in [T.ifx, T.ifx.blue, C.other("="), C.space(' '), T.empty, T.relax, T.empty.blue]:
 			with self.subTest(t=t):
-				T.aaa.assign_equal(t)
+				T.aaa.set_eq(t)
 				self.assertTrue(T.aaa.meaning_equal(t))
 
 				t.put_next()
-				T.aaa.assign_future()
+				T.aaa.set_future()
 				self.assertTrue(T.aaa.meaning_equal(t))
 
-				T.aaa.assign_equal(T.empty)
+				T.aaa.set_eq(T.empty)
 
 				T.empty.put_next()
-				T.aaa.assign_futurenext()
+				T.aaa.set_future2()
 				self.assertTrue(T.aaa.meaning_equal(t.no_blue))
 
 				assert Token.get_next()==T.empty
 				assert Token.get_next()==t.no_blue
 
-				T.aaa.assign_equal(T.empty)
+				T.aaa.set_eq(T.empty)
 
 				NTokenList([T.empty, t]).put_next()
-				T.aaa.assign_futurenext()
+				T.aaa.set_future2()
 				self.assertTrue(T.aaa.meaning_equal(t))
 
 				assert Token.get_next()==T.empty
