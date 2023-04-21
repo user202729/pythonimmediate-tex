@@ -1803,22 +1803,26 @@ class BalancedTokenList(TokenList):
 		will be used and it takes from the input stream until a ``{``, and the ``{`` itself will not be removed.
 		"""
 		assert delimiter, "Delimiter cannot be empty!"
-		return typing.cast(Callable[[PTTBalancedTokenList, Engine], TTPBalancedTokenList], Python_call_TeX_local(
-			# '#1' is either \long or [], '#2' is the delimiter
-			r"""
-			\cs_new_protected:Npn \__get_until_tmp #1 #2 {
-				#1 \def \__delimit_tmpii ##1 #2 {
-					%sync%
-					%send_arg0(##1)%
-					\pythonimmediatelisten
+		try:
+			return typing.cast(Callable[[PTTBalancedTokenList, Engine], TTPBalancedTokenList], Python_call_TeX_local(
+				# '#1' is either \long or [], '#2' is the delimiter
+				r"""
+				\cs_new_protected:Npn \__get_until_tmp #1 #2 {
+					#1 \def \__delimit_tmpii ##1 #2 {
+						%sync%
+						%send_arg0(##1)%
+						\pythonimmediatelisten
+					}
+					\__delimit_tmpii
 				}
-				\__delimit_tmpii
-			}
-			\cs_new_protected:Npn %name% {
-				%read_arg0(\__arg)%
-				\expandafter \__get_until_tmp \__arg
-			}
-			""", recursive=False))(PTTBalancedTokenList(BalancedTokenList([r"\long" if long else [], delimiter])), engine)
+				\cs_new_protected:Npn %name% {
+					%read_arg0(\__arg)%
+					\expandafter \__get_until_tmp \__arg
+				}
+				""", recursive=False))(PTTBalancedTokenList(BalancedTokenList([r"\long" if long else [], delimiter])), engine)
+		except:
+			print(f"Error in _get_until_raw with delimiter = {delimiter}")
+			raise
 
 	@staticmethod
 	def get_until(delimiter: BalancedTokenList, remove_braces: bool=True, long: bool=True, engine: Engine=default_engine)->"BalancedTokenList":
