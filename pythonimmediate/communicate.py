@@ -153,7 +153,7 @@ class GlobalConfiguration:
 	naive_flush: bool=False
 
 	def __post_init__(self)->None:
-		assert 0<=self.debug<=9
+		assert -9<=self.debug<=9
 
 	@staticmethod
 	def from_args(args: argparse.Namespace, communicator: Communicator)->GlobalConfiguration:

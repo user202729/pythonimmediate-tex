@@ -113,6 +113,8 @@ pythonimmediate: Any
 import pythonimmediate  # type: ignore
 
 pythonimmediate.debugging=True
+if "pythonimmediatenodebug" in os.environ:
+	pythonimmediate.debugging=False
 pythonimmediate.debug=debug
 
 FunctionType = typing.TypeVar("FunctionType", bound=Callable)
@@ -2921,7 +2923,14 @@ class _CatcodeManager(_TeXManager):
 			))
 
 	def __setitem__(self, x: str|int, catcode: Catcode)->None:
-		BalancedTokenList([r"\catcode" + str(_get_charcode(x)) + "=" + str(catcode.value)]).execute(self.engine)
+		#BalancedTokenList([r"\catcode" + str(_get_charcode(x)) + "=" + str(catcode.value)]).execute(self.engine)
+		typing.cast(Callable[[PTTVerbatimLine, Engine], None], Python_call_TeX_local(
+			r"""
+			\cs_new_protected:Npn %name% {
+				%read_arg0(\__data)%
+				\catcode \__data \pythonimmediatecontinuenoarg
+			}
+			""" , sync=True))(PTTVerbatimLine(str(_get_charcode(x)) + "=" + str(catcode.value)), self.engine)
 
 
 catcode=_CatcodeManager()
