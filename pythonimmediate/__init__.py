@@ -1558,8 +1558,10 @@ class TokenList(TokenListBaseClass):
 
 		Usage example::
 
-			BalancedTokenList.e3(r'\cs_new_protected:Npn \__mymodule_myfunction:n #1 { #1 #1 }')
-			# returns an instance of BalancedTokenList with the expected content
+			>>> BalancedTokenList.e3(r'\cs_new_protected:Npn \__mymodule_myfunction:n #1 { #1 #1 }')
+			<BalancedTokenList: \cs_new_protected:Npn \__mymodule_myfunction:n #₆ 1₁₂ {₁ #₆ 1₁₂ #₆ 1₁₂ }₂>
+			>>> BalancedTokenList.e3('a\n\nb')
+			<BalancedTokenList: a₁₁ b₁₁>
 		"""
 		return cls.from_string(s, lambda x: e3_catcode_table.get(x, Catcode.other), ' ')
 
@@ -1572,9 +1574,18 @@ class TokenList(TokenListBaseClass):
 
 		Usage example::
 
-			BalancedTokenList.doc(r'\def\a{b}')  # returns an instance of BalancedTokenList with the expected content
-			BalancedTokenList.doc('}')  # raises an error
-			TokenList.doc('}')  # returns an instance of TokenList with the expected content
+			>>> BalancedTokenList.doc(r'\def\a{b}')
+			<BalancedTokenList: \def \a {₁ b₁₁ }₂>
+			>>> BalancedTokenList.doc('}')
+			Traceback (most recent call last):
+				...
+			ValueError: Token list <BalancedTokenList: }₂> is not balanced
+			>>> BalancedTokenList.doc('\n\n')
+			Traceback (most recent call last):
+				...
+			NotImplementedError: Double-newline to \par not implemented yet!
+			>>> TokenList.doc('}')
+			<TokenList: }₂>
 		"""
 		if "\n\n" in s:
 			raise NotImplementedError(r"Double-newline to \par not implemented yet!")
