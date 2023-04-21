@@ -696,6 +696,12 @@ class Token(NToken):
 		"""
 		return self.value(engine=engine).str(engine=engine)
 
+	def e3bool(self, engine: Engine=default_engine)->bool:
+		"""
+		given ``self`` is a expl3 ``bool``-variable, return the content.
+		"""
+		return len(BalancedTokenList([r"\bool_if:NT", self, "1"]).expand_x())
+
 	@property
 	def no_blue(self)->"Token": return self
 
@@ -1720,6 +1726,15 @@ class BalancedTokenList(TokenList):
 			\pythonimmediatelisten
 		}
 		""", recursive=expansion_only_can_call_Python))(PTTBalancedTokenList(self), engine)
+
+	def expand_estr(self, engine: Engine=default_engine)->str:
+		"""
+		Expand this token list according to :ref:`estr-expansion`.
+
+		It's undefined behavior if the expansion result is unbalanced.
+		"""
+		BalancedTokenList([self]).put_next(engine=engine)
+		return get_arg_estr(engine=engine)
 
 	def execute(self, engine: Engine=  default_engine)->None:
 		typing.cast(Callable[[PTTBalancedTokenList, Engine], None], Python_call_TeX_local(
