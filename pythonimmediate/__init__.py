@@ -240,8 +240,12 @@ r"""
 		\csname __run_ \__line :\endcsname
 }
 
-\cs_new_protected:Npn \pythonimmediatecallhandler #1 {
+\cs_new_protected:Npn \pythonimmediatecallhandlerasync #1 {
 	\__send_content:e {i #1 %naive_inline% }
+}
+
+\cs_new_protected:Npn \pythonimmediatecallhandler #1 {
+	\pythonimmediatecallhandlerasync {#1} \pythonimmediatelisten
 }
 
 % read documentation of ``_peek`` commands for details what this command does.
@@ -309,66 +313,92 @@ r"""
 
 _handlers: Dict[str, Callable[[Engine], None]]={}
 
-def add_handler(f: Callable[[Engine], None])->str:
+def add_handler_async(f: Callable[[Engine], None])->str:
 	r"""
-	This function provides the facility to efficiently call Python code from [TeX]
-	and without polluting the global namespace.
+	Similar to :func:`add_handler`, however, the function has these additional restrictions:
 
-	First, note that with :func:`.pyc` you can do the following::
-
-		def myfunction():
-			print(1)
-		execute(r"\def \test {\py{myfunction()}}")
-
-	However, this pollutes the global namespace as well as parsing the string
-	``myfunction()`` into Python code every time it's called.
-
-	With this dictionary, you can do the following::
-
-		def myfunction(engine):
-			print(1)
-		identifier = add_handler(myfunction)
-		execute(r"\def\test{\pythonimmediatecallhandler{" + identifier + "}}")
-
-	The returned value, `identifier`, is a string consist of only English alphabetical letters,
-	which should be used to pass into ``\pythonimmediatecallhandler`` [TeX] command
-	and :func:`remove_handler`.
-
-	The handlers must follow a very specific format:
-
-	* It must takes a single argument of type :class:`Engine`, as input, and returns nothing.
 	* Within the function, **it must not send anything to [TeX].**
 	* It **must not cause a Python error**, otherwise the error reporting facility
 	  may not work properly (does not print the correct [TeX] traceback).
 
-	In order to allow the Python function to call [TeX], it's necessary to
-	"listen" for callbacks on [TeX] side as well -- as [TeX] does not have the capability
-	to execute multiple threads, it's necessary to explicitly listen for instructions from the Python side.
-	To do that::
+	Also, on the [TeX] side you need ``\pythonimmediatecallhandlerasync``.
+
+	Example::
 
 		def myfunction(engine):
 			print(1)
-			execute("hello world")  # it's possible to execute TeX code here
-			finish_listen()
 		identifier = add_handler(myfunction)
-		execute(r"\def\test{\pythonimmediatecallhandler{" + identifier + r"}\pythonimmediatelisten}")
+		execute(r"\def\test{\pythonimmediatecallhandlerasync{" + identifier + "}}")
 
-	At the end of the Python function, :func:`finish_listen` **must be called**
-	in order to stop the listening on the [TeX] side.
+	Note that in order to allow the Python function to call [TeX], it's necessary to
+	"listen" for callbacks on [TeX] side as well -- as [TeX] does not have the capability
+	to execute multiple threads, it's necessary to explicitly listen for instructions from the Python side,
+	which is what the command ``\pythonimmediatelisten`` in ``\pythonimmediatecallhandler``'s implementation does.
 
 	.. note::
-		Internally, ``\pythonimmediatecallhandler{abc}``
+		Internally, ``\pythonimmediatecallhandlerasync{abc}``
 		sends ``i⟨string⟩`` from [TeX] to Python
 		(optionally flushes the output),
 		and the function with index ``⟨string⟩`` in this dict is called.
 
-	.. seealso::
-		:func:`remove_handler`.
 	"""
 	identifier=get_random_Python_identifier()
 	assert identifier not in _handlers
 	_handlers[identifier]=f
 	return identifier
+
+def add_handler(f: Callable[[Engine], None])->str:
+	r"""
+	This function provides the facility to efficiently call Python code from [TeX]
+	and without polluting the global namespace.
+
+	First, note that with :func:`.pyc` you can do the following, where ``myfunction`` is in the global
+	:const:`user_scope`::
+
+		def myfunction():
+			print(1)
+		execute(r"\def \test {\py{myfunction()}}")
+
+	However, this pollutes the global namespace as well as having to parse the string
+	``myfunction()`` into Python code every time it's called.
+
+	With this function, you can do the following::
+
+		def myfunction(engine):
+			print(1)
+			execute("hello world")  # it's possible to execute TeX code here
+		identifier = add_handler(myfunction)
+		execute(r"\def\test{\pythonimmediatecallhandler{" + identifier + r"}}")
+
+	The returned value, `identifier`, is a string consist of only English alphabetical letters,
+	which should be used to pass into ``\pythonimmediatecallhandler`` [TeX] command
+	and :func:`remove_handler`.
+
+	The handlers must take a single argument of type :class:`Engine` as input, and returns nothing.
+
+	.. seealso::
+		:func:`add_handler_async`, :func:`remove_handler`.
+	"""
+	def g(engine: Engine)->None:
+		# this is hopelessly complicated, will figure out later
+		old_action_done=engine.action_done
+		engine.action_done=False
+		try:
+			f(engine)
+		except:
+			if engine.action_done:
+				# error occurred after 'finish' is called, cannot signal the error to TeX, will just ignore (after printing out the traceback)...
+				pass
+			else:
+				# TODO what should be done here? What if the error raised below is caught
+				engine.action_done=True
+			raise
+		finally:
+			if not engine.action_done:
+				run_none_finish(engine)
+			engine.action_done=old_action_done
+
+	return add_handler_async(g)
 
 def remove_handler(identifier: str)->None:
 	"""
@@ -660,27 +690,9 @@ class Token(NToken):
 
 		Returns an identifier, as described in :func:`add_handler`.
 		"""
-		@functools.wraps(f)
-		def g(engine: Engine)->None:
-			old_action_done=engine.action_done
-			engine.action_done=False
-			try:
-				f()
-			except:
-				if engine.action_done:
-					# error occurred after 'finish' is called, cannot signal the error to TeX, will just ignore (after printing out the traceback)...
-					pass
-				else:
-					# TODO what should be done here? What if the error raised below is caught
-					engine.action_done=True
-				raise
-			finally:
-				if not engine.action_done:
-					run_none_finish(engine)
-				engine.action_done=old_action_done
-		identifier = add_handler(g)
+		identifier = add_handler(lambda _engine: f())
 		TokenList([T.gdef if global_ else r"\def", self, r"{"
-			 r"\pythonimmediatecallhandler{"+identifier+r"}\pythonimmediatelisten"
+			 r"\pythonimmediatecallhandler{"+identifier+r"}"
 			 r"}"]).execute()
 		return identifier
 
@@ -700,7 +712,7 @@ class Token(NToken):
 		"""
 		given ``self`` is a expl3 ``bool``-variable, return the content.
 		"""
-		return len(BalancedTokenList([r"\bool_if:NT", self, "1"]).expand_x())
+		return bool(len(BalancedTokenList([r"\bool_if:NT", self, "1"]).expand_x()))
 
 	@property
 	def no_blue(self)->"Token": return self
