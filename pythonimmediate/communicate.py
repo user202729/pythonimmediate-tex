@@ -8,9 +8,12 @@ from abc import ABC, abstractmethod
 import typing
 import sys
 from typing import List, Any, Optional, Dict, Type, TypeVar, IO, Callable
+import dataclasses
 from dataclasses import dataclass
 from io import StringIO
 import argparse
+from pathlib import Path
+from multiprocessing.connection import Client, Connection
 
 
 char_to_communicator: Dict[str, Type[Communicator]]={}
@@ -44,10 +47,6 @@ class Communicator(ABC):
 	@staticmethod
 	@abstractmethod
 	def is_available()->bool: ...
-
-
-from multiprocessing.connection import Client, Connection
-import dataclasses
 
 
 @dataclass
@@ -134,10 +133,23 @@ class UnnamedPipeCommunicator(Communicator):
 
 @dataclass
 class GlobalConfiguration:
+	"""
+	Represents the configuration.
+
+	This will be parsed from command-line argument in pytotex
+	using :meth:`from_args`, then sent
+	to textopy side (which is where most of the processing is done)
+	with a base64 of pickle encoding,
+	on the textopy side a pseudo-config is created from the passed command-line arguments,
+	then the real config is read in :class:`.ParentProcessEngine`'s constructor.
+
+	Which means it's preferable to avoid any mutable state in the configuration object.
+	"""
 	debug: int=0
 	communicator: Communicator=typing.cast(Communicator, None)
 	sanity_check_extra_line: bool=False
 	debug_force_buffered: bool=False
+	debug_log_communication: Optional[Path]=None
 	naive_flush: bool=False
 
 	def __post_init__(self)->None:
@@ -150,5 +162,6 @@ class GlobalConfiguration:
 				communicator=communicator,
 				sanity_check_extra_line=args.sanity_check_extra_line,
 				debug_force_buffered=args.debug_force_buffered,
+				debug_log_communication=args.debug_log_communication,
 				naive_flush=args.naive_flush,
 				)

@@ -5,6 +5,9 @@ then pass to [TeX].
 
 User code are not executed here.
 
+Anything that is put in ``pythonimmediatedebugextraargs`` environment variable
+will be appended to the command-line arguments.
+
 Supported command-line arguments:
 
 .. argparse::
@@ -18,6 +21,9 @@ import sys
 import signal
 import argparse
 from typing import Type
+from pathlib import Path
+import os
+import shlex
 
 from .communicate import Communicator, MultiprocessingNetworkCommunicator, UnnamedPipeCommunicator
 
@@ -37,6 +43,7 @@ def get_parser()->argparse.ArgumentParser:
 					 "Should never be necessary unless the package is buggy. "
 					 "Might not work on Windows/MikTeX.")
 	parser.add_argument("--no-sanity-check-extra-line", dest="sanity_check_extra_line", action="store_false")
+	parser.add_argument("--debug-log-communication", type=Path, default=None, help="Debug mode, log all communications. Pass the output path.")
 	parser.add_argument("--debug-force-buffered", action="store_true",
 					 help="""Debug mode, simulate [TeX] writes being 4096-byte buffered. Don't use.
 
@@ -57,9 +64,8 @@ if __name__ == "__main__":
 	#debug=functools.partial(print, file=debug_file, flush=True)
 	debug=lambda *args, **kwargs: None
 
-
 	parser=get_parser()
-	args=parser.parse_args()
+	args=parser.parse_args(sys.argv[1:] + shlex.split(os.environ.get("pythonimmediatedebugextraargs", "")))
 
 	mode=args.mode
 	if mode is None:

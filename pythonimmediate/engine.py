@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 import sys
 import subprocess
 from dataclasses import dataclass
+import atexit
 
 from . import communicate
 from .communicate import GlobalConfiguration
@@ -161,6 +162,10 @@ class ParentProcessEngine(Engine):
 
 	This should not be used directly. Only pythonimmediate.main module should use this.
 	"""
+	_logged_communication: bytearray
+	def _log_communication(self, s: bytes)->None:
+		self._logged_communication += s
+
 	def __init__(self, pseudo_config: GlobalConfiguration)->None:
 		super().__init__()
 
@@ -216,26 +221,38 @@ class ParentProcessEngine(Engine):
 		import base64
 		import pickle
 		self._config=pickle.loads(base64.b64decode(line))
-		assert isinstance(self._config, GlobalConfiguration)
+		assert isinstance(self.config, GlobalConfiguration)
 
 		sys.stdin=None  # type: ignore
 		# avoid user mistakenly read
 
-	def _read(self)->bytes:
-		line=self.input_file.readline()
-		if self.ignore_first_line:
-			self.ignore_first_line=False
-			return self._read()
+		if self.config.debug_log_communication is not None:
+			debug_log_communication = self.config.debug_log_communication
+			self._logged_communication = bytearray()
+			def write_communication_log()->None:
+				debug_log_communication.write_bytes(self._logged_communication)
+			atexit.register(write_communication_log)
 
-		if self.config.debug>=5: print("TeX → Python: " + debug_possibly_shorten(line.decode('u8')))
+	def _read(self)->bytes:
+		while True:
+			line=self.input_file.readline()
+			if self.ignore_first_line:
+				self.ignore_first_line=False
+				continue
+			break
+
 		if not line: self.exited=True
+		if self.config.debug_log_communication is not None and line:
+			assert line.endswith(b'\n') and line.count(b'\n')==1, line
+			self._log_communication(b">"+line)
 		return line
 
 	def _write(self, s: bytes)->None:
-		if self.config.debug>=5:
-			for line in s.splitlines():
-				print("Python → TeX: " + debug_possibly_shorten(line.decode('u8')))
 		self.config.communicator.send(s)
+		if self.config.debug_log_communication is not None and s:
+			lines=s.split(b'\n')
+			for line in lines[:-1]: self._log_communication(b"<"+line+b'\n')
+			if lines[-1]: self._log_communication(b"<"+lines[-1]+b"...\n")
 
 
 @dataclass
@@ -323,7 +340,7 @@ class DefaultEngine(Engine):
 		return line
 
 	def _write(self, s: bytes)->None:
-		self.get_engine().write(s)
+		self.get_engine()._write(s)
 
 
 default_engine=DefaultEngine()
