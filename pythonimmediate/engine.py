@@ -357,7 +357,6 @@ For Python running inside a TeX process, useful attributes are :attr:`~Engine.na
 
 
 
-@dataclass
 class ChildProcessEngine(Engine):
 	r"""
 	An object that represents a [TeX] engine that runs as a subprocess of this process.
@@ -419,7 +418,7 @@ class ChildProcessEngine(Engine):
 		self.process: Optional[subprocess.Popen]=None  # guard like this so that __del__ does not blow up if Popen() fails
 		self.process=subprocess.Popen(
 				[
-					engine_name_to_latex_executable[engine_name], "-shell-escape",
+					engine_name_to_latex_executable[engine_name], "--shell-escape",
 						*args, r"\RequirePackage[child-process]{pythonimmediate}\pythonimmediatelisten\stop"],
 				stdin=subprocess.PIPE,
 				stdout=subprocess.PIPE,
@@ -443,6 +442,35 @@ class ChildProcessEngine(Engine):
 		send_raw(surround_delimiter(substitute_private(
 			get_bootstrap_code(self)
 			)), engine=self)
+
+	def __repr__(self)->str:
+		r"""
+		Example::
+
+			>>> e = ChildProcessEngine("pdftex", args=["--8bit"])
+			>>> e
+			ChildProcessEngine('pdftex')
+			>>> e.close()
+			>>> e
+			<ChildProcessEngine('pdftex') closed>
+
+			>>> e = ChildProcessEngine("luatex")
+			>>> e
+			ChildProcessEngine('luatex')
+			>>> from pythonimmediate import BalancedTokenList
+			>>> BalancedTokenList(r"\undefined").expand_x(engine=e)
+			Traceback (most recent call last):
+				...
+			RuntimeError: TeX error!
+			>>> e
+			<ChildProcessEngine('luatex') error>
+		"""
+		s = f"ChildProcessEngine('{self.name}')"
+		if self.error_happened:
+			return f"<{s} error>"
+		if not self.process:
+			return f"<{s} closed>"
+		return s
 
 	def _stdout_thread_func(self)->None:
 		assert self.process is not None

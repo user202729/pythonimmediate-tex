@@ -1719,6 +1719,9 @@ class TokenList(TokenListBaseClass):
 		return "".join(token.simple_detokenize(get_catcode) for token in self)
 
 	def str_if_unicode(self, unicode: _Bool=True)->str:
+		"""
+		See :meth:`NTokenList.str_if_unicode`.
+		"""
 		return NTokenList(self).str_if_unicode(unicode)
 
 	def str(self, engine: Engine=default_engine)->str:
@@ -1726,6 +1729,15 @@ class TokenList(TokenListBaseClass):
 		See :meth:`NTokenList.str`.
 		"""
 		return NTokenList(self).str(engine)
+
+	def int(self)->int:
+		r"""
+		Assume this token list contains an integer (as valid result of ``\number ...``),
+		returns the integer value.
+
+		At the moment, not much error checking is done.
+		"""
+		return int(self.str_if_unicode())
 
 
 #@export_function_to_module
@@ -2937,9 +2949,9 @@ Can be bound to an engine similar to :const:`catcode`.
 
 class _CatcodeManager(_TeXManager):
 	def __getitem__(self, x: str|int)->Catcode:
-		return Catcode.lookup(int(
-			BalancedTokenList([r"\the\catcode" + str(_get_charcode(x))]).expand_o(self.engine).str_if_unicode()
-			))
+		return Catcode.lookup(
+			BalancedTokenList([r"\the\catcode" + str(_get_charcode(x))]).expand_o(self.engine).int()
+			)
 
 	def __setitem__(self, x: str|int, catcode: Catcode)->None:
 		#BalancedTokenList([r"\catcode" + str(_get_charcode(x)) + "=" + str(catcode.value)]).execute(self.engine); return
@@ -2964,6 +2976,23 @@ Similar to :const:`~pythonimmediate.simple.var`, you can also bind it to an engi
 
 	catcode(engine)["a"] = Catcode.letter
 """
+
+
+class MathClass(enum.Enum):
+	ord = 0
+	op = 1
+	bin = 2
+	rel = 3
+	open = 4
+	close = 5
+	punct = 6
+	variable_family = varfam = 7
+
+	@staticmethod
+	def lookup(x: int)->Catcode:
+		return _mathclass_value_to_member[x]
+
+_mathclass_value_to_member = {item.value: item for item in MathClass}
 
 
 # ========
