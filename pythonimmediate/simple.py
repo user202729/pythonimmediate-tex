@@ -720,6 +720,37 @@ def execute(block: str, engine: Engine=default_engine)->None:
 	run_block_local(block, engine=engine)
 
 @_export
+def execute_tokenized(line: str, engine: Engine=default_engine)->None:
+	"""
+	Temporary.
+	"""
+	typing.cast(Callable[[PTTTeXLine, Engine], None], Python_call_TeX_local(
+		r"""
+		\cs_new_protected:Npn %name% {
+			%read_arg0(\__data)%
+			\__data
+
+			%optional_sync%
+			\pythonimmediatelisten
+		}
+		"""))(PTTTeXLine(line), engine)
+
+@_export
+def put_next_tokenized(line: str, engine: Engine=default_engine)->None:
+	"""
+	Temporary.
+	"""
+	typing.cast(Callable[[PTTTeXLine, Engine], None], Python_call_TeX_local(
+		r"""
+		\cs_new_protected:Npn %name% {
+			%read_arg0(\__data)%
+
+			%optional_sync%
+			\expandafter \pythonimmediatelisten \__data
+		}
+		"""))(PTTTeXLine(line), engine)
+
+@_export
 def print_TeX(*args, **kwargs)->None:
 	r"""
 	Unlike other packages, the normal ``print()`` function prints to the console.
@@ -988,7 +1019,7 @@ def is_balanced(content: str)->bool:
 		>>> is_balanced(r"\{")
 		True
 	"""
-	return TokenList.from_string(content, default_get_catcode).is_balanced()
+	return TokenList.doc(content).is_balanced()
 
 @_export
 def split_balanced(content: str, separator: str)->List[str]:
@@ -1010,10 +1041,10 @@ def split_balanced(content: str, separator: str)->List[str]:
 			...
 		ValueError: Content is not balanced!
 	"""
-	content1=TokenList.from_string(content, default_get_catcode)
+	content1=TokenList.doc(content)
 	if not content1.is_balanced():
 		raise ValueError("Content is not balanced!")
-	separator1=BalancedTokenList.from_string(separator, default_get_catcode)
+	separator1=BalancedTokenList.doc(separator)
 	result: List[str]=[]
 	result_degree=0
 	remaining=TokenList()
@@ -1045,7 +1076,7 @@ def strip_optional_braces(content: str)->str:
 		>>> strip_optional_braces("{a},{b}")
 		'{a},{b}'
 	"""
-	t=TokenList.from_string(content, default_get_catcode)
+	t=TokenList.doc(content)
 	assert t.is_balanced(), "The string must be balanced!"
 	if content.startswith("{") and content.endswith("}") and t[1:-1].is_balanced():
 		return content[1:-1]
