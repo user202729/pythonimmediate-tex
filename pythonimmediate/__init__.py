@@ -1316,6 +1316,7 @@ e3_catcode_table=dict(doc_catcode_table)
 e3_catcode_table[ord("_")]=Catcode.letter
 e3_catcode_table[ord(":")]=Catcode.letter
 e3_catcode_table[ord(" ")]=Catcode.ignored
+e3_catcode_table[ord("\t")]=Catcode.ignored
 e3_catcode_table[ord("~")]=Catcode.space
 
 
@@ -1562,8 +1563,8 @@ class TokenList(TokenListBaseClass):
 
 			>>> BalancedTokenList.e3(r'\cs_new_protected:Npn \__mymodule_myfunction:n #1 { #1 #1 }')
 			<BalancedTokenList: \cs_new_protected:Npn \__mymodule_myfunction:n #₆ 1₁₂ {₁ #₆ 1₁₂ #₆ 1₁₂ }₂>
-			>>> BalancedTokenList.e3('a\n\nb')
-			<BalancedTokenList: a₁₁ b₁₁>
+			>>> BalancedTokenList.e3('a\tb\n\nc')
+			<BalancedTokenList: a₁₁ b₁₁ c₁₁>
 		"""
 		return cls.from_string(s, lambda x: e3_catcode_table.get(x, Catcode.other), ' ')
 
@@ -2923,7 +2924,7 @@ class _CatcodeManager(_TeXManager):
 			))
 
 	def __setitem__(self, x: str|int, catcode: Catcode)->None:
-		#BalancedTokenList([r"\catcode" + str(_get_charcode(x)) + "=" + str(catcode.value)]).execute(self.engine)
+		#BalancedTokenList([r"\catcode" + str(_get_charcode(x)) + "=" + str(catcode.value)]).execute(self.engine); return
 		typing.cast(Callable[[PTTVerbatimLine, Engine], None], Python_call_TeX_local(
 			r"""
 			\cs_new_protected:Npn %name% {
