@@ -430,7 +430,7 @@ class ChildProcessEngine(Engine):
 
 		# the variables below can only be modified/read when lock is held
 		self.error_happened: bool=False
-		self._exclam_line_seen: bool=False
+		self._error_marker_line_seen: bool=False
 		self._stdout_lines: List[bytes]=[]  # Note that this is asynchronously populated so values may not be always correct
 		self._stdout_buffer=bytearray()  # remaining part that does not fit in any line
 
@@ -455,19 +455,19 @@ class ChildProcessEngine(Engine):
 				self._stdout_buffer+=line
 
 				if b"\n" in line:
-					# add complete lines to self._stdout_lines and update self._exclam_line_seen
+					# add complete lines to self._stdout_lines and update self._error_marker_line_seen
 					parts = self._stdout_buffer.split(b"\n")
 					self._stdout_lines+=map(bytes, parts[:-1])
-					self._exclam_line_seen=self._exclam_line_seen or any(line.startswith(b"! ") for line in parts[:-1])
+					self._error_marker_line_seen=self._error_marker_line_seen or any(line.startswith(b"<*> ") for line in parts[:-1])
 					self._stdout_buffer=parts[-1]
 
 				# check potential error
-				if self._stdout_buffer == b"? " and self._exclam_line_seen:
+				if self._stdout_buffer == b"? " and self._error_marker_line_seen:
 					self.error_happened=True
 					self.process.kill()  # this is a simple way to break out _read() but it will not allow error recovery
 
 				# debug logging
-				#sys.stderr.write(f" | {self._stdout_lines=} | {self._stdout_buffer=} | {self._exclam_line_seen=} | {self.error_happened=}\n")
+				#sys.stderr.write(f" | {self._stdout_lines=} | {self._stdout_buffer=} | {self._error_marker_line_seen=} | {self.error_happened=}\n")
 
 	def get_process(self)->subprocess.Popen:
 		if self.process is None:

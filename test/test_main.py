@@ -44,7 +44,7 @@ class Test:
 			assert TokenList([T.testa]).expand_x(engine=new_engine).str_if_unicode() == "456"
 
 	@pytest.mark.parametrize("engine_name", engine_names)
-	def test_child_process_engine_2(self, engine_name: EngineName)->None:
+	def test_child_process_engine_error(self, engine_name: EngineName)->None:
 		assert pythonimmediate.debugging, "This test cannot work in no-debug mode"
 		# (as execute() will not wait for the execution to finish)
 		engine=ChildProcessEngine(engine_name)
@@ -53,6 +53,12 @@ class Test:
 				BalancedTokenList([C.other(10)]).execute()
 			assert engine.error_happened
 
+	def test_child_process_engine_lua_error(self)->None:
+		engine=ChildProcessEngine("luatex")
+		with default_engine.set_engine(engine):
+			with pytest.raises(RuntimeError):
+				BalancedTokenList(r"\directlua{?}").expand_x()
+			assert engine.error_happened
 
 	@pytest.mark.parametrize("engine_name", engine_names)
 	@pytest.mark.parametrize("communication_method", ["unnamed-pipe", "multiprocessing-network"])
