@@ -112,10 +112,9 @@ from .engine import Engine, default_engine, ParentProcessEngine
 pythonimmediate: Any
 import pythonimmediate  # type: ignore
 
-pythonimmediate.debugging=True
+debugging: bool=True
 if os.environ.get("pythonimmediatenodebug", "").lower() in ["true", "1"]:
-	pythonimmediate.debugging=False
-pythonimmediate.debug=debug
+	debugging=False
 
 FunctionType = typing.TypeVar("FunctionType", bound=Callable)
 
@@ -1255,7 +1254,6 @@ class FrozenRelaxToken(Token):
 		raise NotImplementedError("This isn't simple!")
 
 frozen_relax_token=FrozenRelaxToken()
-pythonimmediate.frozen_relax_token=frozen_relax_token
 
 # other special tokens later...
 
@@ -2680,7 +2678,7 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 		sync=True
 
 	if sync is None:
-		sync=pythonimmediate.debugging
+		sync=debugging
 		assert not ttp_argtypes
 		TeX_code=template_substitute(TeX_code, "%optional_sync%",
 							   lambda _: r'\__send_content%naive_send%:e { r }' if sync else '',)

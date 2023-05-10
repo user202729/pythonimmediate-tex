@@ -1,6 +1,7 @@
 import subprocess
 import tempfile
 from typing import List
+import re
 
 import pytest
 
@@ -14,7 +15,7 @@ T=ControlSequenceToken.make
 
 from pathlib import Path
 for name in ["test_pythonimmediate.tex", "helper_file.py"]:
-	a=Path("/tmp")/name
+	a=Path(tempfile.gettempdir())/name
 	a.unlink(missing_ok=True)
 	a.symlink_to(Path(__file__).parent.parent/"tex"/"test"/name)
 
@@ -57,10 +58,12 @@ class Test:
 	@pytest.mark.parametrize("communication_method", ["unnamed-pipe", "multiprocessing-network"])
 	@pytest.mark.parametrize("use_8bit", [True, False])
 	def test_subprocess(self, engine_name: EngineName, communication_method: str, use_8bit: bool)->None:
+		tex_file=str(Path(tempfile.gettempdir())/"test_pythonimmediate.tex").replace("\\", "/")
+		assert re.fullmatch(r"[A-Za-z0-9_./]*", tex_file)
 		subprocess.run(
 				[engine_name_to_latex_executable[engine_name], "-shell-escape", *(
 					["-8bit"] if use_8bit else []
-					), r"\def\specifymode{"+communication_method+r"}\input{/tmp/test_pythonimmediate.tex}"],
+					), r"\def\specifymode{"+communication_method+r"}\input{"+tex_file+"}"],
 				check=True,
 				cwd=tempfile.gettempdir(),
 				)
