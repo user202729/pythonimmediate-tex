@@ -395,6 +395,8 @@ class ChildProcessEngine(Engine):
 
 	:param args: List of additional arguments to be passed to the executable, such as ``--recorder`` etc.
 	:param env: See documentation of *env* argument in ``subprocess.Popen``.
+		Note that it's usually recommended to append environment variables that should be set to
+		``os.environ`` instead of replacing it entirely.
 	"""
 
 	def __init__(self, engine_name: EngineName, args: Iterable[str]=(), env=None)->None:
@@ -429,7 +431,7 @@ class ChildProcessEngine(Engine):
 		# the variables below can only be modified/read when lock is held
 		self.error_happened: bool=False
 		self._exclam_line_seen: bool=False
-		self._stdout_lines: List[bytes]=[]
+		self._stdout_lines: List[bytes]=[]  # Note that this is asynchronously populated so values may not be always correct
 		self._stdout_buffer=bytearray()  # remaining part that does not fit in any line
 
 		# create thread listen for stdout
@@ -452,10 +454,10 @@ class ChildProcessEngine(Engine):
 			with self._stdout_lock:
 				self._stdout_buffer+=line
 
-				if b"\n" in self._stdout_buffer:
+				if b"\n" in line:
 					# add complete lines to self._stdout_lines and update self._exclam_line_seen
 					parts = self._stdout_buffer.split(b"\n")
-					self._stdout_lines+=parts[:-1]
+					self._stdout_lines+=map(bytes, parts[:-1])
 					self._exclam_line_seen=self._exclam_line_seen or any(line.startswith(b"! ") for line in parts[:-1])
 					self._stdout_buffer=parts[-1]
 
