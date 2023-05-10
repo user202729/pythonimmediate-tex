@@ -435,7 +435,7 @@ class ChildProcessEngine(Engine):
 		self._stdout_buffer=bytearray()  # remaining part that does not fit in any line
 
 		# create thread listen for stdout
-		self._stdout_thread=threading.Thread(target=self._stdout_thread_func)
+		self._stdout_thread=threading.Thread(target=self._stdout_thread_func, daemon=True)
 		self._stdout_lock=threading.Lock()
 		self._stdout_thread.start()
 
