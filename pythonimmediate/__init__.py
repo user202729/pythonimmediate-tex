@@ -1357,6 +1357,8 @@ class TokenList(TokenListBaseClass):
 	This will make `a` be the token list with value ``abc{def\gh }``.
 
 	Note that the list that is recursively nested inside is used to represent a nesting level.
+	A string will be "flattened" into the closest level, but a token list will not be flattened --
+	they can be manually flattened with Python ``*`` syntax.
 
 	As a special case, you can construct from a string::
 
@@ -1383,9 +1385,10 @@ class TokenList(TokenListBaseClass):
 
 	  See also :class:`Catcode` for the explanation of the ``Catcode.letter("a")`` form.
 
+	By default, strings will be converted to token lists using :meth:`TokenList.e3`, although you can customize it by:
 
-	By default, strings will be converted to token lists using :meth:`TokenList.e3`, although you can customize it by passing
-	the second argument to the constructor.
+	- Passing the second argument to the constructor.
+	- Manually specify the type: ``TokenList([T.directlua, [*TokenList.fstr("123")]])``.
 	"""
 
 	@staticmethod
@@ -1565,6 +1568,23 @@ class TokenList(TokenListBaseClass):
 			<BalancedTokenList: a₁₁ b₁₁ c₁₁>
 		"""
 		return cls.from_string(s, lambda x: e3_catcode_table.get(x, Catcode.other), ' ')
+
+	@classmethod
+	def fstr(cls: Type[TokenListType], s: str)->TokenListType:
+		r"""
+		Approximate tokenizer in detokenized catcode regime.
+
+		Refer to documentation of :meth:`from_string` for details.
+		``^^J`` (or ``\n``) is used to denote newlines.
+
+		Usage example::
+
+			>>> BalancedTokenList.fstr('hello world')
+			<BalancedTokenList: h₁₂ e₁₂ l₁₂ l₁₂ o₁₂  ₁₀ w₁₂ o₁₂ r₁₂ l₁₂ d₁₂>
+			>>> BalancedTokenList.fstr('ab\\c  d\n \t')
+			<BalancedTokenList: a₁₂ b₁₂ \\₁₂ c₁₂  ₁₀  ₁₀ d₁₂ \n₁₂  ₁₀ \t₁₂>
+		"""
+		return cls(space if ch==' ' else Catcode.other(ch) for ch in s)
 
 	@classmethod
 	def doc(cls: Type[TokenListType], s: str)->TokenListType:

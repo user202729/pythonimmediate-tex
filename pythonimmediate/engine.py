@@ -362,7 +362,7 @@ class ChildProcessEngine(Engine):
 	r"""
 	An object that represents a [TeX] engine that runs as a subprocess of this process.
 
-	Can be used as a context manager to automatically close the subprocess when the context is exited.
+	Can be used as a context manager to automatically close the subprocess when the context is exited. Alternatively :meth:`close` can be used to manually terminate the subprocess.
 
 	For example, the following Python code, if run alone, will spawn a [TeX] process and use it to write "Hello world" to a file named ``a.txt`` in the temporary directory::
 
@@ -380,7 +380,6 @@ class ChildProcessEngine(Engine):
 		# now the engine is closed.
 
 	Note that explicit ``engine`` argument must be passed in most functions.
-
 	See :class:`DefaultEngine` for a way to bypass that.
 
 	We attempt to do correct error detection on the [TeX] side, however it's not always easy.
@@ -393,9 +392,12 @@ class ChildProcessEngine(Engine):
 		^^J%
 		? }
 		\readline -1 to \xx
+
+	:param args: List of additional arguments to be passed to the executable, such as ``--recorder`` etc.
+	:param env: See documentation of *env* argument in ``subprocess.Popen``.
 	"""
 
-	def __init__(self, engine_name: EngineName, args: Iterable[str]=())->None:
+	def __init__(self, engine_name: EngineName, args: Iterable[str]=(), env=None)->None:
 		super().__init__()
 		self._name=engine_name
 
@@ -421,6 +423,7 @@ class ChildProcessEngine(Engine):
 				stdout=subprocess.PIPE,
 				stderr=subprocess.PIPE,
 				cwd=tempfile.gettempdir(),
+				env=env,
 				)
 
 		# the variables below can only be modified/read when lock is held
@@ -494,10 +497,9 @@ class ChildProcessEngine(Engine):
 
 	def close(self)->None:
 		"""
-		sent a ``r`` to the process so TeX exits gracefully.
-
-		this might be called from :meth:`__del__` so do not import anything here.
+		Terminates the [TeX] subprocess gracefully.
 		"""
+		# this might be called from :meth:`__del__` so do not import anything here
 		process=self.get_process()
 		if not process.poll():
 			# process has not terminated (it's possible for process to already terminate if it's killed on error)
