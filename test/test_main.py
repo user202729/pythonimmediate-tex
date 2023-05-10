@@ -42,13 +42,15 @@ class Test:
 			assert TokenList([T.testa]).expand_x(engine=engine).str_if_unicode() == "123"
 			assert TokenList([T.testa]).expand_x(engine=new_engine).str_if_unicode() == "456"
 
-	@pytest.mark.skip
 	@pytest.mark.parametrize("engine_name", engine_names)
 	def test_child_process_engine_2(self, engine_name: EngineName)->None:
+		assert pythonimmediate.debugging, "This test cannot work in no-debug mode"
+		# (as execute() will not wait for the execution to finish)
 		engine=ChildProcessEngine(engine_name)
 		with default_engine.set_engine(engine):
 			with pytest.raises(RuntimeError):
 				BalancedTokenList([C.other(10)]).execute()
+			assert engine.error_happened
 
 
 	@pytest.mark.parametrize("engine_name", engine_names)

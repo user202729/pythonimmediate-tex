@@ -6,6 +6,7 @@ from typing import Optional, Literal, Iterable, List, Dict, Tuple
 from abc import ABC, abstractmethod
 import sys
 import subprocess
+import threading
 from dataclasses import dataclass
 import atexit
 
@@ -381,6 +382,17 @@ class ChildProcessEngine(Engine):
 	Note that explicit ``engine`` argument must be passed in most functions.
 
 	See :class:`DefaultEngine` for a way to bypass that.
+
+	We attempt to do correct error detection on the [TeX] side, however it's not always easy.
+	For example the following code will reproduce the output on error identically:
+
+	.. code-block:: latex
+
+		\message{^^J! error.^^J%
+		l.1 \errmessage{error}^^J%
+		^^J%
+		? }
+		\readline -1 to \xx
 	"""
 
 	def __init__(self, engine_name: EngineName, args: Iterable[str]=())->None:
@@ -406,33 +418,76 @@ class ChildProcessEngine(Engine):
 					engine_name_to_latex_executable[engine_name], "-shell-escape",
 						*args, r"\RequirePackage[child-process]{pythonimmediate}\pythonimmediatelisten\stop"],
 				stdin=subprocess.PIPE,
-				#stdout=subprocess.PIPE,  # we don't need the stdout
-				stdout=subprocess.DEVNULL,
+				stdout=subprocess.PIPE,
 				stderr=subprocess.PIPE,
 				cwd=tempfile.gettempdir(),
 				)
+
+		# the variables below can only be modified/read when lock is held
+		self.error_happened: bool=False
+		self._exclam_line_seen: bool=False
+		self._stdout_lines: List[bytes]=[]
+		self._stdout_buffer=bytearray()  # remaining part that does not fit in any line
+
+		# create thread listen for stdout
+		self._stdout_thread=threading.Thread(target=self._stdout_thread_func)
+		self._stdout_lock=threading.Lock()
+		self._stdout_thread.start()
 
 		from . import surround_delimiter, send_raw, substitute_private, get_bootstrap_code
 		send_raw(surround_delimiter(substitute_private(
 			get_bootstrap_code(self)
 			)), engine=self)
 
+	def _stdout_thread_func(self)->None:
+		assert self.process is not None
+		assert self.process.stdout is not None
+		while True:
+			line: bytes=self.process.stdout.read1()  # type: ignore
+			if not line: break
+
+			with self._stdout_lock:
+				self._stdout_buffer+=line
+
+				if b"\n" in self._stdout_buffer:
+					# add complete lines to self._stdout_lines and update self._exclam_line_seen
+					parts = self._stdout_buffer.split(b"\n")
+					self._stdout_lines+=parts[:-1]
+					self._exclam_line_seen=self._exclam_line_seen or any(line.startswith(b"! ") for line in parts[:-1])
+					self._stdout_buffer=parts[-1]
+
+				# check potential error
+				if self._stdout_buffer == b"? " and self._exclam_line_seen:
+					self.error_happened=True
+					self.process.kill()  # this is a simple way to break out _read() but it will not allow error recovery
+
+				# debug logging
+				#sys.stderr.write(f" | {self._stdout_lines=} | {self._stdout_buffer=} | {self._exclam_line_seen=} | {self.error_happened=}\n")
+
 	def get_process(self)->subprocess.Popen:
 		if self.process is None:
 			raise RuntimeError("process is already closed!")
 		return self.process
 
+	def _check_no_error(self)->None:
+		with self._stdout_lock:
+			if self.error_happened:
+				raise RuntimeError("TeX error!")
+
 	def _read(self)->bytes:
 		process=self.get_process()
 		assert process.stderr is not None
-		#print("waiting to read")
+		self._check_no_error()
+		#print("waiting to read", file=sys.stderr)
 		line=process.stderr.readline()
-		#print("reading", line)
+		#print("reading", line, file=sys.stderr)
+		self._check_no_error()
 		return line
 
 	def _write(self, s: bytes)->None:
 		process=self.get_process()
 		assert process.stdin is not None
+		self._check_no_error()
 		#print("writing", s)
 		process.stdin.write(s)
 		process.stdin.flush()
@@ -444,13 +499,16 @@ class ChildProcessEngine(Engine):
 		this might be called from :meth:`__del__` so do not import anything here.
 		"""
 		process=self.get_process()
-		from . import run_none_finish
-		run_none_finish(self)
-		process.wait()
+		if not process.poll():
+			# process has not terminated (it's possible for process to already terminate if it's killed on error)
+			from . import run_none_finish
+			run_none_finish(self)
+			process.wait()
 		assert process.stdin is not None
 		assert process.stderr is not None
 		process.stdin.close()
 		process.stderr.close()
+		#self._stdout_thread.join()  # _stdout_thread will automatically terminate once process.stderr is no longer readable
 		self.process=None
 
 	def __del__(self)->None:

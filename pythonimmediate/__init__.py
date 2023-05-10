@@ -113,7 +113,7 @@ pythonimmediate: Any
 import pythonimmediate  # type: ignore
 
 pythonimmediate.debugging=True
-if "pythonimmediatenodebug" in os.environ:
+if os.environ.get("pythonimmediatenodebug", "").lower() in ["true", "1"]:
 	pythonimmediate.debugging=False
 pythonimmediate.debug=debug
 
