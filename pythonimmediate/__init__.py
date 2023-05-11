@@ -1077,18 +1077,101 @@ class ControlSequenceTokenMaker:
 
 
 #@export_function_to_module
-@dataclass(repr=False, frozen=True)
 class ControlSequenceToken(Token):
 	r"""
-	Represents a control sequence.
+	Represents a control sequence::
 
-	Note that currently, on non-Unicode engines, the ``csname`` field is represented in a particular way: each
-	character represents a byte in the TokenList, and thus it has character code no more than 255.
+		>>> ControlSequenceToken("abc")
+		<Token: \abc>
 
-	So for example, the control sequence obtained by expanding ``\csname ℝ\endcsname`` once
-	has ``.csname`` field equal to ``"\xe2\x84\x9d"`` (which has ``len=3``).
+	Some care is needed to construct control sequence tokens whose name contains Unicode characters,
+	as the exact token created depends on whether the engine is Unicode-based:
+
+		>>> ControlSequenceToken("×")
+		Traceback (most recent call last):
+			...
+		AssertionError: Cannot construct a control sequence with non-ASCII characters without specifying is_unicode
+
+	The same control sequences may appear differently on Unicode and non-Unicode engines, and conversely,
+	different control sequences may appear the same between Unicode and non-Unicode engines::
+
+		>>> a = ControlSequenceToken("u8:×", is_unicode=False)
+		>>> a
+		<Token: \u8:×>
+		>>> a == ControlSequenceToken(b"u8:\xc3\x97", is_unicode=False)
+		True
+		>>> a.codes
+		(117, 56, 58, 195, 151)
+		>>> b = ControlSequenceToken("u8:×", is_unicode=True)
+		>>> b
+		<Token: \u8:×>
+		>>> b.codes
+		(117, 56, 58, 215)
+		>>> a == b
+		False
+		>>> a == ControlSequenceToken("u8:\xc3\x97", is_unicode=True)
+		True
+
+	*is_unicode* will be fetched from :const:`~pythonimmediate.engine.default_engine`
+	if not explicitly specified.
 	"""
-	csname: str
+	_codes: Tuple[int, ...]  # this is the only thing that is guaranteed to be defined.
+	_csname: Optional[str]  # defined if csname is representable as a str. The same control sequence may be represented differently depends on is_unicode.
+	_csname_bytes: Optional[bytes]  # defined if csname is representable as a bytes.
+
+	def __init__(self, csname: Union[str, bytes], is_unicode: Optional[bool]=None)->None:
+		if is_unicode is None and default_engine.engine is not None:
+			is_unicode = default_engine.is_unicode
+
+		if is_unicode is None:
+			# check csname can only be interpreted as one way (i.e. all codes ≤ 0x7f)
+			if isinstance(csname, str):
+				assert all(ord(c) <= 0x7f for c in csname), "Cannot construct a control sequence with non-ASCII characters without specifying is_unicode"
+			else:
+				assert all(c <= 0x7f for c in csname), "Cannot construct a control sequence with non-ASCII characters without specifying is_unicode"
+
+		if isinstance(csname, str):
+			self._csname = csname
+			self._csname_bytes = csname.encode("u8")
+			if is_unicode:
+				self._codes = tuple(ord(c) for c in csname)
+			else:
+				self._codes = tuple(self._csname_bytes)
+
+		else:
+			assert is_unicode in (None, False), "Cannot construct control sequence from bytes if is_unicode"
+			self._csname_bytes = csname
+			try: self._csname = csname.decode('u8')
+			except UnicodeDecodeError: self._csname = None
+			self._codes = tuple(self._csname_bytes)
+
+	def __eq__(self, other: Any)->bool:
+		if not isinstance(other, ControlSequenceToken): return False
+		return self._codes == other._codes
+
+	def __hash__(self)->int:
+		return hash(self._codes)
+
+	@property
+	def codes(self)->Tuple[int, ...]:
+		r"""
+		Return the codes of this control sequence -- that is, if ``\detokenize{...}`` is applied on this token,
+		the tokens with the specified character codes (plus ``\escapechar``) will result.
+		"""
+		return self._codes
+
+	@property
+	def csname(self)->str:
+		r"""
+		Return some readable name of the control sequence. Might return ``None`` if the name is not representable in UTF-8.
+		"""
+		assert self._csname is not None
+		return self._csname
+
+	@property
+	def csname_bytes(self)->bytes:
+		assert self._csname_bytes is not None
+		return self._csname_bytes
 
 	make=typing.cast(ControlSequenceTokenMaker, None)  # some interference makes this incorrect. Manually assign below
 	"""

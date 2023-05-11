@@ -350,7 +350,7 @@ A constant that can be used to avoid passing explicit ``engine`` argument to fun
 
 See documentation of :class:`DefaultEngine` for more details.
 
-For Python running inside a TeX process, useful attributes are :attr:`~Engine.name` and :attr:`~Engine.is_unicode`.
+For Python running inside a [TeX] process, useful attributes are :attr:`~Engine.name` and :attr:`~Engine.is_unicode`.
 """
 
 
