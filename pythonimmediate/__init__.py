@@ -3072,11 +3072,72 @@ class MathClass(enum.Enum):
 	variable_family = varfam = 7
 
 	@staticmethod
-	def lookup(x: int)->Catcode:
+	def lookup(x: int)->MathClass:
 		return _mathclass_value_to_member[x]
 
 _mathclass_value_to_member = {item.value: item for item in MathClass}
 
+@dataclass(frozen=True)
+class Umathcode:
+	r"""
+	Example of using *active*::
+
+		>>> Umathcode.parse(0x1000000)
+		Umathcode.active
+		>>> Umathcode.active.family
+		1
+	"""
+
+	family: int
+	cls: MathClass
+	position: int
+
+	active=typing.cast("Umathcode", None)  # class member
+
+	@staticmethod
+	def parse(x: int)->Umathcode:
+		if x==0x1000000: return Umathcode.active
+		assert -0x80000000 <= x <= 0x7fffffff
+		position = x&((1<<21)-1)
+		x>>=21
+		cls = MathClass.lookup(x&((1<<3)-1))
+		x>>=3
+		assert -0x80 <= x <= 0x7f
+		family = x&((1<<8)-1)
+		return Umathcode(family, cls, position)
+
+	@property
+	def value(self)->int:
+		return (self.family<<3|self.cls.value)<<21|self.position
+
+	def __repr__(self)->str:
+		if self==Umathcode.active: return "Umathcode.active"
+		try:
+			c = chr(self.position)
+			return f'Umathcode(family={self.family}, cls={self.cls!r}, position={self.position} {c!r})'
+		except ValueError:
+			return f'Umathcode(family={self.family}, cls={self.cls!r}, position={self.position})'
+
+Umathcode.active = Umathcode(family=1, cls=MathClass.ord, position=0)
+
+
+
+class _UmathcodeManager(_TeXManager):
+	def __getitem__(self, x: str|int)->Umathcode:
+		assert self.engine.is_unicode
+		return Umathcode.parse(
+			BalancedTokenList([r"\the\Umathcodenum" + str(_get_charcode(x))]).expand_o(self.engine).int()
+			)
+
+	def __setitem__(self, x: str|int, code: Umathcode)->None:
+		assert self.engine.is_unicode
+		BalancedTokenList([r"\Umathcodenum" + str(_get_charcode(x)) + "=" + str(code.value)]).execute(self.engine); return
+
+
+umathcode=_UmathcodeManager()
+r"""
+Similar to :const:`~pythonimmediate.catcode`.
+"""
 
 # ========
 
