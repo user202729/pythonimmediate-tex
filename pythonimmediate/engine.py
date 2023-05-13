@@ -425,6 +425,7 @@ class ChildProcessEngine(Engine):
 				stderr=subprocess.PIPE,
 				cwd=tempfile.gettempdir(),
 				env=env,
+				start_new_session=True,  # avoid ctrl-C propagating to TeX process (when used in interactive terminal the TeX process should not be killed on ctrl-C)
 				)
 
 		# the variables below can only be modified/read when lock is held
