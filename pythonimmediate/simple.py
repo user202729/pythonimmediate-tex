@@ -1293,6 +1293,54 @@ class VarManager:
 			}
 			""", recursive=False, sync=None))(PTTVerbatimLine(key), PTTTeXLine(val), self.engine)
 
+_escape_str_translation=str.maketrans({
+	"&": r"\&",
+	"%": r"\%",
+	"$": r"\$",
+	"#": r"\#",
+	"_": r"\_",
+	"{": r"\{",
+	"}": r"\}",
+	"~": r"\~{}",
+	"^": r"\^{}",
+	"\\": r"\textbackslash{}",
+	" ": r"\ ",
+	"\n": r"\\",
+	# OT1:
+	"<": r"\textless{}",
+	">": r"\textgreater{}",
+	})
+@_export
+def escape_str(s: str)->str:
+	r"""
+	Given an arbitrary string, output some [LaTeX] code that when executed will typeset the original string.
+
+	Example::
+
+		>>> escape_str("123")
+		'123'
+		>>> escape_str(r"a%#_^~\?")
+		'a\\%\\#\\_\\^{}\\~{}\\textbackslash{}?'
+		>>> escape_str("[")
+		'['
+		>>> escape_str("  ")
+		'\\ \\ '
+		>>> escape_str("\n")
+		'\\\\'
+
+	``\n`` gets escaped to ``\\`` so that multiple consecutive ``\n`` gives multiple line breaks.
+
+	``<`` and ``>`` also needs to be escaped, but only in OT1 font encoding, see https://tex.stackexchange.com/q/2369/250119::
+
+		>>> escape_str("<>")
+		'\\textless{}\\textgreater{}'
+
+	Some Unicode characters may not be supported regardless.
+
+	Be careful with initial ``[`` in text which may be interpreted as an optional argument in specific cases.
+	For example https://tex.stackexchange.com/questions/34580/escape-character-in-latex/686889#comment1155297_34586.
+	"""
+	return s.translate(_escape_str_translation)
 
 var=VarManager(default_engine)
 r"""
