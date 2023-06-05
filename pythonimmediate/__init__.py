@@ -731,7 +731,7 @@ class Token(NToken):
 			(BalancedTokenList([self])+BalancedTokenList.fstr('=' + str(val))).execute(engine)
 			return None
 		else:
-			return int(BalancedTokenList([T.the, self]).expand_o(engine).str(engine))
+			return BalancedTokenList([T.the, self]).expand_o(engine).int()
 
 	def e3bool(self, engine: Engine=default_engine)->bool:
 		"""
@@ -3165,6 +3165,31 @@ class _UmathcodeManager(_TeXManager):
 umathcode=_UmathcodeManager()
 r"""
 Similar to :const:`~pythonimmediate.catcode`.
+"""
+
+
+class _CountManager(_TeXManager):
+	def __getitem__(self, x: str|int)->int:
+		if isinstance(x, int):
+			return BalancedTokenList([r"\the\count" + str(_get_charcode(x))]).expand_o(self.engine).int()
+		else:
+			assert isinstance(x, str)
+			return BalancedTokenList([T.the, T[x]]).expand_o(self.engine).int()
+
+	def __setitem__(self, x: str|int, val: int)->None:
+		if isinstance(x, int):
+			BalancedTokenList([r"\count" + str(x) + "=" + str(val)]).execute(self.engine)
+		else:
+			assert isinstance(x, str)
+			BalancedTokenList([T[x], "=" + str(val)]).execute(self.engine)
+
+
+count=_CountManager()
+r"""
+Manipulate count registers. Interface is similar to :const:`~pythonimmediate.catcode`.
+
+Manipulate count registers. For example ``count[5]=6`` is equivalent to [TeX]'s ``\count5=6``,
+or ``count["endlinechar"]=10`` is equivalent to [TeX]'s ``\endlinechar=10``.
 """
 
 # ========
