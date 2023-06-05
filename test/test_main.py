@@ -156,3 +156,13 @@ class Test:
 		    k = 1
 		    return [f1("j=`j`, k=`k`") for j in range(5)]
 		assert f() == ['j=0, k=1', 'j=1, k=1', 'j=2, k=1', 'j=3, k=1', 'j=4, k=1']
+
+	def test_multithreading_default_engine(self)->None:
+		import threading
+		with ChildProcessEngine("pdftex") as engine:
+			with default_engine.set_engine(engine):
+				def f()->None:
+					assert default_engine.engine is None
+				t=threading.Thread(target=f)
+				t.start()
+				t.join()

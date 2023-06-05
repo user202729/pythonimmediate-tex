@@ -270,11 +270,12 @@ class SetDefaultEngineContextManager:
 		default_engine.set_engine(self.old_engine)
 
 
-class DefaultEngine(Engine):
+class DefaultEngine(Engine, threading.local):
 	"""
 	A convenience class that can be used to avoid passing explicit ``engine`` argument to functions.
 
-	This is not thread-safe.
+	This is thread-safe, which means that each thread can have its own set default engine
+	and :meth:`set_engine` for one thread does not affect other threads.
 
 	Users should not instantiate this class directly. Instead, use :const:`default_engine`.
 
@@ -321,7 +322,7 @@ class DefaultEngine(Engine):
 		if the engine is None.
 		"""
 		if self.engine is None:
-			raise RuntimeError("Default engine not set!")
+			raise RuntimeError("Default engine not set for this thread!")
 		return self.engine
 
 	@property
