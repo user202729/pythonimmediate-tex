@@ -413,6 +413,13 @@ class NFFunctionType(Protocol):
 def make_nf_function(wrapped: Callable[[str, Callable, Engine], None])->NFFunctionType:
 	"""
 	Internal helper decorator.
+
+	Make a function usable like both a function and a decorator that accepts the same kind of arguments as :func:`newcommand`.
+
+	In particular it requires an optional *name* and a mandatory *function*, which may be taken in a single call
+	or by argument currying/applying decorator.
+
+	See the documentation of :func:`newcommand` for more details on how the possible ways the resulting command can be used.
 	"""
 	def wrapped_return_identity(name: str, f: Callable, engine: Engine)->Callable:
 		wrapped(name, f, engine)
