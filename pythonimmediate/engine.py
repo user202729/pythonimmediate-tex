@@ -228,10 +228,11 @@ class ParentProcessEngine(Engine):
 		# avoid user mistakenly read
 
 		if self.config.debug_log_communication is not None:
+			print(f"[All communications will be logged to {self.config.debug_log_communication}]", flush=True)
 			debug_log_communication = self.config.debug_log_communication
 			self._logged_communication = bytearray()
 			def write_communication_log()->None:
-				debug_log_communication.write_bytes(self._logged_communication)
+				debug_log_communication.write_bytes(b"Communication log ['<': TeX to Python, '>': Python to TeX]:\n" + self._logged_communication)
 			atexit.register(write_communication_log)
 
 	def _read(self)->bytes:

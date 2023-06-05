@@ -1,4 +1,3 @@
-from __future__ import annotations
 """
 Receive things that should be passed to [TeX] from [TeX]-to-Py half (:mod:`pythonimmediate.textopy`),
 then pass to [TeX].
@@ -6,7 +5,9 @@ then pass to [TeX].
 User code are not executed here.
 
 Anything that is put in ``pythonimmediatedebugextraargs`` environment variable
-will be appended to the command-line arguments.
+will be appended to the command-line arguments. For example you could invoke [TeX] with
+``pythonimmediatedebugextraargs='--debug-log-communication=/tmp/a.diff --debug=5' pdflatex test.tex``
+to enable debugging facilities.
 
 Supported command-line arguments:
 
@@ -16,6 +17,8 @@ Supported command-line arguments:
    :prog: pytotex
 
 """
+
+from __future__ import annotations
 
 import sys
 import signal
@@ -43,7 +46,10 @@ def get_parser()->argparse.ArgumentParser:
 					 "Should never be necessary unless the package is buggy. "
 					 "Might not work on Windows/MikTeX.")
 	parser.add_argument("--no-sanity-check-extra-line", dest="sanity_check_extra_line", action="store_false")
-	parser.add_argument("--debug-log-communication", type=Path, default=None, help="Debug mode, log all communications. Pass the output path.")
+	parser.add_argument("--debug-log-communication", type=Path, default=None,
+					 help="Debug mode, log all communications. Pass the output path. "
+					 "For example you may want to specify ``--debug-log-communication=/tmp/a.diff`` to log all communication to ``a.diff`` file "
+					 "(because the lines are prefixed with ``<`` and ``>``, diff syntax highlighting works nicely with it)")
 	parser.add_argument("--debug-force-buffered", action="store_true",
 					 help="""Debug mode, simulate [TeX] writes being 4096-byte buffered. Don't use.
 
@@ -57,6 +63,9 @@ def get_parser()->argparse.ArgumentParser:
 					 "Required in some [TeX] distribution that does not flush output.")
 	return parser
 
+def parse_args()->argparse.Namespace:
+	return get_parser().parse_args(sys.argv[1:] + shlex.split(os.environ.get("pythonimmediatedebugextraargs", "")))
+
 if __name__ == "__main__":
 	signal.signal(signal.SIGINT, signal.SIG_IGN)  # when the other half terminates this one will terminates "gracefully"
 
@@ -64,8 +73,7 @@ if __name__ == "__main__":
 	#debug=functools.partial(print, file=debug_file, flush=True)
 	debug=lambda *args, **kwargs: None
 
-	parser=get_parser()
-	args=parser.parse_args(sys.argv[1:] + shlex.split(os.environ.get("pythonimmediatedebugextraargs", "")))
+	args=parse_args()
 
 	mode=args.mode
 	if mode is None:

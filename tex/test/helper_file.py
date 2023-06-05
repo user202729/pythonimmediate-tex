@@ -1,7 +1,7 @@
 import unittest
 import pythonimmediate
 from typing import Any
-from pythonimmediate import Token, TokenList, BalancedTokenList, Catcode, ControlSequenceToken, frozen_relax_token, BlueToken, NTokenList, catcode, remove_handler, group
+from pythonimmediate import Token, TokenList, BalancedTokenList, Catcode, ControlSequenceToken, frozen_relax_token, BlueToken, NTokenList, catcode, remove_handler, group, get_env_body_verb_approximate
 from pythonimmediate import Catcode as C
 from pythonimmediate import default_engine, simple
 T=ControlSequenceToken.make
@@ -586,6 +586,26 @@ class Test(unittest.TestCase):
 		hello world
 		 \#^&%$
 		\end{myenv*}
+		"""))
+		self.assertEqual(a, 1)
+		
+	def test_get_env_body_verb_approximate(self)->None:
+		a=0
+		@simple.newenvironment("myenv**")
+		def myenv():
+			s, _, _=get_env_body_verb_approximate()
+			nonlocal a
+			a=1
+			self.assertEqual(s, "hello world\n \\#^&%$\n")
+			yield
+
+		self.assertEqual(a, 0)
+		import textwrap
+		simple.execute(textwrap.dedent(r"""
+		\begin{myenv**}
+		hello world
+		 \#^&%$
+		\end{myenv**}
 		"""))
 		self.assertEqual(a, 1)
 

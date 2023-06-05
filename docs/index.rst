@@ -33,6 +33,13 @@ There are different sections of the documentation:
   (can be specified through the ``args=`` TeX module option)
   are documented in :mod:`pythonimmediate.pytotex`.
 
+- Debugging functionalities should be available:
+
+  - Error messages should be as descriptive as possible.
+  - TeX errors results in Python traceback, and Python error results in TeX traceback.
+  - Errors in code executed with the ``pycode`` environment gives the correct traceback point to the Python line of code in the TeX file.
+  - There are some command-line flags to enable debugging functionalities, which can be passed in follows the documentation in :mod:`pythonimmediate.pytotex`.
+
 .. toctree::
    :maxdepth: 4
    :caption: Contents:

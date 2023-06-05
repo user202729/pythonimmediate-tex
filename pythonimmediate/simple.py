@@ -66,7 +66,7 @@ import re
 from dataclasses import dataclass
 
 import pythonimmediate
-from . import scan_Python_call_TeX_module, PTTTeXLine, PTTVerbatimLine, PTTTeXLine, Python_call_TeX_local, check_line, Token, TTPEBlock, TTPEmbeddedLine, get_random_Python_identifier, CharacterToken, define_TeX_call_Python, parse_meaning_str, peek_next_meaning, run_block_local, run_code_redirect_print_TeX, TTPBlock, TTPLine, BalancedTokenList, TokenList, ControlSequenceToken, doc_catcode_table, Catcode
+from . import scan_Python_call_TeX_module, PTTTeXLine, PTTVerbatimLine, PTTTeXLine, Python_call_TeX_local, check_line, Token, TTPEBlock, TTPEmbeddedLine, get_random_Python_identifier, CharacterToken, define_TeX_call_Python, parse_meaning_str, peek_next_meaning, run_block_local, run_code_redirect_print_TeX, TTPBlock, TTPLine, BalancedTokenList, TokenList, ControlSequenceToken, doc_catcode_table, Catcode, T, ControlSequenceToken, group
 from .engine import Engine, default_engine
 
 if not typing.TYPE_CHECKING:
@@ -855,15 +855,21 @@ def newenvironment(name: str, f: Callable, engine: Engine)->None:
 		""", recursive=False))(PTTVerbatimLine(name), PTTVerbatimLine(begin_identifier), PTTVerbatimLine(end_identifier), engine)
 
 
-	pending_objects=[]  # nonlocal mutable, create one for each environment
+	pending_objects: list[tuple[Iterator, int]]=[]  # nonlocal mutable, create one for each environment
 
-	def begin_f():
+	def begin_f()->None:
 		a=f()
 		next(a)
-		pending_objects.append(a)
+		pending_objects.append((a, (T.currentgrouplevel.int() if engine.config.debug>=2 else -1)))
 
-	def end_f():
-		a=pending_objects.pop()
+	def end_f()->None:
+		if not pending_objects:
+			assert False, r"\end{" + name + r"} called before \begin{" + name + "} finishes!"
+
+		a, expectedgrouplevel=pending_objects.pop()
+		if expectedgrouplevel!=(T.currentgrouplevel.int() if engine.config.debug>=2 else -1):
+			assert False, r"\end{" + name + r"} called before \begin{" + name + "} finishes! (likely, wrong group level)"
+
 		try:
 			next(a)
 			assert False, "Function must yield exactly once!"
@@ -877,6 +883,59 @@ def newenvironment(name: str, f: Callable, engine: Engine)->None:
 			lambda engine: run_code_redirect_print_TeX(end_f, engine=engine),
 			f"(end environment: {name})", argtypes=[], identifier=end_identifier)
 	# ignore _code, already executed something equivalent in the TeX command
+
+@_export
+def get_env_body_verb_approximate(envname: Optional[str]=None, engine: Engine=default_engine)->tuple[str, str, int]:
+	r"""
+	This function is to be used inside :func:`newenvironment`'s registered function in order to get the environment body.
+
+	It can only be used once, and it only works if the argument is not already tokenized,
+	i.e., it appears at "top-level"/does not appear inside any command or some environments such as ``align``.
+	(basically where a ``\verb|...|`` command can appear.)
+
+	:returns: a tuple ``(body, filename, line_number)`` where ``body`` is the body of the environment,
+		``filename`` is the filename of the TeX file, and ``line_number`` is the line number of the last line of the environment.
+
+	.. note::
+		The returned code may have some tab characters converted to ``^^I``, trailing spaces stripped etc.
+
+		For advanced users:
+		Basically it takes the following content until ``\end{⟨value of \@currenvir⟩}``, as by the ``saveenv`` package.
+	"""
+	if envname is None: envname=T["@currenvir"].val().detokenize()
+	assert envname is not None
+
+	with group:
+		endlinechar=T.endlinechar.int()
+		BalancedTokenList(r'\cctab_select:N \c_other_cctab').execute()  # also change endlinechar
+		T.endlinechar.int(10)
+
+		lineno=T.inputlineno.int()
+		result=BalancedTokenList()
+		token=Token.get_next()
+		if endlinechar>=0:
+			if token!=Catcode.other(endlinechar):
+				raise RuntimeError(f"Content is already tokenized or environment begin line not on a separate line! "
+					f"(first following token is {token})")
+		else:
+			if T.inputlineno.int()==lineno:
+				raise RuntimeError("Content is already tokenized! (current endlinechar is -1)")
+			result.append(token)
+		result+=BalancedTokenList.get_until(BalancedTokenList.fstr(r'\end{' + T["@currenvir"].val().detokenize() + "}\n"))
+		BalancedTokenList([r'\end{', *T["@currenvir"].val(), '}']).put_next()
+		code=result.detokenize()
+
+		filename: str
+		if T.currfileabspath.defined():
+			filename=T.currfileabspath.val().str()
+		elif T.currfilename.defined():
+			filename=T.currfilename.val().str()
+		else:
+			filename="??"
+
+		inputlineno=T.inputlineno.int()
+
+	return code, filename, inputlineno
 
 @_export
 @make_nf_function

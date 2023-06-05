@@ -68,6 +68,7 @@ This is a table of [TeX] primitives, and their Python wrapper:
 	* - ``\begingroup``, ``\endgroup``
 	  - :const:`group`
 
+Some debug functionalities are provided and can be specified on the command-line, refer to :mod:`~pythonimmediate.pytotex` documentation.
 
 """
 
@@ -431,7 +432,7 @@ def run_main_loop(engine: Engine)->TeXToPyObjectType:
 
 def run_main_loop_get_return_one(engine: Engine)->str:
 	line=readline(engine=engine)
-	assert line[0]=="r"
+	assert line[0]=="r", line
 	return line[1:]
 
 
@@ -716,6 +717,21 @@ class Token(NToken):
 		given ``self`` is a expl3 ``str``-variable, return the content.
 		"""
 		return self.val(engine=engine).str(engine=engine)
+
+	@typing.overload
+	def int(self, val: int, engine: Engine=default_engine)->None: ...
+	@typing.overload
+	def int(self, *, engine: Engine=default_engine)->int: ...
+
+	def int(self, val: Optional[int]=None, engine: Engine=default_engine)->Optional[int]:
+		r"""
+		Given ``self`` is a ``\countdef`` token, either set or get its value.
+		"""
+		if isinstance(val, int):
+			(BalancedTokenList([self])+BalancedTokenList.fstr('=' + str(val))).execute(engine)
+			return None
+		else:
+			return int(BalancedTokenList([T.the, self]).expand_o(engine).str(engine))
 
 	def e3bool(self, engine: Engine=default_engine)->bool:
 		"""
@@ -1060,7 +1076,7 @@ if is_sphinx_build:
 
 class ControlSequenceTokenMaker:
 	r"""
-	Shorthand to create control sequence objects in Python easier.
+	Shorthand to create :class:`ControlSequenceToken` objects in Python easier.
 
 	There's a default one that can be used as, if you assign ``T=ControlSequenceToken.make``,
 	then ``T.hello`` returns the token ``\hello``.

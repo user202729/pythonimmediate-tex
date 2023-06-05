@@ -6,13 +6,18 @@ import typing
 
 
 def main()->None:
+	"""
+	This side does not receive the user-provided arguments directly, instead some parts of the configuration is decided by the pytotex side
+	and forwarded to this half.
+
+	The arguments are re-parsed here anyway to provide a "temporary" configuration for the engine to work with before getting the real configuration.
+	"""
 	from .engine import ParentProcessEngine
 	from . import PTTBlock, PTTVerbatimLine, run_error_finish, default_engine, send_raw, surround_delimiter, substitute_private, get_bootstrap_code, run_main_loop
-	from .pytotex import get_parser
+	from .pytotex import parse_args
 	from .communicate import GlobalConfiguration, Communicator
 
-	parser=get_parser()
-	args=parser.parse_args()
+	args=parse_args()
 	pseudo_config=GlobalConfiguration.from_args(args, typing.cast(Communicator, None))
 
 	try:
@@ -51,7 +56,7 @@ def main()->None:
 				)
 
 		run_error_finish(PTTBlock(full_error), PTTBlock(short_error), engine)
-		os._exit(0)
+		engine.error_happened=True
 
 
 if __name__=="__main__":
