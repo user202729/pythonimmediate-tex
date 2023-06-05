@@ -2882,9 +2882,21 @@ mark_bootstrap(
 		)
 
 def finish_listen(engine: Engine=default_engine):
-	# define_Python_call_TeX is hopelessly complicated, will figure out later
 	"""
-	Refer to the documentation of :func:`add_handler`.
+	Within :func:`add_handler` you may do something as follows::
+
+		def myfunction(engine):
+			print(1)
+			execute("hello world")  # it's possible to execute TeX code here
+			finish_listen()
+			# after the call above it's no longer allowed to execute TeX_code
+			heavy_computations()  # now this part is executed in parallel with TeX code
+		identifier = add_handler(myfunction)
+
+	This is just a (micro)-optimization to allow (some) TeX code to run parallel with Python code.
+
+	.. seealso::
+		:func:`add_handler_async`.
 	"""
 	engine.write((_finish_listen_identifier+"\n").encode('u8'))
 
