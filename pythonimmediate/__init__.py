@@ -1941,7 +1941,7 @@ class BalancedTokenList(TokenList):
 			""", recursive=False))(engine)
 
 	@staticmethod
-	def _get_until_raw(delimiter: BalancedTokenList, long: bool, engine: Engine=default_engine)->"BalancedTokenList":
+	def _get_until_raw(delimiter: BalancedTokenList, long: bool, engine: Engine)->"BalancedTokenList":
 		"""
 		Internal function.
 
@@ -1997,7 +1997,7 @@ class BalancedTokenList(TokenList):
 			auxiliary_token = T.empty
 			if delimiter[0]==auxiliary_token: auxiliary_token = T.relax
 			auxiliary_token.put_next()
-		result = BalancedTokenList._get_until_raw(delimiter, long=long)
+		result = BalancedTokenList._get_until_raw(delimiter, long=long, engine=engine)
 		if not remove_braces:
 			assert result[0]==auxiliary_token
 			del result[0]
@@ -2009,7 +2009,7 @@ class BalancedTokenList(TokenList):
 		r"""
 		Get a TokenList from the input stream delimited by ``{``. The brace is not removed from the input stream.
 		"""
-		return BalancedTokenList._get_until_raw(BalancedTokenList("#"), long=long)
+		return BalancedTokenList._get_until_raw(BalancedTokenList("#"), long=long, engine=engine)
 
 	def detokenize(self, engine: Engine=  default_engine)->str:
 		r"""
