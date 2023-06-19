@@ -27,7 +27,7 @@ Some command are not documented here, refer to:
 from . import*
 
 @define_internal_handler
-def py(code: TTPEBlock, engine: Engine)->None:
+def py(code: TTPEBlock)->None:
 	r"""
 	Evaluate some Python code provided as an argument and typeset the result as [TeX] code.
 	For example ``\py{1+1}`` will typeset 2.
@@ -35,16 +35,17 @@ def py(code: TTPEBlock, engine: Engine)->None:
 	The code is evaluated as if with ``eval()``, so assignments such as ``a=1`` is not suitable here.
 	Use :meth:`pyc` instead.
 	"""
-	pythonimmediate.run_block_finish(str(eval_with_linecache(
+	from . import _run_block_finish
+	_run_block_finish(str(eval_with_linecache(
 		code.lstrip(),
-		user_scope))+"%", engine=engine)
+		user_scope))+"%")
 	# note we use code.lstrip() here because otherwise
 	# \py{
 	# 1+1}
 	# would give IndentationError
 
 @define_internal_handler
-def pyfile(filepath: TTPELine, engine: Engine)->None:
+def pyfile(filepath: TTPELine)->None:
 	r"""
 	Execute a Python file from `filepath`, as if with :func:`pyc` or :func:`pycode`.
 
@@ -52,10 +53,10 @@ def pyfile(filepath: TTPELine, engine: Engine)->None:
 	"""
 	with open(filepath, "r") as f:
 		source=f.read()
-	run_code_redirect_print_TeX(lambda: exec(compile(source, filepath, "exec"), user_scope), engine=engine)
+	run_code_redirect_print_TeX(lambda: exec(compile(source, filepath, "exec"), user_scope))
 
 @define_internal_handler
-def pyfilekpse(filename: TTPELine, engine: Engine)->None:
+def pyfilekpse(filename: TTPELine)->None:
 	r"""
 	Given a file name, use ``kpsewhich`` executable to search for its full path, then execute the file at that path.
 
@@ -68,7 +69,7 @@ def pyfilekpse(filename: TTPELine, engine: Engine)->None:
 	filepath=subprocess.run(["kpsewhich", str(filename)], stdout=subprocess.PIPE, check=True).stdout.decode('u8').rstrip("\n")
 	with open(filepath, "r") as f:
 		source=f.read()
-	run_code_redirect_print_TeX(lambda: exec(compile(source, filepath, "exec"), {"__file__": filepath, "user_scope": user_scope}), engine=engine)
+	run_code_redirect_print_TeX(lambda: exec(compile(source, filepath, "exec"), {"__file__": filepath, "user_scope": user_scope}))
 
 # ======== implementation of ``pycode`` environment
 mark_bootstrap(
@@ -86,7 +87,7 @@ r"""
 }
 """)
 
-def pycode(code: TTPBlock, lineno_: TTPLine, filename: TTPLine, fileabspath: TTPLine, engine: Engine)->None:
+def pycode(code: TTPBlock, lineno_: TTPLine, filename: TTPLine, fileabspath: TTPLine)->None:
 	r"""
 	A [TeX] environment to execute some Python code. Must be used at top-level, and content can be verbatim.
 
@@ -150,12 +151,12 @@ def pycode(code: TTPBlock, lineno_: TTPLine, filename: TTPLine, fileabspath: TTP
 			exec(compiled_code, user_scope)
 		else:
 			exec(code_, user_scope)
-	run_code_redirect_print_TeX(tmp, engine=engine)
+	run_code_redirect_print_TeX(tmp)
 	
 bootstrap_code_functions.append(define_TeX_call_Python(pycode, name="__pycodex"))
 
 @define_internal_handler
-def pyc(code: TTPEBlock, engine: Engine)->None:
+def pyc(code: TTPEBlock)->None:
 	r"""
 	Execute some Python code provided as an argument, typeset whatever resulted by :func:`.print_TeX`.
 
@@ -165,16 +166,16 @@ def pyc(code: TTPEBlock, engine: Engine)->None:
 	Nevertheless, for long code :meth:`
 	Use :meth:`pyc` instead.
 	"""
-	run_code_redirect_print_TeX(lambda: exec_with_linecache(code, user_scope), engine=engine)
+	run_code_redirect_print_TeX(lambda: exec_with_linecache(code, user_scope))
 
 @define_internal_handler
-def pycq(code: TTPEBlock, engine: Engine)->None:
+def pycq(code: TTPEBlock)->None:
 	"""
 	Similar to :meth:`pyc`, however any output by :meth:`print_TeX` is suppressed.
 	"""
 	with RedirectPrintTeX(None):
 		exec_with_linecache(code, user_scope)
-	run_none_finish(engine)
+	run_none_finish()
 
 mark_bootstrap(
 r"""

@@ -67,7 +67,7 @@ from dataclasses import dataclass
 
 import pythonimmediate
 from . import scan_Python_call_TeX_module, PTTTeXLine, PTTVerbatimLine, PTTTeXLine, Python_call_TeX_local, check_line, Token, TTPEBlock, TTPEmbeddedLine, get_random_Python_identifier, CharacterToken, define_TeX_call_Python, parse_meaning_str, peek_next_meaning, run_block_local, run_code_redirect_print_TeX, TTPBlock, TTPLine, BalancedTokenList, TokenList, ControlSequenceToken, doc_catcode_table, Catcode, T, ControlSequenceToken, group
-from .engine import Engine, default_engine
+from .engine import Engine, default_engine, default_engine as engine
 
 if not typing.TYPE_CHECKING:
 	__all__ = []
@@ -79,7 +79,7 @@ def _export(f: T2)->T2:
 	return f
 
 @_export
-def peek_next_char(engine: Engine=  default_engine)->str:
+def peek_next_char()->str:
 	r"""
 	Get the character of the following token, or empty string if it's not a character.
 
@@ -138,16 +138,16 @@ def peek_next_char(engine: Engine=  default_engine)->str:
 	return r[1]
 
 @_export
-def get_next_char(engine: Engine=  default_engine)->str:
+def get_next_char()->str:
 	"""
 	Return the character of the following token as with :func:`peek_next_char`, but also removes it from the input stream.
 	"""
-	result=Token.get_next(engine=engine)
+	result=Token.get_next()
 	assert isinstance(result, CharacterToken), "Next token is not a character!"
 	return result.chr
 
 @_export
-def put_next(arg: str, engine: Engine=  default_engine)->None:
+def put_next(arg: str)->None:
 	r"""
 	Put some content forward in the input stream.
 
@@ -172,7 +172,7 @@ def put_next(arg: str, engine: Engine=  default_engine)->None:
 	.. note::
 		For advanced users: the argument is tokenized in the current category regime.
 	"""
-	typing.cast(Callable[[PTTTeXLine, Engine], None], Python_call_TeX_local(
+	typing.cast(Callable[[PTTTeXLine], None], Python_call_TeX_local(
 		r"""
 		\cs_new_protected:Npn \__put_next_tmpa {
 			%optional_sync%
@@ -182,7 +182,7 @@ def put_next(arg: str, engine: Engine=  default_engine)->None:
 			%read_arg0(\__target)%
 			\expandafter \__put_next_tmpa \__target
 		}
-		""", recursive=False))(PTTTeXLine(arg), engine)
+		""", recursive=False))(PTTTeXLine(arg))
 
 def _replace_double_hash(s: str)->str:
 	return s.replace("##", "#")
@@ -191,7 +191,7 @@ def _replace_par_to_crcr(s: str)->str:
 	return s.replace("\\par ", "\n\n")
 
 @_export
-def get_arg_str(engine: Engine=  default_engine)->str:
+def get_arg_str()->str:
 	r"""
 	Get a mandatory argument from the input stream.
 
@@ -245,7 +245,7 @@ def get_arg_str(engine: Engine=  default_engine)->str:
 		Refer to :meth:`BalancedTokenList.get_next()` for a more advanced API.
 
 	"""
-	return _replace_par_to_crcr(_replace_double_hash(typing.cast(Callable[[Engine], TTPEmbeddedLine], Python_call_TeX_local(
+	return _replace_par_to_crcr(_replace_double_hash(typing.cast(Callable[[], TTPEmbeddedLine], Python_call_TeX_local(
 		r"""
 		\cs_new_protected:Npn %name% #1 {
 			\__send_content%naive_send%:n {
@@ -253,10 +253,10 @@ def get_arg_str(engine: Engine=  default_engine)->str:
 			}
 			\pythonimmediatelisten
 		}
-		""", recursive=False))(engine)))
+		""", recursive=False))()))
 
 @_export
-def get_arg_estr(engine: Engine=  default_engine)->str:
+def get_arg_estr()->str:
 	r"""
 	Get a mandatory argument from the input stream, then process it as described in :ref:`estr-expansion`.
 
@@ -277,7 +277,7 @@ def get_arg_estr(engine: Engine=  default_engine)->str:
 	- if the argument in [TeX] code is ``{\%a\#b\\\~}``, then the Python function will return ``r"%a#b\~"``,
 	- if the argument in [TeX] code is ``{\myvalue}``, then the Python function will return ``"123abc"``.
 	"""
-	return typing.cast(Callable[[Engine], TTPEBlock], Python_call_TeX_local(
+	return typing.cast(Callable[[], TTPEBlock], Python_call_TeX_local(
 		r"""
 
 		\cs_new_protected:Npn %name% #1 {
@@ -285,17 +285,17 @@ def get_arg_estr(engine: Engine=  default_engine)->str:
 			%send_arg0(#1)%
 			\pythonimmediatelisten
 		}
-		""", recursive=False))(engine)
+		""", recursive=False))()
 
 @_export
-def get_optional_arg_str(engine: Engine=  default_engine)->Optional[str]:
+def get_optional_arg_str()->Optional[str]:
 	"""
 	Get an optional argument. See also :ref:`str-tokenization`.
 	
 	.. note::
 		For advanced users: This function corresponds to the ``o``-type argument in ``xparse`` package.
 	"""
-	result=typing.cast(Callable[[Engine], TTPLine], Python_call_TeX_local(
+	result=typing.cast(Callable[[], TTPLine], Python_call_TeX_local(
 		r"""
 		\NewDocumentCommand %name% {o} {
 			\__send_content%naive_send%:e {
@@ -308,18 +308,18 @@ def get_optional_arg_str(engine: Engine=  default_engine)->Optional[str]:
 			}
 			\pythonimmediatelisten
 		}
-		""", recursive=False))(engine)
+		""", recursive=False))()
 	result_=str(result)
 	if result_=="0": return None
 	assert result_[0]=="1", result_
 	return result_[1:]
 
 @_export
-def get_optional_arg_estr(engine: Engine=  default_engine)->Optional[str]:
+def get_optional_arg_estr()->Optional[str]:
 	"""
 	Get an optional argument. See also :ref:`estr-expansion`.
 	"""
-	result=typing.cast(Callable[[Engine], TTPEBlock], Python_call_TeX_local(
+	result=typing.cast(Callable[[], TTPEBlock], Python_call_TeX_local(
 		r"""
 		\NewDocumentCommand %name% {o} {
 			%sync%
@@ -330,14 +330,14 @@ def get_optional_arg_estr(engine: Engine=  default_engine)->Optional[str]:
 			}
 			\pythonimmediatelisten
 		}
-		""", recursive=False))(engine)
+		""", recursive=False))()
 	result_=str(result)
 	if result_=="0": return None
 	assert result_[0]=="1", result_
 	return result_[1:]
 
 @_export
-def get_verb_arg(engine: Engine=  default_engine)->str:
+def get_verb_arg()->str:
 	r"""
 	Get a verbatim argument.
 
@@ -358,7 +358,7 @@ def get_verb_arg(engine: Engine=  default_engine)->str:
 		Hard TAB character in the argument gives an error until the corresponding LaTeX3 bug is fixed,
 		see https://tex.stackexchange.com/q/508001/250119.
 	"""
-	return typing.cast(Callable[[Engine], TTPLine], Python_call_TeX_local(
+	return typing.cast(Callable[[], TTPLine], Python_call_TeX_local(
 		r"""
 		\NewDocumentCommand %name% {v} {
 			\__send_content%naive_send%:n {
@@ -367,10 +367,10 @@ def get_verb_arg(engine: Engine=  default_engine)->str:
 			}
 			\pythonimmediatelisten
 		}
-		""", recursive=False))(engine)
+		""", recursive=False))()
 
 @_export
-def get_multiline_verb_arg(engine: Engine=  default_engine)->str:
+def get_multiline_verb_arg()->str:
 	r"""
 	Get a multi-line verbatim argument. Usage is identical to :func:`get_verb_arg`, except newline characters
 	in the argument is supported.
@@ -378,7 +378,7 @@ def get_multiline_verb_arg(engine: Engine=  default_engine)->str:
 	.. note::
 		in unusual category regime (such as that in ``\ExplSyntaxOn``), it may return wrong result.
 	"""
-	return typing.cast(Callable[[Engine], TTPBlock], Python_call_TeX_local(
+	return typing.cast(Callable[[], TTPBlock], Python_call_TeX_local(
 		r"""
 		\precattl_exec:n {
 			\NewDocumentCommand %name% {+v} {
@@ -389,7 +389,7 @@ def get_multiline_verb_arg(engine: Engine=  default_engine)->str:
 				\pythonimmediatelisten
 			}
 		}
-		""", recursive=False))(engine)  # we cannot set newlinechar=13 because otherwise \__send_block:e does not work properly
+		""", recursive=False))()  # we cannot set newlinechar=13 because otherwise \__send_block:e does not work properly
 
 def _check_name(name: str)->None:
 	"""
@@ -402,15 +402,15 @@ T2 = typing.TypeVar("T2", bound=Callable)
 
 class NFFunctionType(Protocol):
 	@overload
-	def __call__(self, name: str, f: T2, engine: Engine=default_engine)->T2: ...
+	def __call__(self, name: str, f: T2)->T2: ...
 	@overload
-	def __call__(self, f: T2, engine: Engine=default_engine)->T2: ...  # omit name, deduced from f.__name__
+	def __call__(self, f: T2)->T2: ...  # omit name, deduced from f.__name__
 	@overload
-	def __call__(self, name: str, engine: Engine=default_engine)->Callable[[T2], T2]: ...  # use as decorator
+	def __call__(self, name: str)->Callable[[T2], T2]: ...  # use as decorator
 	@overload
-	def __call__(self, engine: Engine=default_engine)->Callable[[T2], T2]: ...  # use as decorator and omit name
+	def __call__(self)->Callable[[T2], T2]: ...  # use as decorator and omit name
 
-def make_nf_function(wrapped: Callable[[str, Callable, Engine], None])->NFFunctionType:
+def make_nf_function(wrapped: Callable[[str, Callable], None])->NFFunctionType:
 	"""
 	Internal helper decorator.
 
@@ -421,20 +421,20 @@ def make_nf_function(wrapped: Callable[[str, Callable, Engine], None])->NFFuncti
 
 	See the documentation of :func:`newcommand` for more details on how the possible ways the resulting command can be used.
 	"""
-	def wrapped_return_identity(name: str, f: Callable, engine: Engine)->Callable:
-		wrapped(name, f, engine)
+	def wrapped_return_identity(name: str, f: Callable)->Callable:
+		wrapped(name, f)
 		return f
 	@functools.wraps(wrapped, assigned=("__name__", "__doc__"), updated=())  # the annotation is changed, exclude that from `assigned`
-	def result(x: Union[str, Callable, None]=None, f: Optional[Callable]=None, engine: Engine=  default_engine)->Callable:
-		if f is not None: return result(x, engine=engine)(f)
-		if x is None: return functools.partial(result, engine=engine)
-		if isinstance(x, str): return functools.partial(wrapped_return_identity, x, engine=engine)
-		return wrapped_return_identity(x.__name__, x, engine)
+	def result(x: Union[str, Callable, None]=None, f: Optional[Callable]=None)->Callable:
+		if f is not None: return result(x)(f)
+		if x is None: return functools.partial(result)
+		if isinstance(x, str): return functools.partial(wrapped_return_identity, x)
+		return wrapped_return_identity(x.__name__, x)
 	return result  # type: ignore
 
 @_export
 @make_nf_function
-def newcommand(name: str, f: Callable, engine: Engine)->None:
+def newcommand(name: str, f: Callable)->None:
 	r"""
 	Define a new [TeX]-command.
 
@@ -519,7 +519,7 @@ def newcommand(name: str, f: Callable, engine: Engine)->None:
 	_check_name(name)
 	identifier=get_random_Python_identifier()
 
-	typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
+	typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine], None], Python_call_TeX_local(
 		r"""
 		\cs_new_protected:Npn %name% {
 			\begingroup
@@ -534,23 +534,23 @@ def newcommand(name: str, f: Callable, engine: Engine)->None:
 			%optional_sync%
 			\pythonimmediatelisten
 		}
-		""", recursive=False))(PTTVerbatimLine(name), PTTVerbatimLine(identifier), engine)
+		""", recursive=False))(PTTVerbatimLine(name), PTTVerbatimLine(identifier))
 
 	_code=define_TeX_call_Python(
-			lambda engine: run_code_redirect_print_TeX(f, engine=engine),
+			lambda: run_code_redirect_print_TeX(f),
 			name, argtypes=[], identifier=identifier)
 	# ignore _code, already executed something equivalent in the TeX command
 
 @_export
 @make_nf_function
-def renewcommand(name: str, f: Callable, engine: Engine)->None:
+def renewcommand(name: str, f: Callable)->None:
 	r"""
 	Redefine a [TeX]-command. Usage is similar to :func:`newcommand`.
 	"""
 	_check_name(name)
 	identifier=get_random_Python_identifier()
 
-	typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
+	typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine], None], Python_call_TeX_local(
 		r"""
 		\cs_new_protected:Npn %name% {
 			\begingroup
@@ -566,19 +566,19 @@ def renewcommand(name: str, f: Callable, engine: Engine)->None:
 			%optional_sync%
 			\pythonimmediatelisten
 		}
-		""", recursive=False))(PTTVerbatimLine(name), PTTVerbatimLine(identifier), engine)
+		""", recursive=False))(PTTVerbatimLine(name), PTTVerbatimLine(identifier))
 	# TODO remove the redundant entry from TeX_handlers (although technically is not very necessary, just cause slight memory leak)
 	#try: del TeX_handlers["u"+name]
 	#except KeyError: pass
 
 	_code=define_TeX_call_Python(
-			lambda engine: run_code_redirect_print_TeX(f, engine=engine),
+			lambda: run_code_redirect_print_TeX(f),
 			name, argtypes=[], identifier=identifier)
 	# ignore _code, already executed something equivalent in the TeX command
 
 
 @_export
-def define_char(char: str, engine: Engine=  default_engine)->Callable[[T2], T2]:
+def define_char(char: str)->Callable[[T2], T2]:
 	r"""
 	Define a character to do some specific action.
 
@@ -601,13 +601,13 @@ def define_char(char: str, engine: Engine=  default_engine)->Callable[[T2], T2]:
 		assert len(char)==1
 		identifier=get_random_Python_identifier()
 		_code=define_TeX_call_Python(
-				lambda engine: run_code_redirect_print_TeX(f, engine=engine),
+				lambda: run_code_redirect_print_TeX(f),
 				f"(char: {char})", argtypes=[], identifier=identifier)
 		# ignore _code, already executed something equivalent while running the TeX command below
 
 		if not engine.is_unicode and ord(char)>127:
 			# must define u8:...
-			typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
+			typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine], None], Python_call_TeX_local(
 				r"""
 				\cs_new_protected:Npn %name% {
 					\begingroup
@@ -622,9 +622,9 @@ def define_char(char: str, engine: Engine=  default_engine)->Callable[[T2], T2]:
 					%optional_sync%
 					\pythonimmediatelisten
 				}
-				""", recursive=False))(PTTVerbatimLine(char), PTTVerbatimLine(identifier), engine)
+				""", recursive=False))(PTTVerbatimLine(char), PTTVerbatimLine(identifier))
 		else:
-			typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
+			typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine], None], Python_call_TeX_local(
 				r"""
 				\cs_new_protected:Npn %name% {
 					\begingroup
@@ -644,12 +644,12 @@ def define_char(char: str, engine: Engine=  default_engine)->Callable[[T2], T2]:
 					%optional_sync%
 					\pythonimmediatelisten
 				}
-				""", recursive=False))(PTTVerbatimLine(char), PTTVerbatimLine(identifier), engine)
+				""", recursive=False))(PTTVerbatimLine(char), PTTVerbatimLine(identifier))
 		return f
 	return result
 
 @_export
-def undefine_char(char: str, engine: Engine=  default_engine)->None:
+def undefine_char(char: str)->None:
 	"""
 	The opposite of :func:`define_char`.
 	"""
@@ -657,7 +657,7 @@ def undefine_char(char: str, engine: Engine=  default_engine)->None:
 
 	if not engine.is_unicode and ord(char)>127:
 		# undefine u8:...
-		typing.cast(Callable[[PTTVerbatimLine, Engine], None], Python_call_TeX_local(
+		typing.cast(Callable[[PTTVerbatimLine], None], Python_call_TeX_local(
 			r"""
 			\cs_new_protected:Npn %name% {
 				\begingroup
@@ -668,10 +668,10 @@ def undefine_char(char: str, engine: Engine=  default_engine)->None:
 				%optional_sync%
 				\pythonimmediatelisten
 			}
-			""", recursive=False))(PTTVerbatimLine(char), engine)
+			""", recursive=False))(PTTVerbatimLine(char))
 	else:
 		# return the normal catcode for the character
-		typing.cast(Callable[[PTTVerbatimLine, Engine], None], Python_call_TeX_local(
+		typing.cast(Callable[[PTTVerbatimLine], None], Python_call_TeX_local(
 			r"""
 			\precattl_exec:n {
 				\cs_new_protected:Npn %name% {
@@ -690,7 +690,7 @@ def undefine_char(char: str, engine: Engine=  default_engine)->None:
 					\pythonimmediatelisten
 				}
 			}
-			""", recursive=False))(PTTVerbatimLine(char), engine)
+			""", recursive=False))(PTTVerbatimLine(char))
 
 @_export
 def execute(block: str, engine: Engine=default_engine)->None:
@@ -724,14 +724,14 @@ def execute(block: str, engine: Engine=default_engine)->None:
 
 		For advanced users: it's implemented with ``\scantokens``, so catcode-changing commands are allowed inside.
 	"""
-	run_block_local(block, engine=engine)
+	run_block_local(block)
 
 @_export
 def execute_tokenized(line: str, engine: Engine=default_engine)->None:
 	"""
 	Temporary.
 	"""
-	typing.cast(Callable[[PTTTeXLine, Engine], None], Python_call_TeX_local(
+	typing.cast(Callable[[PTTTeXLine], None], Python_call_TeX_local(
 		r"""
 		\cs_new_protected:Npn %name% {
 			%read_arg0(\__data)%
@@ -740,14 +740,14 @@ def execute_tokenized(line: str, engine: Engine=default_engine)->None:
 			%optional_sync%
 			\pythonimmediatelisten
 		}
-		"""))(PTTTeXLine(line), engine)
+		"""))(PTTTeXLine(line))
 
 @_export
 def put_next_tokenized(line: str, engine: Engine=default_engine)->None:
 	"""
 	Temporary.
 	"""
-	typing.cast(Callable[[PTTTeXLine, Engine], None], Python_call_TeX_local(
+	typing.cast(Callable[[PTTTeXLine], None], Python_call_TeX_local(
 		r"""
 		\cs_new_protected:Npn %name% {
 			%read_arg0(\__data)%
@@ -755,7 +755,7 @@ def put_next_tokenized(line: str, engine: Engine=default_engine)->None:
 			%optional_sync%
 			\expandafter \pythonimmediatelisten \__data
 		}
-		"""))(PTTTeXLine(line), engine)
+		"""))(PTTTeXLine(line))
 
 @_export
 def print_TeX(*args, **kwargs)->None:
@@ -785,7 +785,7 @@ def print_TeX(*args, **kwargs)->None:
 
 @_export
 @make_nf_function
-def newenvironment(name: str, f: Callable, engine: Engine)->None:
+def newenvironment(name: str, f: Callable)->None:
 	r"""
 	Define a new [TeX] normal environment.
 
@@ -831,7 +831,7 @@ def newenvironment(name: str, f: Callable, engine: Engine)->None:
 	begin_identifier=get_random_Python_identifier()
 	end_identifier=get_random_Python_identifier()
 
-	typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
+	typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, PTTVerbatimLine], None], Python_call_TeX_local(
 		r"""
 		\cs_new_protected:Npn %name% {
 			%read_arg0(\__line)%
@@ -852,7 +852,7 @@ def newenvironment(name: str, f: Callable, engine: Engine)->None:
 			%optional_sync%
 			\pythonimmediatelisten
 		}
-		""", recursive=False))(PTTVerbatimLine(name), PTTVerbatimLine(begin_identifier), PTTVerbatimLine(end_identifier), engine)
+		""", recursive=False))(PTTVerbatimLine(name), PTTVerbatimLine(begin_identifier), PTTVerbatimLine(end_identifier))
 
 
 	pending_objects: list[tuple[Iterator, int]]=[]  # nonlocal mutable, create one for each environment
@@ -877,10 +877,10 @@ def newenvironment(name: str, f: Callable, engine: Engine)->None:
 			pass
 
 	_code=define_TeX_call_Python(
-			lambda engine: run_code_redirect_print_TeX(begin_f, engine=engine),
+			lambda: run_code_redirect_print_TeX(begin_f),
 			f"(begin environment: {name})", argtypes=[], identifier=begin_identifier)
 	_code=define_TeX_call_Python(
-			lambda engine: run_code_redirect_print_TeX(end_f, engine=engine),
+			lambda: run_code_redirect_print_TeX(end_f),
 			f"(end environment: {name})", argtypes=[], identifier=end_identifier)
 	# ignore _code, already executed something equivalent in the TeX command
 
@@ -939,7 +939,7 @@ def get_env_body_verb_approximate(envname: Optional[str]=None, engine: Engine=de
 
 @_export
 @make_nf_function
-def newenvironment_verb(name: str, f: Callable[[str], None], engine: Engine)->None:
+def newenvironment_verb(name: str, f: Callable[[str], None])->None:
 	r"""
 	Define a new [TeX] environment that reads its body verbatim.
 
@@ -978,7 +978,7 @@ def newenvironment_verb(name: str, f: Callable[[str], None], engine: Engine)->No
 	"""
 	identifier=get_random_Python_identifier()
 
-	typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine, Engine], None], Python_call_TeX_local(
+	typing.cast(Callable[[PTTVerbatimLine, PTTVerbatimLine], None], Python_call_TeX_local(
 		r"""
 		\cs_new_protected:Npn %name% {
 			%read_arg0(\__line)%
@@ -995,10 +995,10 @@ def newenvironment_verb(name: str, f: Callable[[str], None], engine: Engine)->No
 			%optional_sync%
 			\pythonimmediatelisten
 		}
-		""", recursive=False))(PTTVerbatimLine(name), PTTVerbatimLine(identifier), engine)
+		""", recursive=False))(PTTVerbatimLine(name), PTTVerbatimLine(identifier))
 
 	def f1():
-		body=typing.cast(Callable[[Engine], TTPBlock], Python_call_TeX_local(
+		body=typing.cast(Callable[[], TTPBlock], Python_call_TeX_local(
 			r"""
 			\cs_new_protected:Npn %name% {
 				\saveenvreinsert \__tmp {
@@ -1007,15 +1007,15 @@ def newenvironment_verb(name: str, f: Callable[[str], None], engine: Engine)->No
 					\pythonimmediatelisten
 				}
 			}
-			""", recursive=False))(engine)
+			""", recursive=False))()
 		f(body)
 
 	_code=define_TeX_call_Python(
-			lambda engine: run_code_redirect_print_TeX(f1, engine=engine),
+			lambda: run_code_redirect_print_TeX(f1),
 			f"(verb environment: {name})", argtypes=[], identifier=identifier)
 
 @_export
-def fully_expand(content: str, engine: Engine=  default_engine)->str:
+def fully_expand(content: str)->str:
 	r"""
 	Expand all macros in the given string.
 
@@ -1061,13 +1061,13 @@ def fully_expand(content: str, engine: Engine=  default_engine)->str:
 
 	For macros such as ``\uppercase{...}``, there's no simple workaround. Reimplement it yourself (such as with ``.upper()`` in Python).
 	"""
-	return typing.cast(Callable[[PTTTeXLine, Engine], TTPEmbeddedLine], Python_call_TeX_local(
+	return typing.cast(Callable[[PTTTeXLine], TTPEmbeddedLine], Python_call_TeX_local(
 		r"""
 		\cs_new_protected:Npn %name% {
 			%read_arg0(\__content)%
 			\exp_args:Nx \pythonimmediatecontinue { \__content }
 		}
-		"""))(PTTTeXLine(content), engine)
+		"""))(PTTTeXLine(content))
 
 @_export
 def is_balanced(content: str)->bool:
@@ -1324,13 +1324,6 @@ f1.default_escape="`"  # type: ignore
 
 @dataclass
 class VarManager:
-	engine: Engine
-
-	def __call__(self, engine: Engine)->VarManager:
-		"""
-		Shorthand to bind to another engine.
-		"""
-		return VarManager(engine)
 
 	def __getitem__(self, key: str)->str:
 		"""
@@ -1339,8 +1332,8 @@ class VarManager:
 		_check_name(key)
 		return _replace_double_hash(
 				BalancedTokenList([ControlSequenceToken(key)])
-				.expand_o(engine=self.engine)
-				.detokenize(engine=self.engine)
+				.expand_o()
+				.detokenize()
 				)
 
 	def __setitem__(self, key: str, val: str)->None:
@@ -1348,7 +1341,7 @@ class VarManager:
 		Set the value of a variable.
 		"""
 		_check_name(key)
-		return typing.cast(Callable[[PTTVerbatimLine, PTTTeXLine, Engine], None], Python_call_TeX_local(
+		return typing.cast(Callable[[PTTVerbatimLine, PTTTeXLine], None], Python_call_TeX_local(
 			r"""
 			\cs_new_protected:Npn %name% {
 				%read_arg0(\__line)%
@@ -1357,7 +1350,7 @@ class VarManager:
 				%optional_sync%
 				\pythonimmediatelisten
 			}
-			""", recursive=False, sync=None))(PTTVerbatimLine(key), PTTTeXLine(val), self.engine)
+			""", recursive=False, sync=None))(PTTVerbatimLine(key), PTTTeXLine(val))
 
 _escape_str_translation=str.maketrans({
 	"&": r"\&",
@@ -1408,7 +1401,7 @@ def escape_str(s: str)->str:
 	"""
 	return s.translate(_escape_str_translation)
 
-var=VarManager(default_engine)
+var=VarManager()
 r"""
 Get and set value of "variables" in [TeX].
 
@@ -1417,7 +1410,7 @@ Can be used like this::
 	var["myvar"]="myvalue"  # "equivalent" to \def\myvar{myvalue}
 	var["myvar"]=r"\textbf{123}"  # "equivalent" to \def\myvar{\textbf{123}}
 	var["myvar"]=r"\def\test#1{#1}"  # "equivalent" to \tl_set:Nn \myvar {\def\test#1{#1}}  (note that `#` doesn't need to be doubled here unlike in `\def`)
-	var(engine)["myvar"]="myvalue"  # pass explicit engine
+	var()["myvar"]="myvalue"  # pass explicit engine
 
 	# after ``\def\myvar{myvalue}`` (or ``\edef``, etc.) on TeX you can do:
 	print(var["myvar"])  # get the value of the variable, return a string

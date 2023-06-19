@@ -282,7 +282,7 @@ class DefaultEngine(Engine, threading.local):
 
 	Usage example::
 
-		default_engine.set_engine(engine)
+		default_engine.set_engine(engine)  # set only for this thread
 		execute("hello world")  # this is executed on engine=engine
 
 	.. seealso::
@@ -290,7 +290,7 @@ class DefaultEngine(Engine, threading.local):
 	"""
 
 	def __init__(self)->None:
-		super().__init__()
+		#super().__init__()
 		self.engine: Optional[Engine]=None
 		"""
 		Stores the engine being set internally.
@@ -306,8 +306,8 @@ class DefaultEngine(Engine, threading.local):
 		Can also be used as a context manager to revert to the original engine.
 		Example::
 
-			with default_engine.set_engine(...):
-				pass  # do something
+			with default_engine.set_engine(...):  # only for this thread
+				execute("hello world")
 			# now the original engine is restored
 		"""
 		assert engine is not self
@@ -325,6 +325,19 @@ class DefaultEngine(Engine, threading.local):
 		if self.engine is None:
 			raise RuntimeError("Default engine not set for this thread!")
 		return self.engine
+
+	@property
+	def exited(self)->bool:
+		return self.get_engine().exited
+
+	# temporary hack ><
+	@property
+	def action_done(self)->bool:
+		return self.get_engine().action_done
+
+	@action_done.setter
+	def action_done(self, value: bool)->None:
+		self.get_engine().action_done=value
 
 	@property
 	def name(self)->EngineName:
@@ -441,10 +454,10 @@ class ChildProcessEngine(Engine):
 		self._stdout_lock=threading.Lock()
 		self._stdout_thread.start()
 
-		from . import surround_delimiter, send_raw, substitute_private, get_bootstrap_code
-		send_raw(surround_delimiter(substitute_private(
+		from . import surround_delimiter, substitute_private, get_bootstrap_code
+		self.write(surround_delimiter(substitute_private(
 			get_bootstrap_code(self)
-			)), engine=self)
+			)).encode('u8'))
 
 	def __repr__(self)->str:
 		r"""
@@ -461,7 +474,7 @@ class ChildProcessEngine(Engine):
 			>>> e
 			ChildProcessEngine('luatex')
 			>>> from pythonimmediate import BalancedTokenList
-			>>> BalancedTokenList(r"\undefined").expand_x(engine=e)
+			>>> with default_engine.set_engine(e): BalancedTokenList(r"\undefined").expand_x()
 			Traceback (most recent call last):
 				...
 			RuntimeError: TeX error!
@@ -537,7 +550,8 @@ class ChildProcessEngine(Engine):
 		if not process.poll():
 			# process has not terminated (it's possible for process to already terminate if it's killed on error)
 			from . import run_none_finish
-			run_none_finish(self)
+			with default_engine.set_engine(self):
+				run_none_finish()
 			process.wait()
 		assert process.stdin is not None
 		assert process.stderr is not None

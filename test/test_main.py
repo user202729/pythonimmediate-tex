@@ -28,7 +28,13 @@ class Test:
 		with default_engine.set_engine(engine):
 			s='Æ²×⁴ℝ𝕏'
 			pythonimmediate.simple.execute(r'\edef\testa{\detokenize{' + s + '}}')
-			assert BalancedTokenList([T.testa]).expand_o().str(engine=engine) == s
+			assert BalancedTokenList([T.testa]).expand_o().str() == s
+
+			assert BalancedTokenList([T.testa]).expand_o().str() == s
+
+			s = '456'
+			pythonimmediate.simple.execute(r'\edef\testa{\detokenize{' + s + '}}')
+			assert BalancedTokenList([T.testa]).expand_o().str() == s
 
 			TokenList([T["def"], T.testa, TokenList.doc("123")]).execute()
 			assert TokenList([T.testa]).expand_x().str_if_unicode() == "123"
@@ -39,9 +45,9 @@ class Test:
 			TokenList([T["def"], T.testa, TokenList.doc("789")]).execute()
 
 		with ChildProcessEngine("pdftex") as new_engine:
-			TokenList([T["def"], T.testa, TokenList.doc("456")]).execute(engine=new_engine)
-			assert TokenList([T.testa]).expand_x(engine=engine).str_if_unicode() == "123"
-			assert TokenList([T.testa]).expand_x(engine=new_engine).str_if_unicode() == "456"
+			with default_engine.set_engine(new_engine): TokenList([T["def"], T.testa, TokenList.doc("456")]).execute()
+			with default_engine.set_engine(engine): assert TokenList([T.testa]).expand_x().str_if_unicode() == "123"
+			with default_engine.set_engine(new_engine): assert TokenList([T.testa]).expand_x().str_if_unicode() == "456"
 
 	@pytest.mark.parametrize("engine_name", engine_names)
 	def test_child_process_engine_error(self, engine_name: EngineName)->None:

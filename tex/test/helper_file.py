@@ -58,7 +58,7 @@ class Test(unittest.TestCase):
 		pythonimmediate.put_next(r'\expandafter{\detokenize{' + s + '}}')
 		pythonimmediate.expand_once()
 		t=BalancedTokenList.get_next()
-		assert t.str(engine=default_engine)==s
+		assert t.str()==s
 
 	def test_csname_unicode(self)->None:
 		s='Æ²×⁴ℝ𝕏'

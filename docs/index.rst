@@ -21,13 +21,14 @@ There are different sections of the documentation:
 
   Note that this should be read in conjunction with the ``pythonimmediate`` TeX package documentation.
 
-- Some properties of the parent TeX interpreter can be accessed from :const:`~pythonimmediate.engine.default_engine`.
+- Some properties of the parent TeX engine (e.g. whether Unicode is supported)
+  can be accessed from :const:`~pythonimmediate.engine.default_engine`.
 
 - The rest: contain functions that controls TeX in a more "low-level" way.
   Start with reading the module documentation :mod:`pythonimmediate`.
 
 - See the documentation of :class:`pythonimmediate.engine.ChildProcessEngine` for ways to create a TeX engine from inside Python,
-  and explanation of the ``engine=`` optional argument for most functions.
+  and see :const:`~pythonimmediate.engine.default_engine` for how to set which engine functions are run on.
 
 - The command-line arguments that the Python component accepts
   (can be specified through the ``args=`` TeX module option)
