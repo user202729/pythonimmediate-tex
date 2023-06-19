@@ -258,14 +258,18 @@ class ParentProcessEngine(Engine):
 
 
 @dataclass
-class SetDefaultEngineContextManager:
+class _SetDefaultEngineContextManager:
 	"""
 	Context manager, used in conjunction with default_engine.set_engine(...) to revert to the original engine.
 	"""
 	old_engine: Optional[Engine]
+	new_engine: Optional[Engine]
+	entered: bool=False
 
-	def __enter__(self)->None:
-		pass
+	def __enter__(self)->Optional[Engine]:
+		assert not self.entered, "This context manager is not re-entrant!"
+		self.entered=True
+		return self.new_engine
 
 	def __exit__(self, exc_type, exc_val, exc_tb)->None:
 		default_engine.set_engine(self.old_engine)
@@ -299,19 +303,20 @@ class DefaultEngine(Engine, threading.local):
 		like the engine inside.
 		"""
 
-	def set_engine(self, engine: Optional[Engine])->SetDefaultEngineContextManager:
+	def set_engine(self, engine: Optional[Engine])->_SetDefaultEngineContextManager:
 		"""
 		Set the default engine to another engine.
 
 		Can also be used as a context manager to revert to the original engine.
 		Example::
 
-			with default_engine.set_engine(...):  # only for this thread
+			with default_engine.set_engine(new_engine) as engine:  # only for this thread
+				assert engine is new_engine
 				execute("hello world")
 			# now the original engine is restored
 		"""
 		assert engine is not self
-		result=SetDefaultEngineContextManager(self.engine)
+		result=_SetDefaultEngineContextManager(old_engine=self.engine, new_engine=engine)
 		self.engine=engine
 		return result
 

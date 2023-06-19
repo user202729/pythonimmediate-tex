@@ -34,8 +34,6 @@ def main()->None:
 			sys.stderr.write("\n")
 			traceback.print_exc(file=sys.stderr)
 
-			engine.action_done=False  # force run it
-
 			full_error = "".join(traceback.format_exc())  # to be printed on TeX's log file
 
 			# the short_error will be printed on the terminal, so make sure it's not too long.
