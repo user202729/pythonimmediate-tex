@@ -62,11 +62,34 @@ This is a table of [TeX] primitives, and their Python wrapper:
 	* - Get delimited argument
 	  - :meth:`BalancedTokenList.get_until`, :meth:`BalancedTokenList.get_until_brace`
 	* - ``\catcode``
-	  - :func:`catcode`
+	  - :const:`catcode`
+	* - ``\count``
+	  - :const:`count`
+	* - ``\Umathcode``
+	  - :const:`umathcode`
 	* - ``\detokenize``
 	  - :meth:`BalancedTokenList.detokenize`
 	* - ``\begingroup``, ``\endgroup``
 	  - :const:`group`
+
+In order to get a "value" stored in a "variable"
+(using expl3 terminology, this has various meanings e.g. a ``\countdef`` token, or a typical macro storing a token list),
+use a property on the token object itself:
+
+* :meth:`Token.int`,
+* :meth:`Token.tl`,
+* :meth:`Token.str`,
+* :meth:`Token.bool`,
+* etc.
+
+A token list can be:
+
+* interpreted as a string (provide it is already a string) using :meth:`TokenList.str`,
+* converted from a Python string (opposite of the operation above) using :meth:`TokenList.fstr`,
+* interpreted as an integer using :meth:`TokenList.int`,
+* detokenized using :meth:`BalancedTokenList.detokenize`,
+* expanded with :meth:`BalancedTokenList.expand_x` or :meth:`BalancedTokenList.expand_o`,
+* etc.
 
 Some debug functionalities are provided and can be specified on the command-line, refer to :mod:`~pythonimmediate.pytotex` documentation.
 
@@ -661,11 +684,6 @@ class Token(NToken):
 			}
 			""" , sync=True))(PTTBalancedTokenList(BalancedTokenList([self])))
 
-	def set_val(self, content: "BalancedTokenList", global_: bool=False)->None:
-		"""
-		Given ``self`` is an expl3 ``tl``-variable, assign *content* to it locally.
-		"""
-		TokenList([T.xdef if global_ else T.edef, self, [T.unexpanded, content]]).execute()
 
 	def set_func(self, f: Callable[[], None], global_: bool=False)->str:
 		"""
@@ -678,39 +696,6 @@ class Token(NToken):
 			 r"\pythonimmediatecallhandler{"+identifier+r"}"
 			 r"}"]).execute()
 		return identifier
-
-	def val(self)->"BalancedTokenList":
-		"""
-		given ``self`` is a expl3 ``tl``-variable, return the content.
-		"""
-		return BalancedTokenList([self]).expand_o()
-
-	def val_str(self)->str:
-		"""
-		given ``self`` is a expl3 ``str``-variable, return the content.
-		"""
-		return self.val().str()
-
-	@typing.overload
-	def int(self, val: int)->None: ...
-	@typing.overload
-	def int(self)->int: ...
-
-	def int(self, val: Optional[int]=None)->Optional[int]:
-		r"""
-		Given ``self`` is a ``\countdef`` token, either set or get its value.
-		"""
-		if isinstance(val, int):
-			(BalancedTokenList([self])+BalancedTokenList.fstr('=' + str(val))).execute()
-			return None
-		else:
-			return BalancedTokenList([T.the, self]).expand_o().int()
-
-	def e3bool(self)->bool:
-		"""
-		given ``self`` is a expl3 ``bool``-variable, return the content.
-		"""
-		return bool(len(BalancedTokenList([r"\bool_if:NT", self, "1"]).expand_x()))
 
 	@property
 	def no_blue(self)->"Token": return self
@@ -807,13 +792,31 @@ class Token(NToken):
 			else:
 				assert d==-1
 				typing.cast(Callable[[PTTInt], None], Python_call_TeX_local(
-r"""
-\cs_new_protected:Npn %name% {
-	%read_arg0(\__index)%
-	\expandafter \expandafter \expandafter \pythonimmediatecontinuenoarg
-		\char_generate:nn {\__index} {2}
-}
-""", recursive=False, sync=True))(PTTInt(self.index))
+					r"""
+					\cs_new_protected:Npn %name% {
+						%read_arg0(\__index)%
+						\expandafter \expandafter \expandafter \pythonimmediatecontinuenoarg
+							\char_generate:nn {\__index} {2}
+					}
+					""", recursive=False, sync=True))(PTTInt(self.index))
+
+	def tl(self, content: Optional[BalancedTokenList]=None, *, global_: bool=False)->BalancedTokenList:
+		if content is not None:
+			TokenList([T.xdef if global_ else T.edef, self, [T.unexpanded, content]]).execute()
+			return content
+		return BalancedTokenList([self]).expand_o()
+
+	def str(self)->str:
+		return self.tl().str()
+
+	def int(self, val: Optional[int]=None)->int:
+		if val is not None:
+			(BalancedTokenList([self])+BalancedTokenList.fstr('=' + str(val))).execute()
+			return val
+		return BalancedTokenList([T.the, self]).expand_o().int()
+
+	def bool(self)->bool:
+		return bool(len(BalancedTokenList([r"\bool_if:NT", self, "1"]).expand_x()))
 
 
 

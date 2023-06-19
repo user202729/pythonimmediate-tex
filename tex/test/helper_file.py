@@ -8,7 +8,7 @@ T=ControlSequenceToken.make
 
 assert default_engine.name in ["pdftex", "xetex", "luatex"]
 
-assert default_engine.name==T.c_sys_engine_str.val_str()
+assert default_engine.name==T.c_sys_engine_str.str()
 
 is_unicode: bool=default_engine.is_unicode
 
@@ -423,7 +423,7 @@ class Test(unittest.TestCase):
 				T.empty.blue.meaning_str(),
 				[r"\relax", r"[unknown command code! (0, 1)]"])
 
-		Catcode.active("a").set_val(BalancedTokenList.doc("abc"))
+		Catcode.active("a").tl(BalancedTokenList.doc("abc"))
 
 		self.assertEqual(Catcode.active("a").meaning_str(), "macro:->abc")
 		self.assertIn(

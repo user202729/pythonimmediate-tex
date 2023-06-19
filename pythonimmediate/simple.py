@@ -902,7 +902,7 @@ def get_env_body_verb_approximate(envname: Optional[str]=None, engine: Engine=de
 		For advanced users:
 		Basically it takes the following content until ``\end{⟨value of \@currenvir⟩}``, as by the ``saveenv`` package.
 	"""
-	if envname is None: envname=T["@currenvir"].val().detokenize()
+	if envname is None: envname=T["@currenvir"].tl().detokenize()
 	assert envname is not None
 
 	with group:
@@ -921,15 +921,15 @@ def get_env_body_verb_approximate(envname: Optional[str]=None, engine: Engine=de
 			if T.inputlineno.int()==lineno:
 				raise RuntimeError("Content is already tokenized! (current endlinechar is -1)")
 			result.append(token)
-		result+=BalancedTokenList.get_until(BalancedTokenList.fstr(r'\end{' + T["@currenvir"].val().detokenize() + "}\n"))
-		BalancedTokenList([r'\end{', *T["@currenvir"].val(), '}']).put_next()
+		result+=BalancedTokenList.get_until(BalancedTokenList.fstr(r'\end{' + T["@currenvir"].tl().detokenize() + "}\n"))
+		BalancedTokenList([r'\end{', *T["@currenvir"].tl(), '}']).put_next()
 		code=result.detokenize()
 
 		filename: str
 		if T.currfileabspath.defined():
-			filename=T.currfileabspath.val().str()
+			filename=T.currfileabspath.str()
 		elif T.currfilename.defined():
-			filename=T.currfilename.val().str()
+			filename=T.currfilename.str()
 		else:
 			filename="??"
 
