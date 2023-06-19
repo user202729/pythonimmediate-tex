@@ -53,7 +53,7 @@ This is a table of [TeX] primitives, and their Python wrapper:
 	* - ``\futurelet``
 	  - :meth:`Token.set_future`, :meth:`Token.set_future2`
 	* - ``\def``
-	  - :meth:`Token.set_val` (no parameter),
+	  - :meth:`Token.tl` (no parameter),
 	    :meth:`Token.set_func` (define function to do some task)
 	* - ``\edef``
 	  - :meth:`BalancedTokenList.expand_x`
@@ -64,7 +64,7 @@ This is a table of [TeX] primitives, and their Python wrapper:
 	* - ``\catcode``
 	  - :const:`catcode`
 	* - ``\count``
-	  - :const:`count`
+	  - :const:`count`, :meth:`Token.int`
 	* - ``\Umathcode``
 	  - :const:`umathcode`
 	* - ``\detokenize``
@@ -76,9 +76,9 @@ In order to get a "value" stored in a "variable"
 (using expl3 terminology, this has various meanings e.g. a ``\countdef`` token, or a typical macro storing a token list),
 use a property on the token object itself:
 
-* :meth:`Token.int`,
-* :meth:`Token.tl`,
-* :meth:`Token.str`,
+* :meth:`Token.int` for ``\int_use:N \int_set:Nn``,
+* :meth:`Token.tl` for ``\tl_use:N \tl_set:Nn``,
+* :meth:`Token.str` for ``\str_use:N \str_set:Nn``,
 * :meth:`Token.bool`,
 * etc.
 

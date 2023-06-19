@@ -1,6 +1,7 @@
 \ProvidesExplPackage{pythonimmediate}{2023/03/07}{0.4.0}{Library to run Python code}
 
 \RequirePackage{saveenv}
+\PassOptionsToPackage{abspath}{currfile}  % try to enable abspath if possible (i.e. if package isn't loaded) but otherwise don't give option-clash error
 \RequirePackage{currfile}
 \RequirePackage{l3keys2e}
 \RequirePackage{precattl}
