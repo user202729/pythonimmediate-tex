@@ -2516,7 +2516,8 @@ def run_code_redirect_print_TeX(f: Callable[[], Any])->None:
 		if content.endswith("\n"):
 			content=content[:-1]
 		elif not content:
-			run_none_finish()
+			if engine.status!=EngineStatus.running:
+				run_none_finish()
 			return
 		else:
 			#content+=r"\empty"  # this works too
@@ -2848,7 +2849,7 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 		assert len(args)==len(ptt_argtypes), f"passed in {len(args)} = {args}, expect {len(ptt_argtypes)}"
 
 		# send function header
-		assert engine.status==EngineStatus.waiting
+		assert engine.status==EngineStatus.waiting, engine.status
 
 		sending_content=(identifier+"\n").encode('u8')
 
