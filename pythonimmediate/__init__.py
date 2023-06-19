@@ -106,7 +106,7 @@ debug=lambda *args, **kwargs: None  # type: ignore
 
 
 expansion_only_can_call_Python=False  # normally. May be different in LuaTeX etc.
-from .engine import Engine, default_engine, default_engine as engine, ParentProcessEngine
+from .engine import Engine, default_engine, default_engine as engine, ParentProcessEngine, EngineStatus
 
 
 debugging: bool=True
@@ -367,22 +367,12 @@ def add_handler(f: Callable[[], None])->str:
 	"""
 	def g()->None:
 		# this is hopelessly complicated, will figure out later
-		old_action_done=engine.action_done
-		engine.action_done=False
-		try:
-			f()
-		except:
-			if engine.action_done:
-				# error occurred after 'finish' is called, cannot signal the error to TeX, will just ignore (after printing out the traceback)...
-				pass
-			else:
-				# TODO what should be done here? What if the error raised below is caught
-				engine.action_done=True
-			raise
-		finally:
-			if not engine.action_done:
-				run_none_finish()
-			engine.action_done=old_action_done
+		assert engine.status==EngineStatus.running
+		engine.status=EngineStatus.waiting
+		f()
+		if engine.status==EngineStatus.waiting:
+			run_none_finish()
+		assert engine.status==EngineStatus.running
 
 	return add_handler_async(g)
 
@@ -401,6 +391,7 @@ def remove_handler(identifier: str)->None:
 TeXToPyObjectType=Optional[str]
 
 def run_main_loop()->TeXToPyObjectType:
+	assert engine.status==EngineStatus.running
 	while True:
 		line=_readline()
 		if not line: return None
@@ -413,6 +404,7 @@ def run_main_loop()->TeXToPyObjectType:
 			raise RuntimeError("Internal error: unexpected line "+line)
 
 def run_main_loop_get_return_one()->str:
+	assert engine.status==EngineStatus.running
 	line=_readline()
 	assert line[0]=="r", line
 	return line[1:]
@@ -444,9 +436,9 @@ In other words, ``run_*_local(code)`` is almost identical to ``run_*_peek(code +
 """)
 
 def _run_block_finish(block: str)->None:
-	default_engine.check_not_finished()
-	default_engine.action_done=True
+	assert default_engine.status==EngineStatus.waiting
 	engine.write(("block\n" + surround_delimiter(block)).encode('u8'))
+	default_engine.status=EngineStatus.running
 
 
 def check_line(line: str, *, braces: bool, newline: bool, continue_: Optional[bool])->None:
@@ -469,7 +461,6 @@ This is the global namespace where codes in :func:`.py`, :func:`.pyc`, :func:`.p
 
 def _readline()->str:
 	line=engine.read().decode('u8')
-	debug("======== saw line", line)
 	return line
 
 block_delimiter: str="pythonimm?\"\"\"?'''?"
@@ -2377,25 +2368,15 @@ def define_TeX_call_Python(f: Callable[..., None], name: Optional[str]=None, arg
 		assert argtypes is not None
 		args=[argtype.read() for argtype in argtypes]
 
+		assert engine.status==EngineStatus.running  # this is the status just before the handler is called
+		engine.status=EngineStatus.waiting
 
-		old_action_done=engine.action_done
+		f(*args)
+		if engine.status==EngineStatus.waiting:
+			run_none_finish()
+			assert engine.status==EngineStatus.running, engine.status
 
-		engine.action_done=False
-		try:
-			f(*args)
-		except:
-			if engine.action_done:
-				# error occurred after 'finish' is called, cannot signal the error to TeX, will just ignore (after printing out the traceback)...
-				pass
-			else:
-				# TODO what should be done here? What if the error raised below is caught
-				engine.action_done=True
-			raise
-		finally:
-			if not engine.action_done:
-				run_none_finish()
-		
-			engine.action_done=old_action_done
+		assert engine.status==EngineStatus.running, engine.status
 
 	_handlers[identifier]=g
 
@@ -2828,9 +2809,7 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 		assert len(args)==len(ptt_argtypes), f"passed in {len(args)} = {args}, expect {len(ptt_argtypes)}"
 
 		# send function header
-		engine.check_not_finished()
-		if finish:
-			engine.action_done=True
+		assert engine.status==EngineStatus.waiting
 
 		sending_content=(identifier+"\n").encode('u8')
 
@@ -2841,23 +2820,33 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 
 		engine.write(sending_content)
 
-		if not sync: return None
 
-		# wait for the result
-		if recursive:
-			result_=run_main_loop()
-		else:
-			result_=run_main_loop_get_return_one()
+		if sync:
 
-		result: List[TeXToPyData]=[]
-		if TTPEmbeddedLine not in ttp_argtypes:
-			assert not result_
-		for argtype_ in ttp_argtypes:
-			if argtype_==TTPEmbeddedLine:
-				result.append(TTPEmbeddedLine(result_))
+			# wait for the result
+			engine.status=EngineStatus.running
+			if recursive:
+				result_=run_main_loop()
 			else:
-				result.append(argtype_.read())
-		return tuple(result)
+				result_=run_main_loop_get_return_one()
+			assert engine.status==EngineStatus.running
+
+			result: List[TeXToPyData]=[]
+			if TTPEmbeddedLine not in ttp_argtypes:
+				assert not result_
+			for argtype_ in ttp_argtypes:
+				if argtype_==TTPEmbeddedLine:
+					result.append(TTPEmbeddedLine(result_))
+				else:
+					result.append(argtype_.read())
+
+		if finish:
+			engine.status=EngineStatus.running
+		else:
+			engine.status=EngineStatus.waiting
+
+		if sync: return tuple(result)
+		else: return None
 
 	return wrap_naive_replace(TeX_code), f
 

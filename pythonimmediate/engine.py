@@ -9,6 +9,7 @@ import subprocess
 import threading
 from dataclasses import dataclass
 import atexit
+import enum
 
 from . import communicate
 from .communicate import GlobalConfiguration
@@ -49,22 +50,29 @@ assert len(engine_name_to_latex_executable)==len(engine_names)
 assert set(engine_name_to_latex_executable)==set(engine_names)
 
 
+class EngineStatus(enum.Enum):
+	"""
+	Represent the status of the engine. Helper functions are supposed to manage the status by itself.
+
+	* running: the engine is running [TeX] code and Python cannot write to it, only wait for Python commands.
+	* waiting: the engine is waiting for Python to write a handler.
+	* error: an error happened.
+	* exited: the engine exited cleanly.
+	"""
+	running=enum.auto()
+	waiting=enum.auto()
+	error  =enum.auto()
+	exited =enum.auto()
+
+
 class Engine(ABC):
 	_name: EngineName
 	_config: GlobalConfiguration
+	status: EngineStatus
 
 	def __init__(self):
-		self.action_done=False
-		self.exited=False  # once the engine exit, it can't be used anymore.
 		self._config=GlobalConfiguration()  # dummy value
-
-	# some helper functions for the communication protocol.
-	def check_not_finished(self)->None:
-		"""
-		Internal function.
-		"""
-		if self.action_done:
-			raise RuntimeError("can only do one action per block!")
+		self.status=EngineStatus.waiting
 
 	@property
 	def name(self)->EngineName:
@@ -87,25 +95,6 @@ class Engine(ABC):
 		"""
 		return engine_is_unicode[self.name]
 
-	def check_not_exited(self, message: str)->None:
-		"""
-		Internal function.
-		"""
-		if self.exited:
-			raise RuntimeError(message)
-
-	def check_not_exited_before(self)->None:
-		"""
-		Internal function.
-		"""
-		self.check_not_exited("TeX error already happened, cannot continue")
-
-	def check_not_exited_after(self)->None:
-		"""
-		Internal function.
-		"""
-		self.check_not_exited("TeX error!")
-
 	def read(self)->bytes:
 		"""
 		Internal function.
@@ -116,7 +105,8 @@ class Engine(ABC):
 
 		The returned line does not contain the newline character.
 		"""
-		self.check_not_exited_before()
+		if self.status==EngineStatus.error: raise RuntimeError("TeX error!")
+		assert self.status==EngineStatus.running, self.status
 		while True:
 			result=self._read()
 			if result.rstrip()!=b"pythonimmediate-naive-flush-line":
@@ -124,13 +114,13 @@ class Engine(ABC):
 			else:
 				# ignore this line
 				assert self.config.naive_flush
-		self.check_not_exited_after()
+		if self.status==EngineStatus.error: raise RuntimeError("TeX error!")
 		return result[:-1]
 
 	def write(self, s: bytes)->None:
-		self.check_not_exited_before()
+		if self.status==EngineStatus.error: raise RuntimeError("TeX error!")
+		assert self.status==EngineStatus.waiting, self.status
 		self._write(s)
-		self.check_not_exited_after()
 
 	@abstractmethod
 	def _read(self)->bytes:
@@ -159,9 +149,9 @@ def debug_possibly_shorten(line: str)->str:
 
 class ParentProcessEngine(Engine):
 	"""
-	Represent the engine if this process is started by the TeX's pythonimmediate library.
+	Represent the engine if this process is started by the [TeX]'s pythonimmediate library.
 
-	This should not be used directly. Only pythonimmediate.main module should use this.
+	This should not be instantiated directly. Only :func:`pythonimmediate.textopy.main` should instantiate this.
 	"""
 	_logged_communication: bytearray
 	def _log_communication(self, s: bytes)->None:
@@ -232,8 +222,12 @@ class ParentProcessEngine(Engine):
 			debug_log_communication = self.config.debug_log_communication
 			self._logged_communication = bytearray()
 			def write_communication_log()->None:
-				debug_log_communication.write_bytes(b"Communication log ['<': TeX to Python, '>': Python to TeX]:\n" + self._logged_communication)
+				debug_log_communication.write_bytes(b"Communication log ['>': TeX to Python - include i/r distinction, '<': Python to TeX]:\n" + self._logged_communication)
 			atexit.register(write_communication_log)
+
+		from . import surround_delimiter, substitute_private, get_bootstrap_code
+		self.write(surround_delimiter(substitute_private(get_bootstrap_code(self))).encode('u8'))
+		self.status=EngineStatus.running
 
 	def _read(self)->bytes:
 		while True:
@@ -243,7 +237,7 @@ class ParentProcessEngine(Engine):
 				continue
 			break
 
-		if not line: self.exited=True
+		if not line: self.status=EngineStatus.error
 		if self.config.debug_log_communication is not None and line:
 			assert line.endswith(b'\n') and line.count(b'\n')==1, line
 			self._log_communication(b">"+line)
@@ -331,18 +325,14 @@ class DefaultEngine(Engine, threading.local):
 			raise RuntimeError("Default engine not set for this thread!")
 		return self.engine
 
-	@property
-	def exited(self)->bool:
-		return self.get_engine().exited
-
 	# temporary hack ><
 	@property
-	def action_done(self)->bool:
-		return self.get_engine().action_done
+	def status(self)->EngineStatus:
+		return self.get_engine().status
 
-	@action_done.setter
-	def action_done(self, value: bool)->None:
-		self.get_engine().action_done=value
+	@status.setter
+	def status(self, value: EngineStatus)->None:
+		self.get_engine().status=value
 
 	@property
 	def name(self)->EngineName:

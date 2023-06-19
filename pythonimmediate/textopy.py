@@ -12,7 +12,7 @@ def main()->None:
 
 	The arguments are re-parsed here anyway to provide a "temporary" configuration for the engine to work with before getting the real configuration.
 	"""
-	from .engine import ParentProcessEngine
+	from .engine import ParentProcessEngine, EngineStatus
 	from . import PTTBlock, PTTVerbatimLine, run_error_finish, default_engine, surround_delimiter, substitute_private, get_bootstrap_code, run_main_loop
 	from .pytotex import parse_args
 	from .communicate import GlobalConfiguration, Communicator
@@ -24,7 +24,6 @@ def main()->None:
 
 	with default_engine.set_engine(engine):
 		try:
-			engine.write(surround_delimiter(substitute_private(get_bootstrap_code(engine))).encode('u8'))
 			run_main_loop()  # if this returns cleanly TeX has no error. Otherwise some readline() will reach eof and print out a stack trace
 			if engine.config.sanity_check_extra_line:
 				assert not engine._read(), "Internal error: TeX sends extra line"
@@ -54,7 +53,8 @@ def main()->None:
 					for wrapped_line in textwrap.wrap(paragraph, width=40)
 					)
 
-			run_error_finish(PTTBlock(full_error), PTTBlock(short_error))
+			if engine.status==EngineStatus.waiting:
+				run_error_finish(PTTBlock(full_error), PTTBlock(short_error))
 
 
 if __name__=="__main__":
