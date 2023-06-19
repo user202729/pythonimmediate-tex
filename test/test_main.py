@@ -23,26 +23,27 @@ for name in ["test_pythonimmediate.tex", "helper_file.py"]:
 class Test:
 	@pytest.mark.parametrize("engine_name", engine_names)
 	def test_child_process_engine(self, engine_name: EngineName)->None:
-		engine=ChildProcessEngine(engine_name)
+		with default_engine.set_engine(None):  # with the new fixture to automatically provide an engine for doctest we need to do this
+			engine=ChildProcessEngine(engine_name)
 
-		with default_engine.set_engine(engine):
-			s='Æ²×⁴ℝ𝕏'
-			pythonimmediate.simple.execute(r'\edef\testa{\detokenize{' + s + '}}')
-			assert BalancedTokenList([T.testa]).expand_o().str() == s
+			with default_engine.set_engine(engine):
+				s='Æ²×⁴ℝ𝕏'
+				pythonimmediate.simple.execute(r'\edef\testa{\detokenize{' + s + '}}')
+				assert BalancedTokenList([T.testa]).expand_o().str() == s
 
-			assert BalancedTokenList([T.testa]).expand_o().str() == s
+				assert BalancedTokenList([T.testa]).expand_o().str() == s
 
-			s = '456'
-			pythonimmediate.simple.execute(r'\edef\testa{\detokenize{' + s + '}}')
-			assert BalancedTokenList([T.testa]).expand_o().str() == s
+				s = '456'
+				pythonimmediate.simple.execute(r'\edef\testa{\detokenize{' + s + '}}')
+				assert BalancedTokenList([T.testa]).expand_o().str() == s
 
-			TokenList([T["def"], T.testa, TokenList.doc("123")]).execute()
-			assert TokenList([T.testa]).expand_x().str_if_unicode() == "123"
+				TokenList([T["def"], T.testa, TokenList.doc("123")]).execute()
+				assert TokenList([T.testa]).expand_x().str_if_unicode() == "123"
 
-		assert default_engine.engine is None
+			assert default_engine.engine is None
 
-		with pytest.raises(RuntimeError):
-			TokenList([T["def"], T.testa, TokenList.doc("789")]).execute()
+			with pytest.raises(RuntimeError):
+				TokenList([T["def"], T.testa, TokenList.doc("789")]).execute()
 
 		with ChildProcessEngine("pdftex") as new_engine:
 			with default_engine.set_engine(new_engine): TokenList([T["def"], T.testa, TokenList.doc("456")]).execute()

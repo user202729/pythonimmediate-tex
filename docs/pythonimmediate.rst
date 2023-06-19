@@ -9,61 +9,61 @@ pythonimmediate.communicate module
 
 .. automodule:: pythonimmediate.communicate
    :members:
-   :undoc-members:
    :show-inheritance:
+   :private-members:
 
 pythonimmediate.copy\_to\_stderr module
 ---------------------------------------
 
 .. automodule:: pythonimmediate.copy_to_stderr
    :members:
-   :undoc-members:
    :show-inheritance:
+   :private-members:
 
 pythonimmediate.engine module
 -----------------------------
 
 .. automodule:: pythonimmediate.engine
    :members:
-   :undoc-members:
    :show-inheritance:
+   :private-members:
 
 pythonimmediate.pytotex module
 ------------------------------
 
 .. automodule:: pythonimmediate.pytotex
    :members:
-   :undoc-members:
    :show-inheritance:
+   :private-members:
 
 pythonimmediate.simple module
 -----------------------------
 
 .. automodule:: pythonimmediate.simple
    :members:
-   :undoc-members:
    :show-inheritance:
+   :private-members:
 
 pythonimmediate.texcmds module
 ------------------------------
 
 .. automodule:: pythonimmediate.texcmds
    :members:
-   :undoc-members:
    :show-inheritance:
+   :private-members:
 
 pythonimmediate.textopy module
 ------------------------------
 
 .. automodule:: pythonimmediate.textopy
    :members:
-   :undoc-members:
    :show-inheritance:
+   :private-members:
 
 Module contents
 ---------------
 
 .. automodule:: pythonimmediate
    :members:
-   :undoc-members:
    :show-inheritance:
+   :private-members:

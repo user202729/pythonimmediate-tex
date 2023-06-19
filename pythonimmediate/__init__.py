@@ -801,21 +801,56 @@ class Token(NToken):
 					""", recursive=False, sync=True))(PTTInt(self.index))
 
 	def tl(self, content: Optional[BalancedTokenList]=None, *, global_: bool=False)->BalancedTokenList:
+		r"""
+		Manipulate an expl3 tl variable.
+
+		>>> BalancedTokenList(r'\tl_set:Nn \l_tmpa_tl {1{2}}').execute()
+		>>> T.l_tmpa_tl.tl()
+		<TTPBalancedTokenList: 1₁₂ {₁ 2₁₂ }₂>
+		>>> T.l_tmpa_tl.tl(BalancedTokenList('3+4'))
+		<BalancedTokenList: 3₁₂ +₁₂ 4₁₂>
+		>>> T.l_tmpa_tl.tl()
+		<TTPBalancedTokenList: 3₁₂ +₁₂ 4₁₂>
+
+		"""
 		if content is not None:
 			TokenList([T.xdef if global_ else T.edef, self, [T.unexpanded, content]]).execute()
 			return content
 		return BalancedTokenList([self]).expand_o()
 
 	def str(self)->str:
+		r"""
+		Manipulate an expl3 str variable.
+
+		>>> BalancedTokenList(r'\str_set:Nn \l_tmpa_str {a+b}').execute()
+		>>> T.l_tmpa_str.str()
+		'a+b'
+		"""
 		return self.tl().str()
 
 	def int(self, val: Optional[int]=None)->int:
+		r"""
+		Manipulate an expl3 int variable.
+
+		>>> BalancedTokenList(r'\int_set:Nn \l_tmpa_int {5+6}').execute()
+		>>> T.l_tmpa_int.int()
+		11
+		
+		.. seealso:: :data:`count`.
+		"""
 		if val is not None:
 			(BalancedTokenList([self])+BalancedTokenList.fstr('=' + str(val))).execute()
 			return val
 		return BalancedTokenList([T.the, self]).expand_o().int()
 
 	def bool(self)->bool:
+		r"""
+		Manipulate an expl3 bool variable.
+
+		>>> BalancedTokenList(r'\bool_set_true:N \l_tmpa_bool').execute()
+		>>> T.l_tmpa_bool.bool()
+		True
+		"""
 		return bool(len(BalancedTokenList([r"\bool_if:NT", self, "1"]).expand_x()))
 
 
@@ -1079,7 +1114,8 @@ class ControlSequenceToken(Token):
 	Some care is needed to construct control sequence tokens whose name contains Unicode characters,
 	as the exact token created depends on whether the engine is Unicode-based:
 
-		>>> ControlSequenceToken("×")
+		>>> with default_engine.set_engine(None):  # if there's no default_engine...
+		...     ControlSequenceToken("×")  # this will raise an error
 		Traceback (most recent call last):
 			...
 		AssertionError: Cannot construct a control sequence with non-ASCII characters without specifying is_unicode
@@ -2992,8 +3028,29 @@ def _get_charcode(x: str|int)->int:
 	assert len(x)==1
 	return ord(x)
 
+"""
+we need to put the docstring in the class instead of member
+because although Sphinx supports docstring after member
+https://stackoverflow.com/a/20230473
+pytest doctest doesn't
+https://github.com/pytest-dev/pytest/issues/6996
+"""
+
 
 class _GroupManager:
+	"""
+	Create a semi-simple group.
+
+	Use as ``group.begin()`` and ``group.end()``, or as a context manager::
+
+		>>> count[0]=5
+		>>> with group:
+		...     count[0]=6
+		...     count[0]
+		6
+		>>> count[0]
+		5
+	"""
 	def begin(self):
 		TokenList(r"\begingroup").execute()
 	def __enter__(self)->None:
@@ -3005,17 +3062,17 @@ class _GroupManager:
 
 group=_GroupManager()
 r"""
-Create a semi-simple group.
-
-Use as ``group.begin()`` and ``group.end()``, or as a context manager::
-
-	with group:
-		...
-
-Can be bound to an engine similar to :const:`catcode`.
+See :class:`_GroupManager`.
 """
 
 class _CatcodeManager:
+	"""
+	Python interface to manage the category code. Example usage::
+
+		>>> catcode[97]
+		<Catcode.letter: 11>
+		>>> catcode["a"] = Catcode.letter
+	"""
 	def __getitem__(self, x: str|int)->Catcode:
 		return Catcode.lookup(
 			BalancedTokenList([r"\the\catcode" + str(_get_charcode(x))]).expand_o().int()
@@ -3034,15 +3091,7 @@ class _CatcodeManager:
 
 catcode=_CatcodeManager()
 r"""
-Python interface to manage the category code. Example usage::
-
-	catcode["a"] = Catcode.letter
-	catcode[97] = Catcode.letter
-	assert catcode["a"] == Catcode.letter
-
-Similar to :const:`~pythonimmediate.simple.var`, you can also bind it to an engine other than :const:`~pythonimmediate.engine.default_engine`::
-
-	catcode()["a"] = Catcode.letter
+See :class:`_CatcodeManager`.
 """
 
 
@@ -3108,45 +3157,74 @@ Umathcode.active = Umathcode(family=1, cls=MathClass.ord, position=0)
 
 
 class _UmathcodeManager:
+	"""
+	For example::
+
+		>>> umathcode[0]
+		Traceback (most recent call last):
+			...
+		RuntimeError: umathcode is not available for non-Unicode engines!
+		>>> from pythonimmediate.engine import ChildProcessEngine
+		>>> with default_engine.set_engine(ChildProcessEngine("luatex")): umathcode["A"]
+		Umathcode(family=1, cls=<MathClass.variable_family: 7>, position=65 'A')
+	"""
+
+	def _ensure_unicode(self)->None:
+		if not engine.is_unicode: raise RuntimeError("umathcode is not available for non-Unicode engines!")
+
 	def __getitem__(self, x: str|int)->Umathcode:
-		assert engine.is_unicode
+		self._ensure_unicode()
 		return Umathcode.parse(
 			BalancedTokenList([r"\the\Umathcodenum" + str(_get_charcode(x))]).expand_o().int()
 			)
 
 	def __setitem__(self, x: str|int, code: Umathcode)->None:
-		assert engine.is_unicode
+		self._ensure_unicode()
 		BalancedTokenList([r"\Umathcodenum" + str(_get_charcode(x)) + "=" + str(code.value)]).execute(); return
 
 
 umathcode=_UmathcodeManager()
 r"""
 Similar to :const:`~pythonimmediate.catcode`.
+
+See :class:`_UmathcodeManager`.
 """
 
 
 class _CountManager:
+	r"""
+	Manipulate count registers. Interface is similar to :const:`~pythonimmediate.catcode`.
+
+	For example::
+
+		>>> count[5]=6  # equivalent to `\count5=6`
+		>>> count[5]
+		6
+		>>> count["endlinechar"]=10  # equivalent to `\endlinechar=10`
+		>>> T.endlinechar.int()  # can also be accessed this way
+		10
+
+	As shown in the last example, accessing named count registers can also be done through :meth:`Token.int`.
+
+	"""
 	def __getitem__(self, x: str|int)->int:
 		if isinstance(x, int):
 			return BalancedTokenList([r"\the\count" + str(_get_charcode(x))]).expand_o().int()
 		else:
 			assert isinstance(x, str)
-			return BalancedTokenList([T.the, T[x]]).expand_o().int()
+			return T[x].int()
 
 	def __setitem__(self, x: str|int, val: int)->None:
 		if isinstance(x, int):
 			BalancedTokenList([r"\count" + str(x) + "=" + str(val)]).execute()
 		else:
 			assert isinstance(x, str)
-			BalancedTokenList([T[x], "=" + str(val)]).execute()
+			T[x].int(val)
 
 
 count=_CountManager()
-r"""
-Manipulate count registers. Interface is similar to :const:`~pythonimmediate.catcode`.
-
-Manipulate count registers. For example ``count[5]=6`` is equivalent to [TeX]'s ``\count5=6``,
-or ``count["endlinechar"]=10`` is equivalent to [TeX]'s ``\endlinechar=10``.
+"""
+See :class:`_CountManager`.
 """
 
 # ========
