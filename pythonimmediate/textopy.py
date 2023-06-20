@@ -3,7 +3,7 @@ import traceback
 import os
 import sys
 import typing
-
+import atexit
 
 def main()->None:
 	"""
@@ -13,20 +13,28 @@ def main()->None:
 	The arguments are re-parsed here anyway to provide a "temporary" configuration for the engine to work with before getting the real configuration.
 	"""
 	from .engine import ParentProcessEngine, EngineStatus
-	from . import PTTBlock, PTTVerbatimLine, run_error_finish, default_engine, surround_delimiter, substitute_private, get_bootstrap_code, run_main_loop
+	from . import PTTBlock, PTTVerbatimLine, run_error_finish, default_engine, surround_delimiter, substitute_private, get_bootstrap_code, run_main_loop, run_none_finish
 	from .pytotex import parse_args
 	from .communicate import GlobalConfiguration, Communicator
 
 	args=parse_args()
 	pseudo_config=GlobalConfiguration.from_args(args, typing.cast(Communicator, None))
 
+	def atexit_callback()->None:
+		if engine.status==EngineStatus.running:
+			engine.status=EngineStatus.waiting
+			with default_engine.set_engine(engine):
+				run_none_finish()  # correspond to the final \pythonimmediatelisten in \AtEndDocument
+
+			if engine.config.sanity_check_extra_line:
+				assert not engine._read(), "Internal error: TeX sends extra line"
+	atexit.register(atexit_callback)
+
 	engine=ParentProcessEngine(pseudo_config)
 
 	with default_engine.set_engine(engine):
 		try:
 			run_main_loop()  # if this returns cleanly TeX has no error. Otherwise some readline() will reach eof and print out a stack trace
-			if engine.config.sanity_check_extra_line:
-				assert not engine._read(), "Internal error: TeX sends extra line"
 
 		except:
 			# see also documentation of run_error_finish.

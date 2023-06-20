@@ -313,6 +313,7 @@ r"""
 
 \AtEndDocument{
 	\__send_content:e {r %naive_inline%}
+	\pythonimmediatelisten
 	\__close_write:
 }
 """)
