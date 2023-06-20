@@ -6,7 +6,7 @@ import re
 import pytest
 
 import pythonimmediate
-from pythonimmediate.engine import ChildProcessEngine, default_engine, engine_names, engine_name_to_latex_executable, EngineName
+from pythonimmediate.engine import ChildProcessEngine, default_engine, engine_names, engine_name_to_latex_executable, EngineName, EngineStatus
 from pythonimmediate import TokenList, ControlSequenceToken, BalancedTokenList
 from pythonimmediate import Catcode as C
 
@@ -58,14 +58,14 @@ class Test:
 		with default_engine.set_engine(engine):
 			with pytest.raises(RuntimeError):
 				BalancedTokenList([C.other(10)]).execute()
-			assert engine.error_happened
+			assert engine.status==EngineStatus.error
 
 	def test_child_process_engine_lua_error(self)->None:
 		engine=ChildProcessEngine("luatex")
 		with default_engine.set_engine(engine):
 			with pytest.raises(RuntimeError):
 				BalancedTokenList(r"\directlua{?}").expand_x()
-			assert engine.error_happened
+			assert engine.status==EngineStatus.error
 
 	@pytest.mark.parametrize("engine_name", engine_names)
 	@pytest.mark.parametrize("communication_method", ["unnamed-pipe", "multiprocessing-network"])

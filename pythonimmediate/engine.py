@@ -366,7 +366,7 @@ For Python running inside a [TeX] process, useful attributes are :attr:`~Engine.
 
 
 
-class TeXProcessError(Exception): pass
+class TeXProcessError(RuntimeError): pass
 
 class ChildProcessEngine(Engine):
 	r"""
@@ -502,6 +502,7 @@ class ChildProcessEngine(Engine):
 
 	def _stdout_thread_func(self)->None:
 		assert self.process is not None
+		assert self.process.stdin is not None
 		assert self.process.stdout is not None
 		while True:
 			line: bytes=self.process.stdout.read1()  # type: ignore
@@ -518,6 +519,7 @@ class ChildProcessEngine(Engine):
 					self._stdout_buffer=parts[-1]
 					if b'!  ==> Fatal error occurred, no output PDF file produced!' in parts[:-1]:
 						self.status=EngineStatus.error
+						self.process.wait()
 
 				# check potential error
 				if self._stdout_buffer == b"? " and self._error_marker_line_seen:
@@ -600,6 +602,9 @@ class ChildProcessEngine(Engine):
 		"""
 		# this might be called from :meth:`__del__` so do not import anything here
 		process=self.get_process()
+		if self.status==EngineStatus.error:
+			# only _stdout_thread can possibly set status to error, so we just need to wait for _stdout_thread
+			self._stdout_thread.join()
 		if not process.poll():
 			# process has not terminated (it's possible for process to already terminate if it's killed on error)
 			from . import run_none_finish
