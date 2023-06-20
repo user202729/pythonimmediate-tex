@@ -5,6 +5,7 @@ Abstract engine class.
 from typing import Optional, Literal, Iterable, List, Dict, Tuple
 from abc import ABC, abstractmethod
 import sys
+import os
 import subprocess
 import threading
 from dataclasses import dataclass
@@ -174,7 +175,6 @@ class ParentProcessEngine(Engine):
 		self.input_file=sys.stdin.buffer
 
 		if pseudo_config.debug_force_buffered:
-			import os
 			r, w=os.pipe()
 			self.input_file=os.fdopen(r, "rb")
 
@@ -220,8 +220,9 @@ class ParentProcessEngine(Engine):
 		# avoid user mistakenly read
 
 		if self.config.debug_log_communication is not None:
-			print(f"[All communications will be logged to {self.config.debug_log_communication}]", flush=True)
-			debug_log_communication = self.config.debug_log_communication
+			from string import Template
+			debug_log_communication = Path(Template(self.config.debug_log_communication).safe_substitute(pid=os.getpid()))
+			print(f"[All communications will be logged to {debug_log_communication}]", flush=True)
 			self._logged_communication = bytearray()
 			def write_communication_log()->None:
 				debug_log_communication.write_bytes(b"Communication log ['>': TeX to Python - include i/r distinction, '<': Python to TeX]:\n" + self._logged_communication)
@@ -591,11 +592,15 @@ class ChildProcessEngine(Engine):
 			...
 		pythonimmediate.engine.TeXProcessError: a.lua:1: hello
 
-		>>> with ChildProcessEngine("pdftex") as engine, default_engine.set_engine(engine):
-		...		execute(r'\loop\begingroup\iftrue\repeat')
+		>>> execute(r'\loop\begingroup\iftrue\repeat')
 		Traceback (most recent call last):
 			...
 		pythonimmediate.engine.TeXProcessError: TeX capacity exceeded, sorry [grouping levels=255].
+
+		>>> execute(r'a')
+		Traceback (most recent call last):
+			...
+		pythonimmediate.engine.TeXProcessError: LaTeX Error: Missing \begin{document}.
 		"""
 		if self.status==EngineStatus.error:
 			log_lines=(self.directory/"texput.log").read_bytes().splitlines()
@@ -631,7 +636,6 @@ class ChildProcessEngine(Engine):
 		process=self.get_process()
 		assert process.stdin is not None
 		self._check_no_error()
-		#print("writing", s)
 		process.stdin.write(s)
 		process.stdin.flush()
 
@@ -646,6 +650,7 @@ class ChildProcessEngine(Engine):
 		if self.status==EngineStatus.error:
 			# only _stdout_thread can possibly set status to error, so we just need to wait for _stdout_thread
 			self._stdout_thread.join()
+		self.status=EngineStatus.exited
 		if not process.poll():
 			# process has not terminated (it's possible for process to already terminate if it's killed on error)
 			from . import run_none_finish

@@ -9,6 +9,8 @@ will be appended to the command-line arguments. For example you could invoke [Te
 ``pythonimmediatedebugextraargs='--debug-log-communication=/tmp/a.diff --debug=5' pdflatex test.tex``
 to enable debugging facilities.
 
+Side note ``--debug-log-communication`` also accept a ``$pid`` placeholder.
+
 Supported command-line arguments:
 
 .. argparse::
@@ -46,10 +48,11 @@ def get_parser()->argparse.ArgumentParser:
 					 "Should never be necessary unless the package is buggy. "
 					 "Might not work on Windows/MikTeX.")
 	parser.add_argument("--no-sanity-check-extra-line", dest="sanity_check_extra_line", action="store_false")
-	parser.add_argument("--debug-log-communication", type=Path, default=None,
+	parser.add_argument("--debug-log-communication", type=str, default=None,
 					 help="Debug mode, log all communications. Pass the output path. "
 					 "For example you may want to specify ``--debug-log-communication=/tmp/a.diff`` to log all communication to ``a.diff`` file "
-					 "(because the lines are prefixed with ``<`` and ``>``, diff syntax highlighting works nicely with it)")
+					 "(because the lines are prefixed with ``<`` and ``>``, diff syntax highlighting works nicely with it). "
+					 "Placeholder ``$pid`` is supported.")
 	parser.add_argument("--debug-force-buffered", action="store_true",
 					 help="""Debug mode, simulate [TeX] writes being 4096-byte buffered. Don't use.
 

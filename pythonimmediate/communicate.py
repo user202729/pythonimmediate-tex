@@ -149,7 +149,7 @@ class GlobalConfiguration:
 	communicator: Communicator=typing.cast(Communicator, None)
 	sanity_check_extra_line: bool=False
 	debug_force_buffered: bool=False
-	debug_log_communication: Optional[Path]=None
+	debug_log_communication: Optional[str]=None
 	naive_flush: bool=False
 
 	def __post_init__(self)->None:

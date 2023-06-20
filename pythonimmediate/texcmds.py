@@ -38,7 +38,7 @@ def py(code: TTPEBlock)->None:
 	from . import _run_block_finish
 	_run_block_finish(str(eval_with_linecache(
 		code.lstrip(),
-		user_scope))+"%")
+		get_user_scope()))+"%")
 	# note we use code.lstrip() here because otherwise
 	# \py{
 	# 1+1}
@@ -53,7 +53,7 @@ def pyfile(filepath: TTPELine)->None:
 	"""
 	with open(filepath, "r") as f:
 		source=f.read()
-	run_code_redirect_print_TeX(lambda: exec(compile(source, filepath, "exec"), user_scope))
+	run_code_redirect_print_TeX(lambda: exec(compile(source, filepath, "exec"), get_user_scope()))
 
 @define_internal_handler
 def pyfilekpse(filename: TTPELine)->None:
@@ -69,7 +69,7 @@ def pyfilekpse(filename: TTPELine)->None:
 	filepath=subprocess.run(["kpsewhich", str(filename)], stdout=subprocess.PIPE, check=True).stdout.decode('u8').rstrip("\n")
 	with open(filepath, "r") as f:
 		source=f.read()
-	run_code_redirect_print_TeX(lambda: exec(compile(source, filepath, "exec"), {"__file__": filepath, "user_scope": user_scope}))
+	run_code_redirect_print_TeX(lambda: exec(compile(source, filepath, "exec"), {"__file__": filepath, "user_scope": get_user_scope()}))
 
 # ======== implementation of ``pycode`` environment
 mark_bootstrap(
@@ -148,9 +148,9 @@ def pycode(code: TTPBlock, lineno_: TTPLine, filename: TTPLine, fileabspath: TTP
 		code_="\n"*(lineno-len(code_lines)-1)+code_
 		if target_filename:
 			compiled_code=compile(code_, target_filename, "exec")
-			exec(compiled_code, user_scope)
+			exec(compiled_code, get_user_scope())
 		else:
-			exec(code_, user_scope)
+			exec(code_, get_user_scope())
 	run_code_redirect_print_TeX(tmp)
 	
 bootstrap_code_functions.append(define_TeX_call_Python(pycode, name="__pycodex"))
@@ -166,7 +166,7 @@ def pyc(code: TTPEBlock)->None:
 	Nevertheless, for long code :meth:`
 	Use :meth:`pyc` instead.
 	"""
-	run_code_redirect_print_TeX(lambda: exec_with_linecache(code, user_scope))
+	run_code_redirect_print_TeX(lambda: exec_with_linecache(code, get_user_scope()))
 
 @define_internal_handler
 def pycq(code: TTPEBlock)->None:
@@ -174,7 +174,7 @@ def pycq(code: TTPEBlock)->None:
 	Similar to :meth:`pyc`, however any output by :meth:`print_TeX` is suppressed.
 	"""
 	with RedirectPrintTeX(None):
-		exec_with_linecache(code, user_scope)
+		exec_with_linecache(code, get_user_scope())
 	run_none_finish()
 
 mark_bootstrap(

@@ -112,6 +112,7 @@ import signal
 import traceback
 import re
 import collections
+from collections import defaultdict
 import enum
 
 T1 = typing.TypeVar("T1")
@@ -321,8 +322,9 @@ r"""
 # ========
 
 _handlers: Dict[str, Callable[[], None]]={}
+_per_engine_handlers: Dict[Engine, Dict[str, Callable[[], None]]]=defaultdict(dict)
 
-def add_handler_async(f: Callable[[], None])->str:
+def add_handler_async(f: Callable[[], None], *, all_engines: bool=False)->str:
 	r"""
 	Similar to :func:`add_handler`, however, the function has these additional restrictions:
 
@@ -353,31 +355,45 @@ def add_handler_async(f: Callable[[], None])->str:
 	"""
 	identifier=get_random_Python_identifier()
 	assert identifier not in _handlers
-	_handlers[identifier]=f
+	if all_engines:
+		_handlers[identifier]=f
+	else:
+		e=default_engine.get_engine()
+		assert identifier not in _per_engine_handlers[e]
+		_per_engine_handlers[e][identifier]=f
 	return identifier
 
-def add_handler(f: Callable[[], None])->str:
+def add_handler(f: Callable[[], None], *, all_engines: bool=False)->str:
 	r"""
 	This function provides the facility to efficiently call Python code from [TeX]
 	and without polluting the global namespace.
 
-	First, note that with :func:`.pyc` you can do the following, where ``myfunction`` is in the global
-	:const:`user_scope`::
+	First, note that with :func:`.pyc` you can do the following:
 
-		def myfunction():
-			print(1)
-		execute(r"\def \test {\py{myfunction()}}")
+		>>> a=get_user_scope()["a"]=[]
+		>>> execute(r"\def\test{\pyc{a.append(1)}}")
 
-	However, this pollutes the global namespace as well as having to parse the string
-	``myfunction()`` into Python code every time it's called.
+	Then every time ``\test`` is executed on [TeX] side the corresponding Python code will be executed:
+
+		>>> a
+		[]
+		>>> execute(r"\test")
+		>>> a
+		[1]
+
+	However, this pollutes the Python global namespace as well as having to parse the string
+	``a.append(1)`` into Python code every time it's called.
 
 	With this function, you can do the following::
 
-		def myfunction():
-			print(1)
-			execute("hello world")  # it's possible to execute TeX code here
-		identifier = add_handler(myfunction)
-		execute(r"\def\test{\pythonimmediatecallhandler{" + identifier + r"}}")
+		>>> def myfunction(): execute(r"\advance\count0 by 1 ")  # it's possible to execute TeX code here
+		>>> identifier = add_handler(myfunction)
+		>>> execute(r"\def\test{\pythonimmediatecallhandler{" + identifier + r"}}")
+
+		>>> count[0]=5
+		>>> execute(r"\test")
+		>>> count[0]
+		6
 
 	The returned value, `identifier`, is a string consist of only English alphabetical letters,
 	which should be used to pass into ``\pythonimmediatecallhandler`` [TeX] command
@@ -389,7 +405,6 @@ def add_handler(f: Callable[[], None])->str:
 		:func:`add_handler_async`, :func:`remove_handler`.
 	"""
 	def g()->None:
-		# this is hopelessly complicated, will figure out later
 		assert engine.status==EngineStatus.running
 		engine.status=EngineStatus.waiting
 		f()
@@ -397,9 +412,9 @@ def add_handler(f: Callable[[], None])->str:
 			run_none_finish()
 		assert engine.status==EngineStatus.running
 
-	return add_handler_async(g)
+	return add_handler_async(g, all_engines=all_engines)
 
-def remove_handler(identifier: str)->None:
+def remove_handler(identifier: str, *, all_engines: bool=False)->None:
 	"""
 	Remove a handler with the given `identifier`.
 
@@ -409,7 +424,10 @@ def remove_handler(identifier: str)->None:
 	.. seealso::
 		:func:`add_handler`.
 	"""
-	del _handlers[identifier]
+	if all_engines:
+		del _handlers[identifier]
+	else:
+		del _per_engine_handlers[default_engine.get_engine()][identifier]
 
 TeXToPyObjectType=Optional[str]
 
@@ -420,7 +438,10 @@ def run_main_loop()->TeXToPyObjectType:
 		if not line: return None
 
 		if line[0]=="i":
-			_handlers[line[1:]]()
+			identifier=line[1:]
+			f=_per_engine_handlers[default_engine.get_engine()].get(identifier)
+			if f is None: _handlers[identifier]()
+			else: f()
 		elif line[0]=="r":
 			return line[1:]
 		else:
@@ -477,10 +498,23 @@ def check_line(line: str, *, braces: bool, newline: bool, continue_: Optional[bo
 	elif continue_==False: assert "pythonimmediatecontinue" not in line
 
 
-user_scope: Dict[str, Any]={}
-"""
-This is the global namespace where codes in :func:`.py`, :func:`.pyc`, :func:`.pycode` etc. runs in.
-"""
+_user_scope: Dict[Engine, Dict[str, Any]]=defaultdict(dict)
+
+def get_user_scope()->Dict[str, Any]:
+	r"""
+	This is the global namespace where codes in :func:`.py`, :func:`.pyc`, :func:`.pycode` etc. runs in.
+	Mainly useful for :class:`.ChildProcessEngine` or cases when the scope is not the global scope (e.g. :func:`.pyfilekpse`) only.
+
+	>>> a=1
+	>>> execute(r'\pyc{a}')
+	Traceback (most recent call last):
+		...
+	NameError: name 'a' is not defined
+	>>> get_user_scope()["a"]=1
+	>>> execute(r'\pyc{a}')
+
+	"""
+	return _user_scope[default_engine.get_engine()]
 
 def _readline()->str:
 	line=engine.read().decode('u8')
