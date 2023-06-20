@@ -2,7 +2,7 @@
 Abstract engine class.
 """
 
-from typing import Optional, Literal, Iterable, List, Dict, Tuple
+from typing import Optional, Literal, Iterable, List, Dict, Tuple, Callable
 from abc import ABC, abstractmethod
 import sys
 import os
@@ -73,9 +73,40 @@ class Engine(ABC):
 	_config: GlobalConfiguration
 	status: EngineStatus
 
-	def __init__(self):
+	def __init__(self)->None:
 		self._config=GlobalConfiguration()  # dummy value
 		self.status=EngineStatus.waiting
+		self._on_close_list: List[Callable[[], None]]=[]
+
+	def add_on_close(self, f: Callable[[], None])->None:
+		r"""
+		Add a function that will be executed when the engine is closed.
+
+		>>> e=ChildProcessEngine("pdftex")
+		>>> e.add_on_close(lambda: print(1))
+		>>> e.add_on_close(lambda: print(2))
+		>>> e.close()
+		1
+		2
+
+		The same engine may be closed multiple times in case of ``autorestart``,
+		in that case the function will only be called once.
+
+		>>> e=ChildProcessEngine("pdftex", autorestart=True)
+		>>> a=[1, 2, 3]
+		>>> e.add_on_close(a.pop)
+		>>> from pythonimmediate import execute
+		>>> with default_engine.set_engine(e): execute(r"\error")
+		Traceback (most recent call last):
+			...
+		pythonimmediate.engine.TeXProcessError: Undefined control sequence.
+		>>> a
+		[1, 2]
+		>>> e.close()
+		>>> a
+		[1, 2]
+		"""
+		self._on_close_list.append(f)
 
 	@property
 	def name(self)->EngineName:
@@ -141,6 +172,19 @@ class Engine(ABC):
 
 		Because TeX can only read whole lines s should be newline-terminated.
 		"""
+		...
+
+	def close(self)->None:
+		"""
+		Terminates the [TeX] subprocess gracefully.
+		"""
+		self._close()
+		l=self._on_close_list
+		self._on_close_list=[]
+		for f in l: f()
+
+	@abstractmethod
+	def _close(self)->None:
 		...
 
 
@@ -253,6 +297,9 @@ class ParentProcessEngine(Engine):
 			for line in lines[:-1]: self._log_communication(b"<"+line+b'\n')
 			if lines[-1]: self._log_communication(b"<"+lines[-1]+b"...\n")
 
+	def _close(self)->None:
+		assert False
+
 
 @dataclass
 class _SetDefaultEngineContextManager:
@@ -355,6 +402,12 @@ class DefaultEngine(Engine, threading.local):
 
 	def _write(self, s: bytes)->None:
 		self.get_engine()._write(s)
+
+	def add_on_close(self, f: Callable[[], None])->None:
+		assert False
+
+	def _close(self)->None:
+		assert False
 
 
 default_engine=DefaultEngine()
@@ -574,6 +627,9 @@ class ChildProcessEngine(Engine):
 			raise RuntimeError("process is already closed")
 		return self.process
 
+	def _read_log(self)->bytes:
+		return (self.directory/"texput.log").read_bytes()
+
 	def _check_no_error(self)->None:
 		r"""
 		Internal function, check for TeX error.
@@ -603,7 +659,7 @@ class ChildProcessEngine(Engine):
 		pythonimmediate.engine.TeXProcessError: LaTeX Error: Missing \begin{document}.
 		"""
 		if self.status==EngineStatus.error:
-			log_lines=(self.directory/"texput.log").read_bytes().splitlines()
+			log_lines=self._read_log().splitlines()
 
 			self.close()
 			if self._autorestart:
@@ -639,10 +695,7 @@ class ChildProcessEngine(Engine):
 		process.stdin.write(s)
 		process.stdin.flush()
 
-	def close(self)->None:
-		"""
-		Terminates the [TeX] subprocess gracefully.
-		"""
+	def _close(self)->None:
 		# this might be called from :meth:`__del__` so do not import anything here
 		process=self.get_process()
 		assert process.stdin is not None

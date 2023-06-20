@@ -1,13 +1,19 @@
 import pytest
 import sys
 
-engine=None
+engines=None
 
 @pytest.fixture(autouse=True)
-def _setup_default_engine():
+def _setup_default_engine(doctest_namespace):
 	# this is for pytest doctest only
 	from pythonimmediate.engine import default_engine, ChildProcessEngine
 
-	global engine
-	if engine is None: engine=ChildProcessEngine("pdftex", autorestart=True)  # this will create 4 engines if pytest get -n4 regardless
-	default_engine.set_engine(engine)
+	global engines
+	if engines is None:
+		# this will be run for each process if pytest get -n4 regardless
+		engines=[
+				ChildProcessEngine("pdftex", autorestart=True),
+				ChildProcessEngine("luatex", autorestart=True)
+				]
+	default_engine.set_engine(engines[0])
+	doctest_namespace["luatex_engine"]=engines[1]

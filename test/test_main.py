@@ -82,6 +82,25 @@ class Test:
 				)
 
 	@pytest.mark.parametrize("engine_name", engine_names)
+	def test_wlog_atexit(self, engine_name: EngineName, tmp_path: Path)->None:
+		process=subprocess.run(
+				[
+					engine_name_to_latex_executable[engine_name], "-shell-escape", "-interaction=nonstopmode",
+					r'\documentclass{article}\usepackage{pythonimmediate}\pyc{import atexit;from pythonimmediate import*;'
+					r'atexit.register(lambda: wlog("hello"))}'
+					r'\begin{document}\typeout{type}\pyc{wlog("world")}\wlog{test}\end{document}',
+					],
+				cwd=tmp_path,
+				stdout=subprocess.PIPE,
+				)
+		assert b"type" in process.stdout
+		assert b"world" not in process.stdout
+		assert b"Transcript written on" in process.stdout
+		log_text=(tmp_path/"texput.log").read_text()
+		_, log_text_t=log_text.split("Document Class: article", maxsplit=1)
+		assert log_text_t.index("type") < log_text_t.index("world") < log_text_t.index("test") < log_text_t.index("hello"), log_text
+
+	@pytest.mark.parametrize("engine_name", engine_names)
 	def test_nonstopmode_subprocess(self, engine_name: EngineName)->None:
 		# https://github.com/user202729/pythonimmediate-tex/issues/1
 		process=subprocess.run(

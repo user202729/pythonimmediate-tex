@@ -323,7 +323,7 @@ r"""
 # ========
 
 _handlers: Dict[str, Callable[[], None]]={}
-_per_engine_handlers: Dict[Engine, Dict[str, Callable[[], None]]]=defaultdict(dict)
+_per_engine_handlers: Dict[Engine, Dict[str, Callable[[], None]]]={}
 
 def add_handler_async(f: Callable[[], None], *, all_engines: bool=False)->str:
 	r"""
@@ -362,8 +362,9 @@ def add_handler_async(f: Callable[[], None], *, all_engines: bool=False)->str:
 		_handlers[identifier]=f
 	else:
 		e=default_engine.get_engine()
-		assert identifier not in _per_engine_handlers[e]
-		_per_engine_handlers[e][identifier]=f
+		l=_defaultget_with_cleanup(_per_engine_handlers, dict)
+		assert identifier not in l
+		l[identifier]=f
 	return identifier
 
 def add_handler(f: Callable[[], None], *, all_engines: bool=False)->str:
@@ -442,8 +443,8 @@ def run_main_loop()->TeXToPyObjectType:
 
 		if line[0]=="i":
 			identifier=line[1:]
-			f=_per_engine_handlers[default_engine.get_engine()].get(identifier)
-			if f is None: _handlers[identifier]()
+			f=_handlers.get(identifier)
+			if f is None: _per_engine_handlers[default_engine.get_engine()][identifier]()
 			else: f()
 		elif line[0]=="r":
 			return line[1:]
@@ -501,7 +502,15 @@ def check_line(line: str, *, braces: bool, newline: bool, continue_: Optional[bo
 	elif continue_==False: assert "pythonimmediatecontinue" not in line
 
 
-_user_scope: Dict[Engine, Dict[str, Any]]=defaultdict(dict)
+_user_scope: Dict[Engine, Dict[str, Any]]={}
+
+def _defaultget_with_cleanup(d: Dict[Engine, T1], default: Callable[[], T1])->T1:
+	e=default_engine.get_engine()
+	if e not in d:
+		d[e]=default()
+		def cleanup()->None: del d[e]
+		e.add_on_close(cleanup)
+	return d[e]
 
 def get_user_scope()->Dict[str, Any]:
 	r"""
@@ -516,8 +525,18 @@ def get_user_scope()->Dict[str, Any]:
 	>>> get_user_scope()["aaa"]=1
 	>>> execute(r'\pyc{aaa}')
 
+	..
+		Internally this must be cleaned up properly.
+
+		>>> n=len(_user_scope)
+		>>> from pythonimmediate.engine import ChildProcessEngine
+		>>> with ChildProcessEngine("pdftex") as e, default_engine.set_engine(e):
+		...		assert n==len(_user_scope)
+		...		execute(r'\pyc{a=1}')
+		...		assert n+1==len(_user_scope)
+		>>> assert n==len(_user_scope)
 	"""
-	return _user_scope[default_engine.get_engine()]
+	return _defaultget_with_cleanup(_user_scope, dict)
 
 def _readline()->str:
 	line=engine.read().decode('u8')
@@ -598,14 +617,17 @@ class NToken(ABC):
 		"""
 		return bool(NTokenList([T.ifx, self, other, Catcode.other("1"), T.fi]).expand_x())
 
-	def token_code(self)->int:
+	def is_str(self)->bool:
+		return False
+
+	def str_code(self)->int:
 		"""
 		``self`` must represent a character of a [TeX] string. (i.e. equal to itself when detokenized)
 
 		:return: the character code.
 
 		.. note::
-			See :meth:`NTokenList.token_codes`.
+			See :meth:`NTokenList.str_codes`.
 		"""
 		# default implementation, might not be correct. Subclass overrides as needed.
 		raise ValueError("Token does not represent a string!")
@@ -855,15 +877,53 @@ class Token(NToken):
 			return content
 		return BalancedTokenList([self]).expand_o()
 
-	def str(self)->str:
+	def str(self, val: Optional[str]=None)->str:
 		r"""
 		Manipulate an expl3 str variable.
 
 		>>> BalancedTokenList(r'\str_set:Nn \l_tmpa_str {a+b}').execute()
 		>>> T.l_tmpa_str.str()
 		'a+b'
+		>>> T.l_tmpa_str.str('e+f')
+		'e+f'
+		>>> T.l_tmpa_str.str()
+		'e+f'
+		>>> T.l_tmpa_str.str('e+f\ng')
+		'e+f\ng'
+		>>> T.l_tmpa_str.str()
+		'e+f\ng'
 		"""
-		return self.tl().str()
+		if val is not None:
+			if PTTVerbatimLine(val).valid():
+				typing.cast(Callable[[PTTBalancedTokenList, PTTVerbatimLine], None], Python_call_TeX_local(
+					r"""
+					\cs_new_protected:Npn %name% {
+						%read_arg0(\__container)%
+						%read_arg1(\__value)%
+						\expandafter \let \__container \__value
+						\pythonimmediatecontinuenoarg
+					}
+					""", recursive=False, sync=True))(PTTBalancedTokenList(BalancedTokenList([self])), PTTVerbatimLine(val))
+			elif PTTBlock(val).valid():
+				typing.cast(Callable[[PTTBalancedTokenList, PTTBlock], None], Python_call_TeX_local(
+					r"""
+					\cs_new:Npn \__remove_nl_relax #1 ^^J \relax {#1}
+					\cs_new_protected:Npn %name% {
+						%read_arg0(\__container)%
+						%read_arg1(\__value)%
+						\expandafter \__str_continue \expandafter {
+							\exp:w \expandafter \expandafter \expandafter \exp_end: \expandafter
+							\__remove_nl_relax \__value \relax }
+						\pythonimmediatecontinuenoarg
+					}
+					\cs_new_protected:Npn \__str_continue { \expandafter \def \__container }
+					""", recursive=False, sync=True))(PTTBalancedTokenList(BalancedTokenList([self])), PTTBlock(val))
+			else:
+				self.tl(BalancedTokenList.fstr(val))
+			return val
+		t=self.tl()
+		try: return t.str()
+		except ValueError: raise ValueError(f"Token contains {t} which is not a string!")
 
 	def int(self, val: Optional[int]=None)->int:
 		r"""
@@ -1380,10 +1440,11 @@ class CharacterToken(Token):
 			return -1
 		else:
 			return 0
-	def token_code(self)->int:
+	def is_str(self)->bool:
 		catcode=Catcode.space if self.index==32 else Catcode.other
-		if catcode!=self.catcode:
-			raise ValueError("this CharacterToken does not represent a string!")
+		return catcode==self.catcode
+	def str_code(self)->int:
+		if not self.is_str(): raise ValueError("this CharacterToken does not represent a string!")
 		return self.index
 	def simple_detokenize(self, get_catcode: Callable[[int], Catcode])->str:
 		return self.chr
@@ -1718,21 +1779,38 @@ class TokenList(TokenListBaseClass):
 		return cls.from_string(s, lambda x: e3_catcode_table.get(x, Catcode.other), ' ')
 
 	@classmethod
-	def fstr(cls: Type[TokenListType], s: str)->TokenListType:
+	def fstr_if_unicode(cls: Type[TokenListType], s: str|bytes, is_unicode: bool)->TokenListType:
+		if isinstance(str, bytes):
+			assert not is_unicode, "Cannot use bytes if is_unicode"
+		if not is_unicode and isinstance(s, str):
+			s=s.encode('u8')
+		return cls(space if ch in (32, ' ') else C.other(ch) for ch in s)
+
+	@classmethod
+	def fstr(cls: Type[TokenListType], s: str, is_unicode: Optional[bool]=None)->TokenListType:
 		r"""
 		Approximate tokenizer in detokenized catcode regime.
 
 		Refer to documentation of :meth:`from_string` for details.
 		``^^J`` (or ``\n``) is used to denote newlines.
 
-		Usage example::
+		>>> BalancedTokenList.fstr('hello world')
+		<BalancedTokenList: h₁₂ e₁₂ l₁₂ l₁₂ o₁₂  ₁₀ w₁₂ o₁₂ r₁₂ l₁₂ d₁₂>
+		>>> BalancedTokenList.fstr('ab\\c  d\n \t')
+		<BalancedTokenList: a₁₂ b₁₂ \\₁₂ c₁₂  ₁₀  ₁₀ d₁₂ \n₁₂  ₁₀ \t₁₂>
 
-			>>> BalancedTokenList.fstr('hello world')
-			<BalancedTokenList: h₁₂ e₁₂ l₁₂ l₁₂ o₁₂  ₁₀ w₁₂ o₁₂ r₁₂ l₁₂ d₁₂>
-			>>> BalancedTokenList.fstr('ab\\c  d\n \t')
-			<BalancedTokenList: a₁₂ b₁₂ \\₁₂ c₁₂  ₁₀  ₁₀ d₁₂ \n₁₂  ₁₀ \t₁₂>
+		Some care need to be taken for Unicode strings.
+		>>> with default_engine.set_engine(None): BalancedTokenList.fstr('α')
+		Traceback (most recent call last):
+			...
+		RuntimeError: Default engine not set for this thread!
+		>>> with default_engine.set_engine(luatex_engine): BalancedTokenList.fstr('α')
+		<BalancedTokenList: α₁₂>
+		>>> BalancedTokenList.fstr('α')
+		<BalancedTokenList: Î₁₂ ±₁₂>
 		"""
-		return cls(space if ch==' ' else Catcode.other(ch) for ch in s)
+		if is_unicode is None: is_unicode=engine.is_unicode
+		return cls.fstr_if_unicode(s, is_unicode=is_unicode)
 
 	@classmethod
 	def doc(cls: Type[TokenListType], s: str)->TokenListType:
@@ -1857,26 +1935,56 @@ class TokenList(TokenListBaseClass):
 		"""
 		return NTokenList(self).expand_x()
 
-	def token_codes(self)->list[int]:
-		"""
-		See :meth:`NTokenList.token_codes`.
-		"""
-		return NTokenList(self).token_codes()
+	def is_str(self)->bool:
+		return all(t.is_str() for t in self)
 
 	def simple_detokenize(self, get_catcode: Callable[[int], Catcode])->str:
 		return "".join(token.simple_detokenize(get_catcode) for token in self)
 
-	def str_if_unicode(self, unicode: _Bool=True)->str:
+	def str_codes(self)->list[int]:
 		"""
-		See :meth:`NTokenList.str_if_unicode`.
+		``self`` must represent a [TeX] string. (i.e. equal to itself when detokenized)
+
+		:return: the string content.
+
+		>>> BalancedTokenList("abc").str_codes()
+		Traceback (most recent call last):
+			...
+		ValueError: this CharacterToken does not represent a string!
+		>>> BalancedTokenList("+-=").str_codes()
+		[43, 45, 61]
+
+		.. note::
+			In non-Unicode engines, each token will be replaced with a character
+			with character code equal to the character code of that token.
+			UTF-8 characters with character code ``>=0x80`` will be represented by multiple
+			characters in the returned string.
 		"""
-		return NTokenList(self).str_if_unicode(unicode)
+		return [t.str_code() for t in self]
 
 	def str(self)->str:
 		"""
-		See :meth:`NTokenList.str`.
+		``self`` must represent a [TeX] string. (i.e. equal to itself when detokenized)
+
+		:return: the string content.
+
+		>>> BalancedTokenList([C.other(0xce), C.other(0xb1)]).str()
+		'α'
+		>>> with default_engine.set_engine(luatex_engine): BalancedTokenList([C.other('α')]).str()
+		'α'
 		"""
-		return NTokenList(self).str()
+		return self.str_if_unicode(engine.is_unicode)
+
+	def str_if_unicode(self, unicode: bool=True)->_Str:
+		"""
+		Assume this token list represents a string in a (Unicode/non-Unicode) engine, return the string content.
+
+		If the engine is not Unicode, assume the string is encoded in UTF-8.
+		"""
+		if unicode:
+			return "".join(map(chr, self.str_codes()))
+		else:
+			return bytes(self.str_codes()).decode('u8')
 
 	def int(self)->int:
 		r"""
@@ -2156,39 +2264,6 @@ class NTokenList(NTokenListBaseClass):
 		NTokenList([T.edef, P.tmp, bgroup, *self, egroup]).execute()
 		return BalancedTokenList([P.tmp]).expand_o()
 
-	def token_codes(self)->list[int]:
-		"""
-		``self`` must represent a [TeX] string. (i.e. equal to itself when detokenized)
-
-		:return: the string content.
-
-		.. note::
-			In non-Unicode engines, each token will be replaced with a character
-			with character code equal to the character code of that token.
-			UTF-8 characters with character code ``>=0x80`` will be represented by multiple
-			characters in the returned string.
-		"""
-		return [t.token_code() for t in self]
-
-	def str(self)->str:
-		"""
-		``self`` must represent a [TeX] string. (i.e. equal to itself when detokenized)
-
-		:return: the string content.
-		"""
-		return self.str_if_unicode(engine.is_unicode)
-
-	def str_if_unicode(self, unicode: bool=True)->_Str:
-		"""
-		Assume this token list represents a string in a (Unicode/non-Unicode) engine, return the string content.
-
-		If the engine is not Unicode, assume the string is encoded in UTF-8.
-		"""
-		if unicode:
-			return "".join(map(chr, self.token_codes()))
-		else:
-			return bytes(self.token_codes()).decode('u8')
-
 
 class TeXToPyData(ABC):
 	"""
@@ -2374,8 +2449,13 @@ class PTTTeXLine(PyToTeXData):
 class PTTBlock(PyToTeXData):
 	data: str
 	read_code=r"\__read_block:N {}".format
-	def valid(self)->bool: return True
+	@staticmethod
+	def ignore_last_space(s: str)->PTTBlock:
+		return PTTBlock("\n".join(line.rstrip() for line in s.split("\n")))
+	def valid(self)->bool:
+		return "\r" not in self.data and all(line==line.rstrip() for line in self.data.splitlines())
 	def serialize(self)->bytes:
+		assert self.valid(), self
 		return surround_delimiter(self.data).encode('u8')
 
 @dataclass
@@ -3004,6 +3084,75 @@ def remove_TeX_handler(identifier: str)->None:
 	"""
 	P["run_"+identifier+":"].set_eq(T.relax)
 
+_execute_cache: Dict[Engine, Dict[tuple[Token, ...], str]]={}
+
+def _execute_cached0(e: BalancedTokenList)->None:
+	r"""
+	Internal function, identical to :meth:`BalancedTokenList.execute` but cache the value of ``e``
+	such that re-execution of the same token list will be faster.
+
+	>>> count[0]=5
+	>>> _execute_cached0(BalancedTokenList(r'\advance\count0 by 1'))
+	>>> count[0]
+	6
+	>>> _execute_cached0(BalancedTokenList(r'\advance\count0 by 1'))
+	>>> count[0]
+	7
+	"""
+	assert e.is_balanced()
+	l=_defaultget_with_cleanup(_execute_cache, dict)
+	identifier=l.get(tuple(e))
+	if identifier is None:
+		identifier=l[tuple(e)]=add_TeX_handler(e)
+	call_TeX_handler(identifier)
+
+_arg_tokens=[P.arga, P.argb, P.argc]
+_arg1=_arg_tokens[0]
+
+def _store_to_arg1(e: BalancedTokenList)->None:
+	r"""
+	Internal function for a few things...
+
+	..
+		>>> def test(t): _store_to_arg1(t); assert _arg1.tl()==t, (_arg1.tl(), t)
+		>>> for i in range(700): test(BalancedTokenList.fstr(chr(i)))
+		>>> with default_engine.set_engine(luatex_engine):
+		...		for i in range(700): test(BalancedTokenList.fstr(chr(i)))
+	"""
+	if e.is_str():
+		_arg1.str(e.str())
+	else:
+		_arg1.tl(e)
+
+def _copy_arg1_to(e: Token)->None:
+	if e==P.argb:
+		typing.cast(Callable[[], None], Python_call_TeX_local(
+			r"\cs_new_protected:Npn %name% { \let \__argb \__arga %optional_sync% \pythonimmediatelisten }", recursive=False))
+		return
+	if e==P.argc:
+		typing.cast(Callable[[], None], Python_call_TeX_local(
+			r"\cs_new_protected:Npn %name% { \let \__argc \__arga %optional_sync% \pythonimmediatelisten }", recursive=False))
+		return
+	assert False
+	e.set_eq(_arg1)
+
+def _execute_cached(e: BalancedTokenList|str, *args: BalancedTokenList|str)->None:
+	r"""
+	Internal function, identical to :func:`_execute_cached0`, only *e* is cached, the rest are
+	passed in every time and accessible as ``_arg_tokens[0]`` etc.
+
+	>>> group.begin()
+	>>> _execute_cached(r'\catcode \_pythonimmediate_arga', '15=7')
+	>>> catcode[15].value
+	7
+	>>> group.end()
+	"""
+	assert len(args)<=len(_arg_tokens)
+	for a, t in reversed([*zip(args, _arg_tokens)]):
+		_store_to_arg1(BalancedTokenList.fstr(a) if isinstance(a, str) else a)
+		if t!=_arg1: _copy_arg1_to(t)
+	_execute_cached0(BalancedTokenList(e))
+
 
 run_error_finish=typing.cast(Callable[[PTTBlock, PTTBlock], None], Python_call_TeX_local(
 r"""
@@ -3045,7 +3194,6 @@ def run_tokenized_line_peek(line: str, *, check_braces: bool=True, check_newline
 			)(PTTTeXLine(line))[0]
 
 
-
 #@export_function_to_module
 def run_block_local(block: str)->None:
 	typing.cast(Callable[[PTTBlock], None], Python_call_TeX_local(
@@ -3059,7 +3207,7 @@ def run_block_local(block: str)->None:
 			%optional_sync%
 			\pythonimmediatelisten
 		}
-		"""))(PTTBlock(block))
+		"""))(PTTBlock.ignore_last_space(block))
 
 
 #@export_function_to_module
@@ -3152,7 +3300,7 @@ class _CatcodeManager:
 
 		>>> catcode[97]
 		<Catcode.letter: 11>
-		>>> catcode["a"] = Catcode.letter
+		>>> catcode["a"] = C.letter
 	"""
 	def __getitem__(self, x: str|int)->Catcode:
 		return Catcode.lookup(
@@ -3333,6 +3481,11 @@ See :class:`_ToksManager`.
 
 # ========
 
+def wlog(s: str)->None:
+	r"""
+	Wrapper around LaTeX's ``\wlog``.
+	"""
+	_execute_cached(r'\wlog{\_pythonimmediate_arga}', s)
 
 #@export_function_to_module
 @user_documentation
