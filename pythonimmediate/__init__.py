@@ -2934,33 +2934,6 @@ r"""
 """, finish=True, sync=False))
 
 
-
-_finish_listen_identifier=get_random_TeX_identifier()
-mark_bootstrap(
-		r"\cs_new_eq:NN \__run_"+_finish_listen_identifier+r": \relax"
-		)
-
-def finish_listen(engine: Engine=default_engine):
-	"""
-	Within :func:`add_handler` you may do something as follows::
-
-		def myfunction():
-			print(1)
-			execute("hello world")  # it's possible to execute TeX code here
-			finish_listen()
-			# after the call above it's no longer allowed to execute TeX_code
-			heavy_computations()  # now this part is executed in parallel with TeX code
-		identifier = add_handler(myfunction)
-
-	This is just a (micro)-optimization to allow (some) TeX code to run parallel with Python code.
-
-	.. seealso::
-		:func:`add_handler_async`.
-	"""
-	engine.write((_finish_listen_identifier+"\n").encode('u8'))
-
-
-
 """
 Internal function.
 
