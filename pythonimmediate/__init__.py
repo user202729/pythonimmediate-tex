@@ -3487,6 +3487,12 @@ def wlog(s: str)->None:
 	"""
 	_execute_cached(r'\wlog{\_pythonimmediate_arga}', s)
 
+def typeout(s: str)->None:
+	r"""
+	Wrapper around LaTeX's ``\typeout``.
+	"""
+	_execute_cached(r'\typeout{\_pythonimmediate_arga}', s)
+
 #@export_function_to_module
 @user_documentation
 def peek_next_meaning()->str:
