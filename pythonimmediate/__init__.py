@@ -2332,17 +2332,23 @@ class PTTVerbatimRawLine(PyToTeXData):
 	"""
 	data: bytes
 	read_code=r"\__str_get:N {} ".format
+	def valid(self)->bool:
+		return b"\n" not in self.data and self.data.rstrip()==self.data
 	def serialize(self)->bytes:
-		assert b"\n" not in self.data
-		assert self.data.rstrip()==self.data, "Cannot send verbatim line with trailing spaces!"
+		assert self.valid()
 		return self.data+b"\n"
 
 @dataclass
 class PTTVerbatimLine(PyToTeXData):
 	data: str
 	read_code=PTTVerbatimRawLine.read_code
+	@property
+	def _raw(self)->PTTVerbatimRawLine:
+		return PTTVerbatimRawLine(self.data.encode('u8'))
+	def valid(self)->bool:
+		return self._raw.valid()
 	def serialize(self)->bytes:
-		return PTTVerbatimRawLine(self.data.encode('u8')).serialize()
+		return self._raw.serialize()
 
 @dataclass
 class PTTInt(PyToTeXData):
@@ -2367,6 +2373,7 @@ class PTTTeXLine(PyToTeXData):
 class PTTBlock(PyToTeXData):
 	data: str
 	read_code=r"\__read_block:N {}".format
+	def valid(self)->bool: return True
 	def serialize(self)->bytes:
 		return surround_delimiter(self.data).encode('u8')
 
@@ -2956,7 +2963,7 @@ def add_TeX_handler(t: BalancedTokenList)->str:
 	"""
 	return add_TeX_handler_continue_included(t + [T.pythonimmediatecontinuenoarg])
 
-def call_TeX_handler_returns(identifier: str)->None:
+def call_TeX_handler_returns(identifier: str)->str:
 	if engine.status==EngineStatus.error:
 		raise TeXProcessError("error already happened")
 	assert engine.status==EngineStatus.waiting, engine.status
@@ -2965,6 +2972,7 @@ def call_TeX_handler_returns(identifier: str)->None:
 	engine.status=EngineStatus.running
 
 	result=run_main_loop()
+	assert result is not None
 	engine.status=EngineStatus.waiting
 	return result
 
