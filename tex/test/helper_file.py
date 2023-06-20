@@ -470,17 +470,17 @@ class Test(unittest.TestCase):
 				t.blue
 
 	def test_meaning_equal(self)->None:
-		self.assertFalse(T.empty.blue.meaning_equal(T.empty))
-		self.assertFalse(T.empty.meaning_equal(T.empty.blue))
-		self.assertTrue(T.relax.blue.meaning_equal(T.relax))
-		self.assertTrue(T.empty.blue.meaning_equal(T.empty.blue))
+		self.assertFalse(T.empty.blue.meaning_eq(T.empty))
+		self.assertFalse(T.empty.meaning_eq(T.empty.blue))
+		self.assertTrue(T.relax.blue.meaning_eq(T.relax))
+		self.assertTrue(T.empty.blue.meaning_eq(T.empty.blue))
 
 	def test_set_to_blue(self)->None:
 		NTokenList([T.let, T.aaa.blue, T.ifx]).execute()
-		self.assertTrue(T.aaa.meaning_equal(T.ifx))
+		self.assertTrue(T.aaa.meaning_eq(T.ifx))
 
 		NTokenList([T.futurelet, T.aaa.blue, T["@gobble"], T.ifcat]).execute()
-		self.assertTrue(T.aaa.meaning_equal(T.ifcat))
+		self.assertTrue(T.aaa.meaning_eq(T.ifcat))
 
 	def test_make_tokenlist_from_blue(self)->None:
 		with self.assertRaises(RuntimeError):
@@ -490,17 +490,17 @@ class Test(unittest.TestCase):
 		for t in [T.ifx, T.ifx.blue, C.other("="), C.space(' '), T.empty, T.relax, T.empty.blue]:
 			with self.subTest(t=t):
 				T.aaa.set_eq(t)
-				self.assertTrue(T.aaa.meaning_equal(t))
+				self.assertTrue(T.aaa.meaning_eq(t))
 
 				t.put_next()
 				T.aaa.set_future()
-				self.assertTrue(T.aaa.meaning_equal(t))
+				self.assertTrue(T.aaa.meaning_eq(t))
 
 				T.aaa.set_eq(T.empty)
 
 				T.empty.put_next()
 				T.aaa.set_future2()
-				self.assertTrue(T.aaa.meaning_equal(t.no_blue))
+				self.assertTrue(T.aaa.meaning_eq(t.no_blue))
 
 				assert Token.get_next()==T.empty
 				assert Token.get_next()==t.no_blue
@@ -509,7 +509,7 @@ class Test(unittest.TestCase):
 
 				NTokenList([T.empty, t]).put_next()
 				T.aaa.set_future2()
-				self.assertTrue(T.aaa.meaning_equal(t))
+				self.assertTrue(T.aaa.meaning_eq(t))
 
 				assert Token.get_next()==T.empty
 				assert Token.get_next()==t.no_blue

@@ -50,6 +50,8 @@ This is a table of [TeX] primitives, and their Python wrapper:
 	  - :meth:`Token.set_eq`
 	* - ``\ifx``
 	  - :meth:`Token.meaning_eq`
+	* - ``\meaning``
+	  - :meth:`NToken.meaning_str`
 	* - ``\futurelet``
 	  - :meth:`Token.set_future`, :meth:`Token.set_future2`
 	* - ``\def``
@@ -574,16 +576,29 @@ class NToken(ABC):
 	@abstractmethod
 	def repr1(self)->str: ...
 
-	def meaning_str(self)->str:
+	def meaning_str(self, escapechar: Optional[int|str]=None)->str:
 		r"""
-		get the meaning of this token as a string.
+		Get the meaning of this token as a string.
+
+		>>> C.other("-").meaning_str()
+		'the character -'
+		>>> T.relax.meaning_str(escapechar="?")
+		'?relax'
+		>>> T.relax.meaning_str()
+		'\\relax'
 
 		Note that all blue tokens have the meaning equal to ``\relax``
 		(or ``[unknown command code! (0, 1)]`` in a buggy LuaTeX implementation)
 		with the backslash replaced
 		by the current ``escapechar``.
 		"""
-		return NTokenList([T.meaning, self]).expand_x().str()
+		if escapechar is not None:
+			tmp=count["escapechar"]
+			count["escapechar"]=_get_charcode(escapechar)
+		result=NTokenList([T.meaning, self]).expand_x().str()
+		if escapechar is not None:
+			count["escapechar"]=tmp
+		return result
 
 
 	@property
@@ -609,9 +624,10 @@ class NToken(ABC):
 		"""
 		...
 
-	def meaning_equal(self, other: "NToken")->bool:
-		"""
+	def meaning_eq(self, other: "NToken")->bool:
+		r"""
 		Whether this token is the same in meaning as the token specified in the parameter *other*.
+		Equivalent to [TeX]'s ``\ifx``.
 
 		Note that two tokens might have different meaning despite having equal :meth:`meaning_str`.
 		"""
@@ -698,12 +714,6 @@ class Token(NToken):
 		"""
 		assert self.assignable
 		NTokenList([T.let, self, C.other("="), C.space(' '), other]).execute()
-
-	def meaning_eq(self, other: NToken)->bool:
-		r"""
-		Check if the meaning of this token is equivalent to the other token. Equivalent to [TeX] ``\ifx``.
-		"""
-		return bool(len(NTokenList([T.ifx, self, other, C.other("1"), T.fi]).expand_x()))
 
 	def set_future(self)->None:
 		r"""
@@ -1193,6 +1203,9 @@ class ControlSequenceTokenMaker:
 		self.prefix=prefix
 	if enable_get_attribute:
 		def __getattribute__(self, a: str)->"ControlSequenceToken":
+			return ControlSequenceToken(object.__getattribute__(self, "prefix")+a)
+	else:
+		def __getattr__(self, a: str)->"ControlSequenceToken":
 			return ControlSequenceToken(object.__getattribute__(self, "prefix")+a)
 	def __getitem__(self, a: str|bytes)->"ControlSequenceToken":
 		if isinstance(a, bytes):
