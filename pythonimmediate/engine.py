@@ -10,6 +10,7 @@ import threading
 from dataclasses import dataclass
 import atexit
 import enum
+from pathlib import Path
 
 from . import communicate
 from .communicate import GlobalConfiguration
@@ -365,7 +366,7 @@ For Python running inside a [TeX] process, useful attributes are :attr:`~Engine.
 
 
 
-
+class TeXProcessError(Exception): pass
 
 class ChildProcessEngine(Engine):
 	r"""
@@ -373,25 +374,36 @@ class ChildProcessEngine(Engine):
 
 	Can be used as a context manager to automatically close the subprocess when the context is exited. Alternatively :meth:`close` can be used to manually terminate the subprocess.
 
-	For example, the following Python code, if run alone, will spawn a [TeX] process and use it to write "Hello world" to a file named ``a.txt`` in the temporary directory::
+	For example, the following Python code, if run alone, will spawn a [TeX] process and use it to write "Hello world" to a file named ``a.txt`` in the temporary directory:
 
-		from pythonimmediate.engine import ChildProcessEngine
-		from pythonimmediate import execute
-
-		with ChildProcessEngine("pdftex") as engine:
-			# do something with the engine, for example:
-			execute(r'''
-			\immediate\openout9=a.txt
-			\immediate\write9{Hello world}
-			\immediate\closeout9
-			''', engine=engine)
-
-		# now the engine is closed.
+	>>> from pythonimmediate.engine import ChildProcessEngine, default_engine
+	>>> from pythonimmediate import execute
+	>>> from pathlib import Path
+	>>> with ChildProcessEngine("pdftex") as engine, default_engine.set_engine(engine):
+	... 	# do something with the engine, for example:
+	... 	execute(r'''
+	... 	\immediate\openout9=a.txt
+	... 	\immediate\write9{Hello world}
+	... 	\immediate\closeout9
+	... 	''')
+	... 	(Path(engine.directory)/"a.txt").read_text()
+	'Hello world\n'
+	>>> # now the engine is closed and the file is cleaned up.
+	>>> (Path(engine.directory)/"a.txt").is_file()
+	False
 
 	Note that explicit ``engine`` argument must be passed in most functions.
 	See :class:`DefaultEngine` for a way to bypass that.
 
-	We attempt to do correct error detection on the [TeX] side, however it's not always easy.
+	We attempt to do correct error detection on the Python side by parsing the output/log file:
+
+	>>> with ChildProcessEngine("pdftex") as engine, default_engine.set_engine(engine):
+	...		execute(r'\error')
+	Traceback (most recent call last):
+		...
+	pythonimmediate.engine.TeXProcessError: Undefined control sequence.
+
+	However, it's not always easy.
 	For example the following code will reproduce the output on error identically:
 
 	.. code-block:: latex
@@ -425,6 +437,12 @@ class ChildProcessEngine(Engine):
 		#	# we assume nothing maliciously create a file named `.symlink-to-stderr` that is not a symlink to stderr...
 		#	pass
 
+		self._directory: tempfile.TemporaryDirectory=tempfile.TemporaryDirectory(prefix="pyimm-", ignore_cleanup_errors=True)
+		self.directory: Path=Path(self._directory.name)
+		"""
+		A temporary working directory for the engine.
+		"""
+
 		self.process: Optional[subprocess.Popen]=None  # guard like this so that __del__ does not blow up if Popen() fails
 		self.process=subprocess.Popen(
 				[
@@ -433,13 +451,12 @@ class ChildProcessEngine(Engine):
 				stdin=subprocess.PIPE,
 				stdout=subprocess.PIPE,
 				stderr=subprocess.PIPE,
-				cwd=tempfile.gettempdir(),
+				cwd=self.directory,
 				env=env,
 				start_new_session=True,  # avoid ctrl-C propagating to TeX process (when used in interactive terminal the TeX process should not be killed on ctrl-C)
 				)
 
 		# the variables below can only be modified/read when lock is held
-		self.error_happened: bool=False
 		self._error_marker_line_seen: bool=False
 		self._stdout_lines: List[bytes]=[]  # Note that this is asynchronously populated so values may not be always correct
 		self._stdout_buffer=bytearray()  # remaining part that does not fit in any line
@@ -472,12 +489,12 @@ class ChildProcessEngine(Engine):
 			>>> with default_engine.set_engine(e): BalancedTokenList(r"\undefined").expand_x()
 			Traceback (most recent call last):
 				...
-			RuntimeError: TeX error!
+			pythonimmediate.engine.TeXProcessError: Undefined control sequence.
 			>>> e
 			<ChildProcessEngine('luatex') error>
 		"""
 		s = f"ChildProcessEngine('{self.name}')"
-		if self.error_happened:
+		if self.status==EngineStatus.error:
 			return f"<{s} error>"
 		if not self.process:
 			return f"<{s} closed>"
@@ -499,14 +516,18 @@ class ChildProcessEngine(Engine):
 					self._stdout_lines+=map(bytes, parts[:-1])
 					self._error_marker_line_seen=self._error_marker_line_seen or any(line.startswith(b"<*> ") for line in parts[:-1])
 					self._stdout_buffer=parts[-1]
+					if b'!  ==> Fatal error occurred, no output PDF file produced!' in parts[:-1]:
+						self.status=EngineStatus.error
 
 				# check potential error
 				if self._stdout_buffer == b"? " and self._error_marker_line_seen:
-					self.error_happened=True
-					self.process.kill()  # this is a simple way to break out _read() but it will not allow error recovery
+					self.status=EngineStatus.error
+					self.process.stdin.close()  # close the stdin so process will terminate
+					self.process.wait()
+					# this is a simple way to break out _read() but it will not allow error recovery
 
 				# debug logging
-				#sys.stderr.write(f" | {self._stdout_lines=} | {self._stdout_buffer=} | {self._error_marker_line_seen=} | {self.error_happened=}\n")
+				#sys.stderr.write(f" | {self._stdout_lines=} | {self._stdout_buffer=} | {self._error_marker_line_seen=} | {self.status=}\n")
 
 	def get_process(self)->subprocess.Popen:
 		if self.process is None:
@@ -514,9 +535,46 @@ class ChildProcessEngine(Engine):
 		return self.process
 
 	def _check_no_error(self)->None:
+		r"""
+		Internal function, check for TeX error.
+
+		>>> from pythonimmediate import execute
+		>>> with ChildProcessEngine("luatex") as engine, default_engine.set_engine(engine):
+		...		execute(r'\directlua{error("hello")}')
+		Traceback (most recent call last):
+			...
+		pythonimmediate.engine.TeXProcessError: [\directlua]:1: hello
+
+		>>> with ChildProcessEngine("luatex") as engine, default_engine.set_engine(engine):
+		...		(engine.directory/"a.lua").write_text('error("hello")')
+		...		execute(r'\directlua{dofile("a.lua")}')
+		Traceback (most recent call last):
+			...
+		pythonimmediate.engine.TeXProcessError: a.lua:1: hello
+
+		>>> with ChildProcessEngine("pdftex") as engine, default_engine.set_engine(engine):
+		...		execute(r'\loop\begingroup\iftrue\repeat')
+		Traceback (most recent call last):
+			...
+		pythonimmediate.engine.TeXProcessError: TeX capacity exceeded, sorry [grouping levels=255].
+		"""
 		with self._stdout_lock:
-			if self.error_happened:
-				raise RuntimeError("TeX error!")
+			if self.status==EngineStatus.error:
+				log_lines=(self.directory/"texput.log").read_bytes().splitlines()
+				error_lines=[line for i, line in enumerate(log_lines)
+				 if line.startswith(b"!") or
+				 (i+1<len(log_lines) and log_lines[i+1]==b"stack traceback:")  # Lua error
+				 ]
+
+				# find the line right before the last "emergency stop" line in error_lines:
+				emergency_stop_lines=[i for i, line in enumerate(error_lines) if line==b'! Emergency stop.']
+				if not emergency_stop_lines:
+					emergency_stop_lines=[i for i, line in enumerate(error_lines) if line==b'!  ==> Fatal error occurred, no output PDF file produced!']
+				if not emergency_stop_lines or emergency_stop_lines[-1]==0:
+					raise TeXProcessError("TeX error")  # cannot find the error message
+				raise TeXProcessError(
+						error_lines[emergency_stop_lines[-1]-1].removeprefix(b"!").lstrip()
+						.decode('u8', "replace"))
 
 	def _read(self)->bytes:
 		process=self.get_process()
@@ -552,8 +610,9 @@ class ChildProcessEngine(Engine):
 		assert process.stderr is not None
 		process.stdin.close()
 		process.stderr.close()
-		#self._stdout_thread.join()  # _stdout_thread will automatically terminate once process.stderr is no longer readable
+		self._stdout_thread.join()  # _stdout_thread will automatically terminate once process.stderr is no longer readable
 		self.process=None
+		self._directory.cleanup()
 
 	def __del__(self)->None:
 		if self.process is not None:
