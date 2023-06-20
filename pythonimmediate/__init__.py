@@ -2934,14 +2934,8 @@ r"""
 """, finish=True, sync=False))
 
 
-"""
-Internal function.
 
-``run_error_finish`` is fatal to [TeX], so we only run it when it's fatal to Python.
 
-We want to make sure the Python traceback is printed strictly before run_error_finish() is called,
-so that the Python traceback is not interleaved with [TeX] error messages.
-"""
 run_error_finish=typing.cast(Callable[[PTTBlock, PTTBlock], None], Python_call_TeX_local(
 r"""
 \msg_new:nnn {pythonimmediate} {python-error} {Python~error:~#1.}
@@ -2953,6 +2947,14 @@ r"""
 	\__close_write:
 }
 """, finish=True, sync=False))
+"""
+Internal function.
+
+``run_error_finish`` is fatal to [TeX], so we only run it when it's fatal to Python.
+
+We want to make sure the Python traceback is printed strictly before run_error_finish() is called,
+so that the Python traceback is not interleaved with [TeX] error messages.
+"""
 
 # normally the close_write above is not necessary but sometimes error can be skipped through
 # in which case we must make sure the pipe is not written to anymore
