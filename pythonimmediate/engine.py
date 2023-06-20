@@ -647,19 +647,25 @@ class ChildProcessEngine(Engine):
 		process=self.get_process()
 		assert process.stdin is not None
 		assert process.stderr is not None
+
 		if self.status==EngineStatus.error:
 			# only _stdout_thread can possibly set status to error, so we just need to wait for _stdout_thread
 			self._stdout_thread.join()
-		self.status=EngineStatus.exited
+
 		if not process.poll():
 			# process has not terminated (it's possible for process to already terminate if it's killed on error)
 			from . import run_none_finish
 			with default_engine.set_engine(self):
 				run_none_finish()
 			process.wait()
+
 		process.stdin.close()
 		process.stderr.close()
 		self._stdout_thread.join()  # _stdout_thread will automatically terminate once process.stderr is no longer readable
+
+		if self.status!=EngineStatus.error:
+			self.status=EngineStatus.exited
+
 		self.process=None
 		self._directory.cleanup()
 

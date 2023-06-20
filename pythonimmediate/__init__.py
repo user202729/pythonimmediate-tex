@@ -505,13 +505,13 @@ def get_user_scope()->Dict[str, Any]:
 	This is the global namespace where codes in :func:`.py`, :func:`.pyc`, :func:`.pycode` etc. runs in.
 	Mainly useful for :class:`.ChildProcessEngine` or cases when the scope is not the global scope (e.g. :func:`.pyfilekpse`) only.
 
-	>>> a=1
-	>>> execute(r'\pyc{a}')
+	>>> aaa=1
+	>>> execute(r'\pyc{aaa}')
 	Traceback (most recent call last):
 		...
-	NameError: name 'a' is not defined
-	>>> get_user_scope()["a"]=1
-	>>> execute(r'\pyc{a}')
+	NameError: name 'aaa' is not defined
+	>>> get_user_scope()["aaa"]=1
+	>>> execute(r'\pyc{aaa}')
 
 	"""
 	return _user_scope[default_engine.get_engine()]
@@ -3240,6 +3240,7 @@ class _CountManager:
 		>>> count["endlinechar"]=10  # equivalent to `\endlinechar=10`
 		>>> T.endlinechar.int()  # can also be accessed this way
 		10
+		>>> count["endlinechar"]=13
 
 	As shown in the last example, accessing named count registers can also be done through :meth:`Token.int`.
 
