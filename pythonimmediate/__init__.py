@@ -129,7 +129,7 @@ debug=lambda *args, **kwargs: None  # type: ignore
 
 
 expansion_only_can_call_Python=False  # normally. May be different in LuaTeX etc.
-from .engine import Engine, default_engine, default_engine as engine, ParentProcessEngine, EngineStatus
+from .engine import Engine, default_engine, default_engine as engine, ParentProcessEngine, EngineStatus, TeXProcessError
 
 
 debugging: bool=True
@@ -2849,6 +2849,8 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 		assert len(args)==len(ptt_argtypes), f"passed in {len(args)} = {args}, expect {len(ptt_argtypes)}"
 
 		# send function header
+		if engine.status==EngineStatus.error:
+			raise TeXProcessError("error already happened")
 		assert engine.status==EngineStatus.waiting, engine.status
 
 		sending_content=(identifier+"\n").encode('u8')
