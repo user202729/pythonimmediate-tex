@@ -326,6 +326,8 @@ _per_engine_handlers: Dict[Engine, Dict[str, Callable[[], None]]]=defaultdict(di
 
 def add_handler_async(f: Callable[[], None], *, all_engines: bool=False)->str:
 	r"""
+	This function is for micro-optimization. Usage is not really recommended.
+
 	Similar to :func:`add_handler`, however, the function has these additional restrictions:
 
 	* Within the function, **it must not send anything to [TeX].**
@@ -2882,12 +2884,11 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 	def f(*args)->Optional[Tuple[TeXToPyData, ...]]:
 		assert len(args)==len(ptt_argtypes), f"passed in {len(args)} = {args}, expect {len(ptt_argtypes)}"
 
-		# send function header
 		if engine.status==EngineStatus.error:
 			raise TeXProcessError("error already happened")
 		assert engine.status==EngineStatus.waiting, engine.status
 
-		sending_content=(identifier+"\n").encode('u8')
+		sending_content=(identifier+"\n").encode('u8')  # function header
 
 		# function args. We build all the arguments before sending anything, just in case some serialize() error out
 		for arg, argtype in zip(args, ptt_argtypes):
@@ -2895,7 +2896,6 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 			sending_content+=arg.serialize()
 
 		engine.write(sending_content)
-
 
 		if sync:
 
