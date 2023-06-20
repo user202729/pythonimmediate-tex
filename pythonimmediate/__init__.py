@@ -2933,7 +2933,67 @@ r"""
 \cs_new_eq:NN %name% \relax
 """, finish=True, sync=False))
 
+def add_TeX_handler_continue_included(t: BalancedTokenList)->str:
+	r"""
+	Similar to :func:`add_TeX_handler`, however the difference is:
 
+	Here you need to manually include ``\pythonimmediatecontinuenoarg`` token when you want to return control to Python.
+
+	>>> identifier=add_TeX_handler_continue_included(BalancedTokenList(
+	...		r"\afterassignment\pythonimmediatecontinuenoarg \toks0="))
+	>>> BalancedTokenList([["abc"]]).put_next()
+	>>> call_TeX_handler(identifier)  # this will assign \toks0 to be the following braced group
+	>>> toks[0]
+	<TTPBalancedTokenList: a₁₁ b₁₁ c₁₁>
+	"""
+	identifier=get_random_TeX_identifier()
+	P["run_"+identifier+":"].tl(t)
+	return identifier
+
+def add_TeX_handler(t: BalancedTokenList)->str:
+	"""
+	See :func:`call_TeX_handler`.
+	"""
+	return add_TeX_handler_continue_included(t + [T.pythonimmediatecontinuenoarg])
+
+def call_TeX_handler_returns(identifier: str)->None:
+	if engine.status==EngineStatus.error:
+		raise TeXProcessError("error already happened")
+	assert engine.status==EngineStatus.waiting, engine.status
+
+	engine.write((identifier+"\n").encode('u8'))
+	engine.status=EngineStatus.running
+
+	result=run_main_loop()
+	engine.status=EngineStatus.waiting
+	return result
+
+def call_TeX_handler(identifier: str)->None:
+	r"""
+	Analog for :func:`add_handler`, :func:`remove_handler`, but on the [TeX] side.
+
+	The advantage is that it's much faster than using :meth:`BalancedTokenList.execute` every time.
+	Otherwise the effect is identical.
+
+	Of course this is only for the current engine.
+
+	>>> identifier=add_TeX_handler(BalancedTokenList(r"\advance\count0 by 1"))
+	>>> count[0]=5
+	>>> count[0]
+	5
+	>>> call_TeX_handler(identifier)
+	>>> count[0]
+	6
+	>>> remove_TeX_handler(identifier)
+	"""
+	result=call_TeX_handler_returns(identifier)
+	assert result==""
+
+def remove_TeX_handler(identifier: str)->None:
+	"""
+	See :func:`call_TeX_handler`.
+	"""
+	P["run_"+identifier+":"].set_eq(T.relax)
 
 
 run_error_finish=typing.cast(Callable[[PTTBlock, PTTBlock], None], Python_call_TeX_local(
@@ -3238,6 +3298,28 @@ class _CountManager:
 count=_CountManager()
 """
 See :class:`_CountManager`.
+"""
+
+
+class _ToksManager:
+	r"""
+	Manipulate tok registers. Interface is similar to :const:`~pythonimmediate.catcode`.
+
+	For example::
+
+		>>> toks[0]=BalancedTokenList('abc')
+		>>> toks[0]
+		<TTPBalancedTokenList: a₁₁ b₁₁ c₁₁>
+	"""
+	def __getitem__(self, x: int)->BalancedTokenList:
+		return BalancedTokenList([r"\the\toks" + str(x)]).expand_o()
+
+	def __setitem__(self, x: int, val: BalancedTokenList)->None:
+		BalancedTokenList([r"\toks" + str(x), val]).execute()
+
+toks=_ToksManager()
+"""
+See :class:`_ToksManager`.
 """
 
 # ========
