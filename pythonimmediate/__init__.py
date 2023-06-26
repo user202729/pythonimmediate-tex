@@ -674,12 +674,12 @@ class Token(NToken):
 		"""
 		...
 
-	def set_eq(self, other: "NToken")->None:
+	def set_eq(self, other: "NToken", global_: bool=False)->None:
 		"""
 		Assign the meaning of this token to be equivalent to that of the other token.
 		"""
 		assert self.assignable
-		NTokenList([T.let, self, C.other("="), C.space(' '), other]).execute()
+		NTokenList([r"\global" if global_ else "", T.let, self, C.other("="), C.space(' '), other]).execute()
 
 	def set_future(self)->None:
 		r"""
@@ -1630,22 +1630,10 @@ class TokenList(TokenListBaseClass):
 
 	@staticmethod
 	def force_token_list(a: Iterable, string_tokenizer: Callable[[str], TokenList])->Iterable[Token]:
-		if isinstance(a, str):
-			yield from string_tokenizer(a)
-			return
-		for x in a:
-			if isinstance(x, Token):
-				yield x
-			elif isinstance(x, str):
-				yield from string_tokenizer(x)
-			elif isinstance(x, Sequence):
-				yield bgroup
-				child=BalancedTokenList(x)
-				assert child.is_balanced()
-				yield from child
-				yield egroup
-			else:
+		for x in NTokenList.force_token_list(a, string_tokenizer):
+			if not isinstance(x, Token):
 				raise RuntimeError(f"Cannot make TokenList from object {x} of type {type(x)}")
+			yield x
 
 	def is_balanced(self)->bool:
 		"""
@@ -1866,7 +1854,7 @@ class TokenList(TokenListBaseClass):
 			raise NotImplementedError(r"Double-newline to \par not implemented yet!")
 		return cls.from_string(s, lambda x: doc_catcode_table.get(x, Catcode.other), ' ')
 
-	def __init__(self, a: Iterable=(), string_tokenizer: "Callable[[str], TokenList]"=TokenList_e3)->None:
+	def __init__(self, a: Iterable=(), string_tokenizer: Callable[[str], TokenList]=TokenList_e3)->None:
 		"""
 		Refer to :class:`TokenList` on how to use this function.
 		"""
@@ -2218,21 +2206,26 @@ class NTokenList(NTokenListBaseClass):
 	"""
 
 	@staticmethod
-	def force_token_list(a: Iterable)->Iterable[NToken]:
+	def force_token_list(a: Iterable, string_tokenizer: Callable[[str], TokenList])->Iterable[NToken]:
+		if isinstance(a, str):
+			yield from string_tokenizer(a)
+			return
 		for x in a:
 			if isinstance(x, NToken):
 				yield x
+			elif isinstance(x, str):
+				yield from string_tokenizer(x)
 			elif isinstance(x, Sequence):
 				yield bgroup
-				child=NTokenList(x)
+				child=BalancedTokenList(x)
 				assert child.is_balanced()
 				yield from child
 				yield egroup
 			else:
-				raise RuntimeError(f"Cannot make NTokenList from object {x} of type {type(x)}")
+				raise RuntimeError(f"Cannot make TokenList from object {x} of type {type(x)}")
 
 	def __init__(self, a: Iterable=(), string_tokenizer: Callable[[str], TokenList]=TokenList.e3)->None:
-		super().__init__(NTokenList.force_token_list(a))
+		super().__init__(NTokenList.force_token_list(a, string_tokenizer))
 
 	def is_balanced(self)->bool:
 		"""
@@ -3056,7 +3049,7 @@ def add_TeX_handler_continue_included(t: BalancedTokenList)->str:
 
 	Here you need to manually include ``\pythonimmediatecontinuenoarg`` token when you want to return control to Python.
 
-	>>> identifier=add_TeX_handler_continue_included(BalancedTokenList(
+	>>> with group: identifier=add_TeX_handler_continue_included(BalancedTokenList(
 	...		r"\afterassignment\pythonimmediatecontinuenoarg \toks0="))
 	>>> BalancedTokenList([["abc"]]).put_next()
 	>>> call_TeX_handler(identifier)  # this will assign \toks0 to be the following braced group
@@ -3064,7 +3057,7 @@ def add_TeX_handler_continue_included(t: BalancedTokenList)->str:
 	<BalancedTokenList: a₁₁ b₁₁ c₁₁>
 	"""
 	identifier=get_random_TeX_identifier()
-	P["run_"+identifier+":"].tl(t)
+	P["run_"+identifier+":"].tl(t, global_=True)
 	return identifier
 
 def add_TeX_handler(t: BalancedTokenList)->str:
@@ -3095,7 +3088,7 @@ def call_TeX_handler(identifier: str)->None:
 	The advantage is that it's much faster than using :meth:`BalancedTokenList.execute` every time.
 	Otherwise the effect is identical.
 
-	Of course this is only for the current engine.
+	Of course this is only for the current engine, and is global.
 
 	>>> identifier=add_TeX_handler(BalancedTokenList(r"\advance\count0 by 1"))
 	>>> count[0]=5
@@ -3113,7 +3106,7 @@ def remove_TeX_handler(identifier: str)->None:
 	"""
 	See :func:`call_TeX_handler`.
 	"""
-	P["run_"+identifier+":"].set_eq(T.relax)
+	P["run_"+identifier+":"].set_eq(T.relax, global_=True)
 
 _execute_cache: Dict[Engine, Dict[tuple[Token, ...], str]]={}
 
