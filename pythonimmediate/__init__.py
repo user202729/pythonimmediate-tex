@@ -166,6 +166,8 @@ bootstrap_code_functions: list[EngineDependentCode]=[]
 """
 Internal constant.
 Contains functions that takes an engine object and returns some code before :meth:`substitute_private` is applied on it.
+
+:meta hide-value:
 """
 def mark_bootstrap(code: str)->None:
 	bootstrap_code_functions.append(lambda _engine: code)
