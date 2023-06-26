@@ -118,8 +118,6 @@ from collections import defaultdict
 import enum
 
 T1 = typing.TypeVar("T1")
-def user_documentation(x: T1)->T1:
-	return x
 
 is_sphinx_build = "SPHINX_BUILD" in os.environ
 
@@ -140,18 +138,6 @@ if os.environ.get("pythonimmediatenodebug", "").lower() in ["true", "1"]:
 	debugging=False
 
 FunctionType = typing.TypeVar("FunctionType", bound=Callable)
-
-def export_function_to_module(f: FunctionType)->FunctionType:
-	"""
-	the functions decorated with this decorator are accessible from user code with
-
-	import pythonimmediate
-	pythonimmediate.⟨function name⟩(...)
-	"""
-	assert not hasattr(pythonimmediate, f.__name__), f.__name__
-	setattr(pythonimmediate, f.__name__, f)
-	return f
-
 
 import random
 def surround_delimiter(block: str)->str:
@@ -462,31 +448,6 @@ def run_main_loop_get_return_one()->str:
 	return line[1:]
 
 
-
-user_documentation(
-r"""
-All exported functions can be accessed through the module as ``import pythonimmediate``.
-
-The ``_finish`` functions are internal functions, which must be called \emph{at most} once in each
-``\pythonimmediate:n`` call from [TeX]-to tell [TeX]-what to do.
-
-The ``_local`` functions simply execute the code. These functions will only return when
-the [TeX]-code finishes executing; nevertheless, the [TeX]-code might recursively execute some Python code
-inside it.
-
-A simple example is ``pythonimmediate.run_block_local('123')`` which simply typesets ``123``.
-
-The ``_peek`` functions is the same as above; however, the [TeX]-code must contain an explicit command
-``\pythonimmediatecontinue{...}``.
-
-The argument of ``\pythonimmediatecontinue`` will be ``e``-expanded
-by ``\write`` (note that the written content must not contain any newline character,
-otherwise the behavior is undefined), then returned as a string by the Python code.
-The Python function will only return when ``\pythonimmediatecontinue`` is called.
-
-In other words, ``run_*_local(code)`` is almost identical to ``run_*_peek(code + "\pythonimmediatecontinue {}")``.
-""")
-
 def _run_block_finish(block: str)->None:
 	assert default_engine.status==EngineStatus.waiting
 	engine.write(("block\n" + surround_delimiter(block)).encode('u8'))
@@ -562,7 +523,6 @@ def read_block()->str:
 			lines.append(line)
 
 
-#@export_function_to_module
 class NToken(ABC):
 	"""
 	Represent a possibly-notexpanded token.
@@ -658,7 +618,6 @@ class NToken(ABC):
 		return 0
 
 
-#@export_function_to_module
 class Token(NToken):
 	"""
 	Represent a [TeX] token, excluding the notexpanded possibility.
@@ -1215,7 +1174,6 @@ class ControlSequenceTokenMaker:
 		return ControlSequenceToken(object.__getattribute__(self, "prefix")+a)
 
 
-#@export_function_to_module
 class ControlSequenceToken(Token):
 	r"""
 	Represents a control sequence::
@@ -1356,7 +1314,6 @@ P=ControlSequenceTokenMaker("_pythonimmediate_")  # create private tokens
 if enable_get_attribute:
 	assert isinstance(T.testa, ControlSequenceToken)
 
-#@export_function_to_module
 class Catcode(enum.Enum):
 	"""
 	This class contains a shorthand to allow creating a token with little Python code.
@@ -1412,7 +1369,6 @@ _catcode_value_to_member = {item.value: item for item in Catcode}
 
 C=Catcode
 
-#@export_function_to_module
 @dataclass(repr=False, frozen=True)  # must be frozen because bgroup and egroup below are reused
 class CharacterToken(Token):
 	index: int
@@ -1487,7 +1443,6 @@ space=Catcode.space(" ")
 
 
 
-#@export_function_to_module
 @dataclass(frozen=True)
 class BlueToken(NToken):
 	"""
@@ -1554,7 +1509,6 @@ else:  # Python 3.8 compatibility
 
 def TokenList_e3(s: str)->TokenList: return TokenList.e3(s)
 
-#@export_function_to_module
 class TokenList(TokenListBaseClass):
 	r"""
 	Represent a [TeX] token list, none of which can contain a blue token.
@@ -2011,7 +1965,6 @@ class TokenList(TokenListBaseClass):
 		return int(self.str_if_unicode())
 
 
-#@export_function_to_module
 class BalancedTokenList(TokenList):
 	"""
 	Represents a balanced token list.
@@ -2195,7 +2148,6 @@ if typing.TYPE_CHECKING:
 else:  # Python 3.8 compatibility
 	NTokenListBaseClass = collections.UserList
 
-#@export_function_to_module
 class NTokenList(NTokenListBaseClass):
 	"""
 	Similar to :class:`TokenList`, but can contain blue tokens.
@@ -2714,23 +2666,8 @@ def can_be_mangled_to(original: str, mangled: str)->bool:
 	return normalize_line(original)==normalize_line(mangled)
 
 
-# ======== Python-call-TeX functions
-# ======== additional functions...
 
-user_documentation(
-r"""
-These functions get an argument in the input stream and returns it detokenized.
-
-Which means, for example, ``#`` are doubled, multiple spaces might be collapsed into one, spaces might be introduced
-after a control sequence.
-
-It's undefined behavior if the message's "string representation" contains a "newline character".
-""")
-
-def template_substitute(template: str, pattern: str, substitute: Union[str, Callable[[re.Match], str]], optional: bool=False)->str:
-	"""
-	pattern is a regex
-	"""
+def _template_substitute(template: str, pattern: str, substitute: Union[str, Callable[[re.Match], str]], optional: bool=False)->str:
 	if not optional:
 		#assert template.count(pattern)==1
 		assert len(re.findall(pattern, template))==1
@@ -2949,7 +2886,7 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 	if sync is None:
 		sync=debugging
 		assert not ttp_argtypes
-		TeX_code=template_substitute(TeX_code, "%optional_sync%",
+		TeX_code=_template_substitute(TeX_code, "%optional_sync%",
 							   lambda _: r'\__send_content%naive_send%:e { r }' if sync else '',)
 
 	if sync:
@@ -2960,27 +2897,27 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 	else:
 		sync_code=""
 
-	TeX_code=template_substitute(TeX_code, "%sync%", lambda _: sync_code, optional=True)
+	TeX_code=_template_substitute(TeX_code, "%sync%", lambda _: sync_code, optional=True)
 
 	assert sync is not None
 	if ttp_argtypes: assert sync
 	assert ttp_argtypes.count(TTPEmbeddedLine)<=1
 	identifier=get_random_TeX_identifier()
 
-	TeX_code=template_substitute(TeX_code, "%name%", lambda _: r"\__run_" + identifier + ":")
+	TeX_code=_template_substitute(TeX_code, "%name%", lambda _: r"\__run_" + identifier + ":")
 
 	for i, argtype_ in enumerate(ptt_argtypes):
-		TeX_code=template_substitute(TeX_code, r"%read_arg" + str(i) + r"\(([^)]*)\)%",
+		TeX_code=_template_substitute(TeX_code, r"%read_arg" + str(i) + r"\(([^)]*)\)%",
 							   lambda match: argtype_.read_code(match[1]),
 							   optional=True)
 
 	for i, argtype in enumerate(ttp_argtypes):
 
 
-		TeX_code=template_substitute(TeX_code, f"%send_arg{i}" + r"\(([^)]*)\)%",
+		TeX_code=_template_substitute(TeX_code, f"%send_arg{i}" + r"\(([^)]*)\)%",
 							   lambda match: postprocess_send_code(argtype.send_code(match[1]), i==len(ttp_argtypes)-1),
 							   optional=True)
-		TeX_code=template_substitute(TeX_code, f"%send_arg{i}_var" + r"\(([^)]*)\)%",
+		TeX_code=_template_substitute(TeX_code, f"%send_arg{i}_var" + r"\(([^)]*)\)%",
 							   lambda match: postprocess_send_code(argtype.send_code_var(match[1]), i==len(ttp_argtypes)-1),
 							   optional=True)
 
@@ -3194,7 +3131,6 @@ so that the Python traceback is not interleaved with [TeX] error messages.
 # https://github.com/user202729/pythonimmediate-tex/issues/1
 
 
-#@export_function_to_module
 def run_tokenized_line_peek(line: str, *, check_braces: bool=True, check_newline: bool=True, check_continue: bool=True)->str:
 	check_line(line, braces=check_braces, newline=check_newline, continue_=(True if check_continue else None))
 	return typing.cast(
@@ -3209,7 +3145,6 @@ def run_tokenized_line_peek(line: str, *, check_braces: bool=True, check_newline
 			)(PTTTeXLine(line))[0]
 
 
-#@export_function_to_module
 def run_block_local(block: str)->None:
 	typing.cast(Callable[[PTTBlock], None], Python_call_TeX_local(
 		r"""
@@ -3225,7 +3160,6 @@ def run_block_local(block: str)->None:
 		"""))(PTTBlock.ignore_last_space(block))
 
 
-#@export_function_to_module
 def continue_until_passed_back_str()->str:
 	r"""
 	Usage:
@@ -3240,7 +3174,6 @@ def continue_until_passed_back_str()->str:
 		\cs_new_eq:NN %name% \relax
 		"""))()
 
-#@export_function_to_module
 def continue_until_passed_back()->None:
 	r"""
 	Same as ``continue_until_passed_back_str()`` but nothing can be returned from [TeX] to Python.
@@ -3253,7 +3186,6 @@ def continue_until_passed_back()->None:
 	assert not result
 
 
-#@export_function_to_module
 def expand_once()->None:
 	r"""
 	Expand the following content in the input stream once.
@@ -3508,8 +3440,6 @@ def typeout(s: str)->None:
 	"""
 	_execute_cached(r'\typeout{\_pythonimmediate_arga}', s)
 
-#@export_function_to_module
-@user_documentation
 def peek_next_meaning()->str:
 	r"""
 	Get the meaning of the following token, as a string, using the current ``\escapechar``.
