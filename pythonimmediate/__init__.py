@@ -1589,7 +1589,8 @@ class TokenList(TokenListBaseClass):
 	Most generally, you can construct a token list from any iterable consist of (recursively) iterables,
 	or tokens, or strings. For example::
 
-		a = TokenList([Catcode.letter("a"), "bc", [r"def\gh"]])
+		>>> TokenList([Catcode.letter("a"), "bc", [r"def\gh"]])
+		<TokenList: a₁₁ b₁₁ c₁₁ {₁ d₁₁ e₁₁ f₁₁ \gh }₂>
 
 	This will make `a` be the token list with value ``abc{def\gh }``.
 
@@ -1599,7 +1600,8 @@ class TokenList(TokenListBaseClass):
 
 	As a special case, you can construct from a string::
 
-		a = TokenList("\let \a \b")
+		>>> TokenList(r"\let \a \b")
+		<TokenList: \let \a \b>
 
 	The constructor of other classes such as :class:`BalancedTokenList` and :class:`NTokenList`
 	works the same way.
@@ -1610,12 +1612,19 @@ class TokenList(TokenListBaseClass):
 	  is a ``UserList`` of tokens, and iterating over it gives :class:`Token` objects),
 	  similar to how you can copy a list with the ``list`` constructor::
 
-		a = TokenList(["hello world"])
-		b = TokenList(a)
+		>>> a = TokenList(["hello world"])
+		>>> b = TokenList(a)
+		>>> b
+		<TokenList: h₁₁ e₁₁ l₁₁ l₁₁ o₁₁ w₁₁ o₁₁ r₁₁ l₁₁ d₁₁>
+		>>> a==b
+		True
+		>>> a is b
+		False
 
 	- Construct a token list from a list of tokens::
 
-		a=TokenList([Catcode.letter("a"), Catcode.other("b"), T.test])
+		>>> TokenList([Catcode.letter("a"), Catcode.other("b"), T.test])
+		<TokenList: a₁₁ b₁₂ \test>
 
 	  The above will define ``a`` to be ``ab\test``, provided ``T`` is
 	  the object referred to in :class:`ControlSequenceTokenMaker`.
@@ -1625,7 +1634,10 @@ class TokenList(TokenListBaseClass):
 	By default, strings will be converted to token lists using :meth:`TokenList.e3`, although you can customize it by:
 
 	- Passing the second argument to the constructor.
-	- Manually specify the type: ``TokenList([T.directlua, [*TokenList.fstr("123")]])``.
+	- Manually specify the type:
+
+		>>> TokenList([T.directlua, [*TokenList.fstr(r"hello%world\?")]])
+		<TokenList: \directlua {₁ h₁₂ e₁₂ l₁₂ l₁₂ o₁₂ %₁₂ w₁₂ o₁₂ r₁₂ l₁₂ d₁₂ \\₁₂ ?₁₂ }₂>
 	"""
 
 	@staticmethod
