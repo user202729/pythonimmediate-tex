@@ -154,6 +154,7 @@ Internal constant.
 Contains functions that takes an engine object and returns some code before :meth:`substitute_private` is applied on it.
 
 :meta hide-value:
+:meta private:
 """
 def mark_bootstrap(code: str)->None:
 	bootstrap_code_functions.append(lambda _engine: code)
@@ -226,6 +227,8 @@ def mark_bootstrap_naive_replace(code: str)->None:
 		if :attr:`Engine.config.naive_flush` is ``True``, else become empty
 	- ``%naive_flush%``: replaced with ``\__send_content:e {\__naive_flush_data:}``
 		if :attr:`Engine.config.naive_flush` is ``True``
+
+	:meta private:
 	"""
 	bootstrap_code_functions.append(wrap_naive_replace(code))
 
@@ -457,6 +460,8 @@ def _run_block_finish(block: str)->None:
 def check_line(line: str, *, braces: bool, newline: bool, continue_: Optional[bool])->None:
 	"""
 	check user-provided line before sending to TeX for execution
+
+	:meta private:
 	"""
 	if braces:
 		assert line.count("{") == line.count("}")
@@ -509,10 +514,10 @@ def _readline()->str:
 
 block_delimiter: str="pythonimm?\"\"\"?'''?"
 
-def read_block()->str:
+def _read_block()->str:
 	r"""
-	Internal function to read one block sent from [TeX](including the final delimiter line,
-	but the delimiter line is not returned)
+	Internal function to read one block sent from [TeX]
+	(including the final delimiter line, but the delimiter line is not returned)
 	"""
 	lines: List[str]=[]
 	while True:
@@ -836,11 +841,11 @@ class Token(NToken):
 
 		>>> BalancedTokenList(r'\tl_set:Nn \l_tmpa_tl {1{2}}').execute()
 		>>> T.l_tmpa_tl.tl()
-		<TTPBalancedTokenList: 1₁₂ {₁ 2₁₂ }₂>
+		<BalancedTokenList: 1₁₂ {₁ 2₁₂ }₂>
 		>>> T.l_tmpa_tl.tl(BalancedTokenList('3+4'))
 		<BalancedTokenList: 3₁₂ +₁₂ 4₁₂>
 		>>> T.l_tmpa_tl.tl()
-		<TTPBalancedTokenList: 3₁₂ +₁₂ 4₁₂>
+		<BalancedTokenList: 3₁₂ +₁₂ 4₁₂>
 
 		"""
 		if content is not None:
@@ -1157,8 +1162,15 @@ class ControlSequenceTokenMaker:
 	r"""
 	Shorthand to create :class:`ControlSequenceToken` objects in Python easier.
 
-	There's a default one that can be used as, if you assign ``T=ControlSequenceToken.make``,
-	then ``T.hello`` returns the token ``\hello``.
+	>>> from pythonimmediate import T
+	>>> assert T is ControlSequenceToken.make
+	>>> T.hello
+	<Token: \hello>
+	>>> T["a@b"]  # for the "harder to construct" tokens
+	<Token: \a@b>
+	>>> P=ControlSequenceTokenMaker("__mymodule_")
+	>>> P.a
+	<Token: \__mymodule_a>
 	"""
 	def __init__(self, prefix: str)->None:
 		self.prefix=prefix
@@ -1180,6 +1192,8 @@ class ControlSequenceToken(Token):
 
 		>>> ControlSequenceToken("abc")
 		<Token: \abc>
+
+	The preferred way to construct a control sequence is :data:`T`.
 
 	Some care is needed to construct control sequence tokens whose name contains Unicode characters,
 	as the exact token created depends on whether the engine is Unicode-based:
@@ -1309,6 +1323,9 @@ class ControlSequenceToken(Token):
 ControlSequenceToken.make=ControlSequenceTokenMaker("")
 
 T=ControlSequenceToken.make
+"""
+See :class:`ControlSequenceTokenMaker`.
+"""
 P=ControlSequenceTokenMaker("_pythonimmediate_")  # create private tokens
 
 if enable_get_attribute:
@@ -1316,12 +1333,21 @@ if enable_get_attribute:
 
 class Catcode(enum.Enum):
 	"""
+	Enum, consist of ``begin_group``, ``end_group``, etc.
+
+	The corresponding enum value is the [TeX] code for the catcode:
+
+	>>> Catcode.letter.value
+	11
+
 	This class contains a shorthand to allow creating a token with little Python code.
 	The individual :class:`Catcode` objects
 	can be called with either a character or a character code to create the object::
 
-		Catcode.letter("a")  # creates a token with category code letter and character code "a"=chr(97)
-		Catcode.letter(97)  # same as above
+		>>> C.letter("a")  # creates a token with category code letter and character code "a"=chr(97)
+		<Token: a₁₁>
+		>>> C.letter(97)  # same as above
+		<Token: a₁₁>
 
 	Both of the above forms are equivalent to ``CharacterToken(index=97, catcode=Catcode.letter)``.
 
@@ -1350,19 +1376,26 @@ class Catcode(enum.Enum):
 	def for_token(self)->bool:
 		"""
 		Return whether a :class:`CharacterToken`  may have this catcode.
+
+		>>> Catcode.escape.for_token
+		False
+		>>> Catcode.letter.for_token
+		True
 		"""
 		return self not in (Catcode.escape, Catcode.line, Catcode.ignored, Catcode.comment, Catcode.invalid)
 
 	def __call__(self, ch: Union[str, int])->"CharacterToken":
-		"""
-		Shorthand:
-		Catcode.letter("a") = Catcode.letter(97) = CharacterToken(index=97, catcode=Catcode.letter)
-		"""
 		if isinstance(ch, str): ch=ord(ch)
 		return CharacterToken(ch, self)
 
 	@staticmethod
 	def lookup(x: int)->Catcode:
+		"""
+		Construct from [TeX] code.
+
+		>>> C.lookup(11)
+		<Catcode.letter: 11>
+		"""
 		return _catcode_value_to_member[x]
 
 _catcode_value_to_member = {item.value: item for item in Catcode}
@@ -1371,11 +1404,23 @@ C=Catcode
 
 @dataclass(repr=False, frozen=True)  # must be frozen because bgroup and egroup below are reused
 class CharacterToken(Token):
+	"""
+	Represent a character token. The preferred way to construct a character token
+	is using :data:`C`.
+	"""
+
 	index: int
 	"""
-	The character code of this token. For example ``Catcode.letter("a").index==97``.
+	The character code of this token.
+
+	>>> C.letter("a").index
+	97
 	"""
 	catcode: Catcode
+	"""
+	>>> C.letter("a").catcode
+	<Catcode.letter: 11>
+	"""
 
 	@property
 	def can_blue(self)->bool:
@@ -1384,7 +1429,10 @@ class CharacterToken(Token):
 	@property
 	def chr(self)->str:
 		"""
-		The character of this token. For example ``Catcode.letter("a").chr=="a"``.
+		The character of this token.
+
+		>>> C.letter("a").chr
+		'a'
 		"""
 		return chr(self.index)
 	def __post_init__(self)->None:
@@ -1420,7 +1468,15 @@ class CharacterToken(Token):
 	def simple_detokenize(self, get_catcode: Callable[[int], Catcode])->str:
 		return self.chr
 
-class FrozenRelaxToken(Token):
+class _FrozenRelaxToken(Token):
+	r"""
+	>>> frozen_relax_token
+	<Token: [frozen]\relax>
+	>>> BalancedTokenList(r'\ifnum 0=0\fi').expand_x()
+	<BalancedTokenList: [frozen]\relax>
+
+	:meta public:
+	"""
 	can_blue=False
 	assignable=False
 
@@ -1433,7 +1489,10 @@ class FrozenRelaxToken(Token):
 	def simple_detokenize(self, get_catcode: Callable[[int], Catcode])->str:
 		raise NotImplementedError("This isn't simple!")
 
-frozen_relax_token=FrozenRelaxToken()
+frozen_relax_token=_FrozenRelaxToken()
+r"""
+Constant representing the frozen ``\relax`` token. See :class:`_FrozenRelaxToken`.
+"""
 
 # other special tokens later...
 
@@ -2316,7 +2375,7 @@ class TTPBlock(TeXToPyData, str):
 	send_code_var=r"\__send_block:V {} %naive_flush%".format
 	@staticmethod
 	def read()->"TTPBlock":
-		return TTPBlock(read_block())
+		return TTPBlock(_read_block())
 
 class TTPEBlock(TeXToPyData, str):
 	r"""
@@ -2332,11 +2391,13 @@ class TTPEBlock(TeXToPyData, str):
 	send_code_var=r"\__begingroup_setup_estr: \__send_block%naive_send%:e {{ {} }} \endgroup".format
 	@staticmethod
 	def read()->"TTPEBlock":
-		return TTPEBlock(read_block())
+		return TTPEBlock(_read_block())
 
 class TTPBalancedTokenList(TeXToPyData, BalancedTokenList):
 	send_code=r"\__tlserialize_nodot:Nn \__tmp {{ {} }} \__send_content%naive_send%:e {{\unexpanded\expandafter{{ \__tmp }} }}".format
 	send_code_var=r"\__tlserialize_nodot:NV \__tmp {} \__send_content%naive_send%:e {{\unexpanded\expandafter{{ \__tmp }} }}".format
+	def __repr__(self):
+		return repr(BalancedTokenList(self))
 	@staticmethod
 	def read()->"TTPBalancedTokenList":
 		if engine.is_unicode:
@@ -2471,6 +2532,8 @@ def define_TeX_call_Python(f: Callable[..., None], name: Optional[str]=None, arg
 	:param argtypes: list of argument types. If it's None it will be automatically deduced from the function ``f``'s signature.
 	:param identifier: should be obtained by :func:`get_random_Python_identifier`.
 	:returns: some code (to be executed in ``expl3`` catcode regime) as explained above.
+
+	:meta private:
 	"""
 	if argtypes is None:
 		argtypes=[p.annotation for p in inspect.signature(f).parameters.values()]
@@ -2535,6 +2598,8 @@ def define_internal_handler(f: FunctionType)->FunctionType:
 	Define a TeX function with TeX name = ``f.__name__`` that calls f().
 
 	This does not define the specified function in any particular engine, just add them to the :const:`bootstrap_code`.
+
+	:meta private:
 	"""
 	bootstrap_code_functions.append(define_TeX_call_Python(f))
 	return f
@@ -2597,6 +2662,8 @@ def run_code_redirect_print_TeX(f: Callable[[], Any])->None:
 	is executed will be interpreted as [TeX] code to be executed when the function returns.
 
 	Also, any return value of function ``f`` will be appended to the result.
+
+	:meta private:
 	"""
 	with io.StringIO() as t:
 		with RedirectPrintTeX(t):
@@ -2662,6 +2729,8 @@ def can_be_mangled_to(original: str, mangled: str)->bool:
 		True
 		>>> can_be_mangled_to("a\n", "b\n")
 		False
+
+	:meta private:
 	"""
 	return normalize_line(original)==normalize_line(mangled)
 
@@ -2716,6 +2785,8 @@ def build_Python_call_TeX(T: Type, TeX_code: str, *, recursive: bool=True, sync:
 
 	The Tuple[...] can optionally be a single type, then it is almost equivalent to a tuple of one element
 	It can also be None
+
+	:meta private:
 	"""
 
 	assert T.__origin__ == typing.Callable[[], None].__origin__  # type: ignore
@@ -2787,6 +2858,8 @@ def scan_Python_call_TeX(sourcecode: str, filename: Optional[str]=None)->None:
 	temporary variables.
 
 	Don't use this function on untrusted code.
+
+	:meta private:
 	"""
 	import ast
 	from copy import deepcopy
@@ -2817,6 +2890,8 @@ def scan_Python_call_TeX_module(name: str)->None:
 	"""
 	Internal function.
 	Can be used as ``scan_Python_call_TeX_module(__name__)`` to scan the current module.
+
+	:meta private:
 	"""
 	assert name != "__main__"  # https://github.com/python/cpython/issues/86291
 	scan_Python_call_TeX(inspect.getsource(sys.modules[name]), name)
@@ -2878,6 +2953,8 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 	* the ``r`` is not needed if not recursive and ``ttp_argtypes`` is nonempty
 	  (the output itself tells Python when the [TeX]-code finished)
 	* the first line of the output may be on the same line as the ``r`` itself (done, use :class:`TTPEmbeddedLine` type, although a bit hacky)
+
+	:meta private:
 	"""
 	if ttp_argtypes!=[]:
 		assert sync!=False
@@ -2984,7 +3061,7 @@ def add_TeX_handler_continue_included(t: BalancedTokenList)->str:
 	>>> BalancedTokenList([["abc"]]).put_next()
 	>>> call_TeX_handler(identifier)  # this will assign \toks0 to be the following braced group
 	>>> toks[0]
-	<TTPBalancedTokenList: a₁₁ b₁₁ c₁₁>
+	<BalancedTokenList: a₁₁ b₁₁ c₁₁>
 	"""
 	identifier=get_random_TeX_identifier()
 	P["run_"+identifier+":"].tl(t)
@@ -3011,6 +3088,8 @@ def call_TeX_handler_returns(identifier: str)->str:
 
 def call_TeX_handler(identifier: str)->None:
 	r"""
+	Define some "handlers" in [TeX] that can be called quickly without re-sending the code every time it's called.
+
 	Analog for :func:`add_handler`, :func:`remove_handler`, but on the [TeX] side.
 
 	The advantage is that it's much faster than using :meth:`BalancedTokenList.execute` every time.
@@ -3124,6 +3203,8 @@ Internal function.
 
 We want to make sure the Python traceback is printed strictly before run_error_finish() is called,
 so that the Python traceback is not interleaved with [TeX] error messages.
+
+:meta private:
 """
 
 # normally the close_write above is not necessary but sometimes error can be skipped through
@@ -3190,8 +3271,13 @@ def expand_once()->None:
 	r"""
 	Expand the following content in the input stream once.
 
-	For example, if the following tokens in the input stream are ``\iffalse 1 \else 2 \fi``,
-	then after ``expand_once()`` being called once, the tokens in the input stream will be ``2 \fi``.
+	>>> BalancedTokenList(r'\iffalse 1 \else 2 \fi').put_next()  # now following tokens in the input stream is '\iffalse 1 \else 2 \fi'
+	>>> expand_once()  # now following tokens in the input stream is '2 \fi'
+	>>> Token.get_next()
+	<Token: 2₁₂>
+	>>> Token.get_next()
+	<Token: \fi>
+	>>> BalancedTokenList(r'\fi').execute()
 	"""
 	typing.cast(Callable[[], None], Python_call_TeX_local(
 		r"""
@@ -3210,6 +3296,8 @@ because although Sphinx supports docstring after member
 https://stackoverflow.com/a/20230473
 pytest doctest doesn't
 https://github.com/pytest-dev/pytest/issues/6996
+
+so we use :meta public: to force include docstring of private member in documentation
 """
 
 
@@ -3226,6 +3314,8 @@ class _GroupManager:
 		6
 		>>> count[0]
 		5
+
+	:meta public:
 	"""
 	def begin(self):
 		TokenList(r"\begingroup").execute()
@@ -3248,6 +3338,8 @@ class _CatcodeManager:
 		>>> catcode[97]
 		<Catcode.letter: 11>
 		>>> catcode["a"] = C.letter
+
+	:meta public:
 	"""
 	def __getitem__(self, x: str|int)->Catcode:
 		return Catcode.lookup(
@@ -3296,6 +3388,8 @@ class Umathcode:
 		Umathcode.active
 		>>> Umathcode.active.family
 		1
+
+	:meta public:
 	"""
 
 	family: int
@@ -3343,6 +3437,8 @@ class _UmathcodeManager:
 		>>> from pythonimmediate.engine import ChildProcessEngine
 		>>> with default_engine.set_engine(ChildProcessEngine("luatex")): umathcode["A"]
 		Umathcode(family=1, cls=<MathClass.variable_family: 7>, position=65 'A')
+
+	:meta public:
 	"""
 
 	def _ensure_unicode(self)->None:
@@ -3383,6 +3479,7 @@ class _CountManager:
 
 	As shown in the last example, accessing named count registers can also be done through :meth:`Token.int`.
 
+	:meta public:
 	"""
 	def __getitem__(self, x: str|int)->int:
 		if isinstance(x, int):
@@ -3413,7 +3510,7 @@ class _ToksManager:
 
 		>>> toks[0]=BalancedTokenList('abc')
 		>>> toks[0]
-		<TTPBalancedTokenList: a₁₁ b₁₁ c₁₁>
+		<BalancedTokenList: a₁₁ b₁₁ c₁₁>
 	"""
 	def __getitem__(self, x: int)->BalancedTokenList:
 		return BalancedTokenList([r"\the\toks" + str(x)]).expand_o()
@@ -3448,6 +3545,12 @@ def peek_next_meaning()->str:
 
 	It's undefined behavior if there's a newline (``\newlinechar`` or ``^^J``, the latter is OS-specific)
 	in the meaning string.
+
+	>>> BalancedTokenList("2").put_next()
+	>>> peek_next_meaning()
+	'the character 2'
+	>>> Token.get_next()
+	<Token: 2₁₂>
 	"""
 	return typing.cast(Callable[[], TTPEmbeddedLine], Python_call_TeX_local(
 			r"""
@@ -3491,6 +3594,8 @@ def get_bootstrap_code(engine: Engine)->str:
 	Return the bootstrap code for an engine.
 
 	This is before the call to :meth:`substitute_private`.
+	
+	:meta private:
 	"""
 	return "\n".join(
 			f(engine)

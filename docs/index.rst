@@ -41,6 +41,11 @@ There are different sections of the documentation:
   - Errors in code executed with the ``pycode`` environment gives the correct traceback point to the Python line of code in the TeX file.
   - There are some command-line flags to enable debugging functionalities, which can be passed in follows the documentation in :mod:`pythonimmediate.pytotex`.
 
+.. note::
+  Disclaimer: the sole purpose of this package is to let me do some programming in TeX in a sane programming language.
+
+  Its design is not necessarily good, usually with lots of abstraction layers piled over legacy code.
+
 .. toctree::
    :maxdepth: 4
    :caption: Contents:
