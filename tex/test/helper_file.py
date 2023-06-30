@@ -22,6 +22,14 @@ class Test(unittest.TestCase):
 		self.assertEqual(x, "123")
 		self.assertEqual(y, "456")
 
+	def test_implicit_hash_token(self)->None:
+		with group:
+			T.aaa.set_eq(C.param("#"))
+			C.active("?").set_eq(C.param("#"))
+			for s in [BalancedTokenList([T.aaa]), BalancedTokenList([C.active("?")])]:
+				s.put_next()
+				assert BalancedTokenList.get_next() ==s
+
 	def test_renewcommand_non_Python_defined(self)->None:
 		pythonimmediate.execute(r'\def \testb {}')
 

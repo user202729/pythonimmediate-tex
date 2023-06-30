@@ -941,7 +941,7 @@ r"""
 \def \cC{__tldeserialize_\^} #1 #2        { \csname #1 \expandafter \expandafter \expandafter \endcsname \char_generate:nn {`#2-64} {12} }
 \def \cC{__tldeserialize_\>} #1 #2 \cO\   { \csname #1 \endcsname #2  \cU\  }
 \def \cC{__tldeserialize_\*} #1 #2 \cO\  #3 { \csname #1 \endcsname #2  \char_generate:nn {`#3-64} {12} }
-\def \cC{__tldeserialize_\\} #1 \cO\   #2 { \expandafter \noexpand \csname #1 \endcsname                                  \csname #2 \endcsname }
+\def \cC{__tldeserialize_\\} #1 \cO\   #2 { \unexpanded \expandafter \expandafter \expandafter { \expandafter \noexpand \csname #1 \endcsname }                                 \csname #2 \endcsname }
 \def \cC{__tldeserialize_1} #1        #2 { \char_generate:nn {`#1} {1}                                                   \csname #2 \endcsname }
 \def \cC{__tldeserialize_2} #1        #2 { \char_generate:nn {`#1} {2}                                                   \csname #2 \endcsname }
 \def \cC{__tldeserialize_3} #1        #2 { \char_generate:nn {`#1} {3}                                                   \csname #2 \endcsname }
@@ -952,7 +952,8 @@ r"""
 \def \__tldeserialize_A #1        #2 { \char_generate:nn {`#1} {10}                                                  \csname #2 \endcsname }
 \def \__tldeserialize_B #1        #2 { \char_generate:nn {`#1} {11}                                                  \csname #2 \endcsname }
 \def \__tldeserialize_C #1        #2 { #1                                                   \csname #2 \endcsname }
-\def \__tldeserialize_D #1        #2 { \expandafter \expandafter \expandafter \noexpand \char_generate:nn {`#1} {13} \csname #2 \endcsname }
+\def \__tldeserialize_helper { \expandafter \exp_end: \noexpand }
+\def \__tldeserialize_D #1        #2 { \unexpanded \expandafter { \exp:w \expandafter \expandafter \expandafter \__tldeserialize_helper \char_generate:nn {`#1} {13} } \csname #2 \endcsname }
 \def \__tldeserialize_R #1            { \cFrozenRelax                                                                  \csname #1 \endcsname }
 
 % here #1 is the target token list to store the result to, #2 is a string with the final '.'.
