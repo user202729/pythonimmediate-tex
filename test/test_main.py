@@ -14,10 +14,13 @@ T=ControlSequenceToken.make
 
 
 from pathlib import Path
-for name in ["test_pythonimmediate.tex", "helper_file.py"]:
+# this is a hack, it may be run by multiple processes at the same time, so race condition is inevitable
+# (when symlink_to is executed it's not guaranteed a does not exist)
+for name in ["test_pythonimmediate.tex", "test_pythonimmediate_pyerror.tex", "helper_file.py"]:
 	a=Path(tempfile.gettempdir())/name
 	a.unlink(missing_ok=True)
-	a.symlink_to(Path(__file__).parent.parent/"tex"/"test"/name)
+	try: a.symlink_to(Path(__file__).parent.parent/"tex"/"test"/name)
+	except: pass
 
 
 class Test:
@@ -66,6 +69,29 @@ class Test:
 			with pytest.raises(RuntimeError):
 				BalancedTokenList(r"\directlua{?}").expand_x()
 			assert engine.status==EngineStatus.error
+
+	def test_malformed_error_content(self)->None:
+		r"""
+		In an old version, an error with '\r' in the message will make Python
+		exit improperly which causes a broken pipe error for TeX.
+		"""
+		process=subprocess.run(
+				[
+					"pdflatex", "-shell-escape",
+					r"\RequirePackage{pythonimmediate}"
+					r"\pyc{raise RuntimeError('\\x00\\r\\na \\nerror msg ''123456789')}"
+					r"\loop\advance\count0 1\ifnum\count0<200000\repeat"  # wait to see if Python exit
+					r"\pyc{print(123456789)}"  # call Python again
+					r"\stop"
+					],
+				cwd=tempfile.gettempdir(),
+				stdin=subprocess.DEVNULL,
+				stdout=subprocess.PIPE,
+				stderr=subprocess.PIPE,
+				)
+		assert process.returncode==1, process.returncode
+		assert b'error msg 123456789' in process.stderr
+		assert b'error msg 123456789' in process.stdout  # TeX error reporting facility
 
 	@pytest.mark.parametrize("engine_name", engine_names)
 	@pytest.mark.parametrize("communication_method", ["unnamed-pipe", "multiprocessing-network"])

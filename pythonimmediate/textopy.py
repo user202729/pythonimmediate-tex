@@ -66,7 +66,7 @@ def main()->None:
 				)
 
 		if engine.status==EngineStatus.waiting:
-			run_error_finish(PTTBlock(full_error), PTTBlock(short_error))
+			run_error_finish(PTTBlock.coerce(full_error), PTTBlock.coerce(short_error))
 
 
 if __name__=="__main__":

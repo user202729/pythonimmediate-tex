@@ -2482,11 +2482,24 @@ class PTTTeXLine(PyToTeXData):
 class PTTBlock(PyToTeXData):
 	data: str
 	read_code=r"\__read_block:N {}".format
+
 	@staticmethod
 	def ignore_last_space(s: str)->PTTBlock:
+		"""
+		Construct a block from arbitrary string, deleting trailing spaces on each line.
+		"""
 		return PTTBlock("\n".join(line.rstrip() for line in s.split("\n")))
+
+	@staticmethod
+	def coerce(s: str)->PTTBlock:
+		"""
+		Construct a block from arbitrary string, delete some content if needed.
+		"""
+		return PTTBlock("\n".join(line.rstrip() for line in s.split("\n")))
+
 	def valid(self)->bool:
 		return "\r" not in self.data and all(line==line.rstrip() for line in self.data.splitlines())
+
 	def serialize(self)->bytes:
 		assert self.valid(), self
 		return surround_delimiter(self.data).encode('u8')

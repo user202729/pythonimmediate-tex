@@ -659,7 +659,8 @@ class ChildProcessEngine(Engine):
 		pythonimmediate.engine.TeXProcessError: LaTeX Error: Missing \begin{document}.
 		"""
 		if self.status==EngineStatus.error:
-			log_lines=self._read_log().splitlines()
+			self._log=self._read_log()
+			log_lines=self._log.splitlines()
 
 			self.close()
 			if self._autorestart:
