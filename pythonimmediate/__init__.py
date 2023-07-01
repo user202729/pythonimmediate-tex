@@ -674,6 +674,27 @@ class Token(NToken):
 		"""
 		...
 
+	def is_expandable(self)->bool:
+		r"""
+		>>> T.relax.is_expandable()
+		False
+		>>> T.expandafter.is_expandable()
+		True
+		>>> T.undefined.is_expandable()
+		True
+		>>> BalancedTokenList([r'\protected\def\__protected_empty{}']).execute()
+		>>> T.__protected_empty.is_expandable()
+		True
+		>>> C.active("a").set_eq(T.empty)
+		>>> C.active("a").is_expandable()
+		True
+		>>> C.other("a").is_expandable()
+		False
+		"""
+		return TokenList([
+			T.expandafter, T.ifx, T.noexpand, self, self, C.other("1"), T.fi
+			]).expand_x().str() == ""
+
 	def set_eq(self, other: "NToken", global_: bool=False)->None:
 		"""
 		Assign the meaning of this token to be equivalent to that of the other token.
