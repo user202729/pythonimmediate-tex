@@ -3484,7 +3484,7 @@ class _UmathcodeManager:
 			...
 		RuntimeError: umathcode is not available for non-Unicode engines!
 		>>> from pythonimmediate.engine import ChildProcessEngine
-		>>> with default_engine.set_engine(ChildProcessEngine("luatex")): umathcode["A"]
+		>>> with default_engine.set_engine(luatex_engine): umathcode["A"]
 		Umathcode(family=1, cls=<MathClass.variable_family: 7>, position=65 'A')
 
 	:meta public:
