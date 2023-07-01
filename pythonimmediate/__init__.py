@@ -304,10 +304,12 @@ r"""
 \cs_generate_variant:Nn \__send_block:n {V}
 \cs_generate_variant:Nn \__send_block_naive_flush:n {V}
 
-\AtEndDocument{
-	\__send_content:e {r %naive_inline%}
-	\pythonimmediatelisten
-	\__close_write:
+\bool_if:NF \__child_process {
+	\AtEndDocument{
+		\__send_content:e {r %naive_inline%}
+		\pythonimmediatelisten
+		\__close_write:
+	}
 }
 """)
 # the last one don't need to flush because will close anyway (right?)
@@ -432,8 +434,6 @@ def run_main_loop()->TeXToPyObjectType:
 	assert engine.status==EngineStatus.running
 	while True:
 		line=_readline()
-		if not line: return None
-
 		if line[0]=="i":
 			identifier=line[1:]
 			f=_handlers.get(identifier)
@@ -3041,7 +3041,7 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 				result_=run_main_loop()
 			else:
 				result_=run_main_loop_get_return_one()
-			assert engine.status==EngineStatus.running
+			assert engine.status==EngineStatus.running, engine.status
 
 			result: List[TeXToPyData]=[]
 			if TTPEmbeddedLine not in ttp_argtypes:

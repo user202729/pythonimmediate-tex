@@ -153,6 +153,7 @@ class Engine(ABC):
 				# ignore this line
 				assert self.config.naive_flush
 		if self.status==EngineStatus.error: raise RuntimeError("TeX error!")
+		assert result[-1]==10, result  # 10: '\n'
 		return result[:-1]
 
 	def write(self, s: bytes)->None:
@@ -439,6 +440,23 @@ For Python running inside a [TeX] process, useful attributes are :attr:`~Engine.
 """
 
 
+class TeXProcessExited(Exception):
+	r"""
+	An exception that will be raised if some operation makes the process exits.
+
+	>>> from pythonimmediate import execute, BalancedTokenList
+	>>> execute(r'\documentclass{article}\begin{document}hello world')
+	>>> execute(r'\end{document}')
+	Traceback (most recent call last):
+		...
+	pythonimmediate.engine.TeXProcessExited
+	>>> execute(r'\documentclass{article}\begin{document}hello world')
+	>>> BalancedTokenList(r'\end{document}').execute()
+	Traceback (most recent call last):
+		...
+	pythonimmediate.engine.TeXProcessExited
+	"""
+	pass
 
 class TeXProcessError(RuntimeError): pass
 
@@ -508,6 +526,7 @@ class ChildProcessEngine(Engine):
 		pythonimmediate.engine.TeXProcessError: error already happened
 
 		>>> engine=ChildProcessEngine("pdftex", autorestart=True)
+		>>> count[0]=2
 		>>> with default_engine.set_engine(engine): execute(r'\error')
 		Traceback (most recent call last):
 			...
@@ -608,10 +627,11 @@ class ChildProcessEngine(Engine):
 
 	@staticmethod
 	def _stdout_thread_func(ref: weakref.ref[ChildProcessEngine])->None:
-		engine=ref()
-		assert engine is not None
-		process=engine._process
-		del engine
+		def get_engine()->ChildProcessEngine:
+			engine=ref()
+			assert engine is not None
+			return engine
+		process=get_engine()._process
 		assert process is not None
 		assert process.stdin is not None
 		assert process.stdout is not None
@@ -622,7 +642,9 @@ class ChildProcessEngine(Engine):
 
 		while True:
 			line: bytes=process.stdout.read1()  # type: ignore
-			if not line: break
+			if not line:
+				process.wait(timeout=1)
+				break
 
 			_stdout_buffer+=line
 
@@ -633,18 +655,16 @@ class ChildProcessEngine(Engine):
 				_error_marker_line_seen=_error_marker_line_seen or any(line.startswith(b"<*> ") for line in parts[:-1])
 				_stdout_buffer=parts[-1]
 				if b'!  ==> Fatal error occurred, no output PDF file produced!' in parts[:-1]:
-					engine=ref()
-					assert engine is not None
-					engine.status=EngineStatus.error
+					get_engine().status=EngineStatus.error
 					process.wait()
+					break
 
 			# check potential error
 			if _stdout_buffer == b"? " and _error_marker_line_seen:
-				engine=ref()
-				assert engine is not None
-				engine.status=EngineStatus.error
+				get_engine().status=EngineStatus.error
 				process.stdin.close()  # close the stdin so process will terminate
 				process.wait()
+				break
 				# this is a simple way to break out _read() but it will not allow error recovery
 
 			# debug logging
@@ -715,6 +735,12 @@ class ChildProcessEngine(Engine):
 		self._check_no_error()
 		line=process.stderr.readline()
 		self._check_no_error()
+		if not line:
+			process.wait()
+			self.close()
+			if self._autorestart:
+				self._start_process()
+			raise TeXProcessExited
 		return line
 
 	def _write(self, s: bytes)->None:
@@ -736,8 +762,9 @@ class ChildProcessEngine(Engine):
 
 		if not process.poll():
 			# process has not terminated (it's possible for process to already terminate if it's killed on error)
-			with default_engine.set_engine(self):
-				pythonimmediate.run_none_finish()
+			if self.status==EngineStatus.waiting:
+				with default_engine.set_engine(self):
+					pythonimmediate.run_none_finish()
 			process.wait()
 
 		process.stdin.close()
