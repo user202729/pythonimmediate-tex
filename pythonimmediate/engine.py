@@ -15,7 +15,9 @@ import atexit
 import enum
 from pathlib import Path
 import tempfile
+import weakref
 
+import pythonimmediate
 from . import communicate
 from .communicate import GlobalConfiguration
 
@@ -552,7 +554,7 @@ class ChildProcessEngine(Engine):
 
 
 		# create thread listen for stdout
-		self._stdout_thread=threading.Thread(target=self._stdout_thread_func, daemon=True)
+		self._stdout_thread=threading.Thread(target=ChildProcessEngine._stdout_thread_func, args=(weakref.ref(self),), daemon=True)
 		self._stdout_thread.start()
 
 		from . import surround_delimiter, substitute_private, get_bootstrap_code
@@ -589,40 +591,49 @@ class ChildProcessEngine(Engine):
 			return f"<{s} closed>"
 		return s
 
-	def _stdout_thread_func(self)->None:
-		assert self._process is not None
-		assert self._process.stdin is not None
-		assert self._process.stdout is not None
+	@staticmethod
+	def _stdout_thread_func(ref: weakref.ref[ChildProcessEngine])->None:
+		engine=ref()
+		assert engine is not None
+		process=engine._process
+		del engine
+		assert process is not None
+		assert process.stdin is not None
+		assert process.stdout is not None
 
-		self._error_marker_line_seen: bool=False
-		self._stdout_lines: List[bytes]=[]  # Note that this is asynchronously populated so values may not be always correct
-		self._stdout_buffer=bytearray()  # remaining part that does not fit in any line
+		_error_marker_line_seen: bool=False
+		_stdout_lines: List[bytes]=[]  # Note that this is asynchronously populated so values may not be always correct
+		_stdout_buffer=bytearray()  # remaining part that does not fit in any line
 
 		while True:
-			line: bytes=self._process.stdout.read1()  # type: ignore
+			line: bytes=process.stdout.read1()  # type: ignore
 			if not line: break
 
-			self._stdout_buffer+=line
+			_stdout_buffer+=line
 
 			if b"\n" in line:
-				# add complete lines to self._stdout_lines and update self._error_marker_line_seen
-				parts = self._stdout_buffer.split(b"\n")
-				self._stdout_lines+=map(bytes, parts[:-1])
-				self._error_marker_line_seen=self._error_marker_line_seen or any(line.startswith(b"<*> ") for line in parts[:-1])
-				self._stdout_buffer=parts[-1]
+				# add complete lines to _stdout_lines and update _error_marker_line_seen
+				parts = _stdout_buffer.split(b"\n")
+				_stdout_lines+=map(bytes, parts[:-1])
+				_error_marker_line_seen=_error_marker_line_seen or any(line.startswith(b"<*> ") for line in parts[:-1])
+				_stdout_buffer=parts[-1]
 				if b'!  ==> Fatal error occurred, no output PDF file produced!' in parts[:-1]:
-					self.status=EngineStatus.error
-					self._process.wait()
+					engine=ref()
+					assert engine is not None
+					engine.status=EngineStatus.error
+					process.wait()
 
 			# check potential error
-			if self._stdout_buffer == b"? " and self._error_marker_line_seen:
-				self.status=EngineStatus.error
-				self._process.stdin.close()  # close the stdin so process will terminate
-				self._process.wait()
+			if _stdout_buffer == b"? " and _error_marker_line_seen:
+				engine=ref()
+				assert engine is not None
+				engine.status=EngineStatus.error
+				process.stdin.close()  # close the stdin so process will terminate
+				process.wait()
 				# this is a simple way to break out _read() but it will not allow error recovery
 
 			# debug logging
-			#sys.stderr.write(f" | {self._stdout_lines=} | {self._stdout_buffer=} | {self._error_marker_line_seen=} | {self.status=}\n")
+			#sys.stderr.write(f" | {_stdout_lines=} | {_stdout_buffer=} | {_error_marker_line_seen=} | {self.status=}\n")
 
 	def get_process(self)->subprocess.Popen:
 		if self._process is None:
@@ -710,9 +721,8 @@ class ChildProcessEngine(Engine):
 
 		if not process.poll():
 			# process has not terminated (it's possible for process to already terminate if it's killed on error)
-			from . import run_none_finish
 			with default_engine.set_engine(self):
-				run_none_finish()
+				pythonimmediate.run_none_finish()
 			process.wait()
 
 		process.stdin.close()
