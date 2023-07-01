@@ -7,8 +7,7 @@ import pytest
 
 import pythonimmediate
 from pythonimmediate.engine import ChildProcessEngine, default_engine, engine_names, engine_name_to_latex_executable, EngineName, EngineStatus
-from pythonimmediate import TokenList, ControlSequenceToken, BalancedTokenList
-from pythonimmediate import Catcode as C
+from pythonimmediate import TokenList, ControlSequenceToken, BalancedTokenList, Catcode, C, toks
 
 T=ControlSequenceToken.make
 
@@ -21,7 +20,6 @@ for name in ["test_pythonimmediate.tex", "test_pythonimmediate_pyerror.tex", "he
 	a.unlink(missing_ok=True)
 	try: a.symlink_to(Path(__file__).parent.parent/"tex"/"test"/name)
 	except: pass
-
 
 class Test:
 	@pytest.mark.parametrize("engine_name", engine_names)
@@ -218,3 +216,20 @@ class Test:
 				t=threading.Thread(target=f)
 				t.start()
 				t.join()
+
+@pytest.mark.parametrize("engine_name", engine_names)
+@pytest.mark.parametrize("cat", [C.other, C.letter, C.param, C.alignment, C.space])
+class TestBenchmarkTl:
+	def test_bench_send_simple_tl(self, engine_name: str, benchmark, cat: Catcode)->None:
+		with ChildProcessEngine(engine_name) as e, default_engine.set_engine(e):
+			t=BalancedTokenList([r"\toks0=", [cat("?")]*500])
+			@benchmark
+			def _():
+				t.execute()
+
+	def test_bench_recv_simple_tl(self, engine_name: str, benchmark, cat: Catcode)->None:
+		with ChildProcessEngine(engine_name) as e, default_engine.set_engine(e):
+			toks[1]=[cat("?")]*500
+			@benchmark
+			def _():
+				toks[1]

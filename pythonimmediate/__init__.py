@@ -130,7 +130,7 @@ debug=lambda *args, **kwargs: None  # type: ignore
 
 
 expansion_only_can_call_Python=False  # normally. May be different in LuaTeX etc.
-from .engine import Engine, default_engine, default_engine as engine, ParentProcessEngine, EngineStatus, TeXProcessError
+from .engine import Engine, default_engine, default_engine as engine, ParentProcessEngine, EngineStatus, TeXProcessError, ChildProcessEngine
 
 
 debugging: bool=True
@@ -3069,28 +3069,58 @@ r"""
 \cs_new_eq:NN %name% \relax
 """, finish=True, sync=False))
 
-def add_TeX_handler_continue_included(t: BalancedTokenList)->str:
+def _make_param_spec(x: int)->BalancedTokenList:
 	r"""
-	Similar to :func:`add_TeX_handler`, however the difference is:
+	Internal function.
 
-	Here you need to manually include ``\pythonimmediatecontinuenoarg`` token when you want to return control to Python.
-
-	>>> with group: identifier=add_TeX_handler_continue_included(BalancedTokenList(
-	...		r"\afterassignment\pythonimmediatecontinuenoarg \toks0="))
-	>>> BalancedTokenList([["abc"]]).put_next()
-	>>> call_TeX_handler(identifier)  # this will assign \toks0 to be the following braced group
-	>>> toks[0]
-	<BalancedTokenList: a₁₁ b₁₁ c₁₁>
+	>>> _make_param_spec(0)
+	<BalancedTokenList: >
+	>>> _make_param_spec(1)
+	<BalancedTokenList: #₆ 1₁₂>
+	>>> _make_param_spec(9)
+	<BalancedTokenList: #₆ 1₁₂ #₆ 2₁₂ #₆ 3₁₂ #₆ 4₁₂ #₆ 5₁₂ #₆ 6₁₂ #₆ 7₁₂ #₆ 8₁₂ #₆ 9₁₂>
+	>>> _make_param_spec(10)
+	Traceback (most recent call last):
+		...
+	AssertionError
 	"""
+	assert 0<=x<=9
+	return BalancedTokenList([t for i in range(1, x+1) for t in [C.param("#"), C.other(str(i))]])
+
+def add_TeX_handler_param(t: BalancedTokenList, param: int|BalancedTokenList, *, continue_included: bool=False)->str:
+	r"""
+	Similar to :func:`add_TeX_handler`, however it will take parameters following in the input stream.
+
+	>>> identifier=add_TeX_handler_param(BalancedTokenList(r"\def\l_tmpa_tl{#2,#1}"), 2)
+	>>> BalancedTokenList(r'{123}{456}').put_next()
+	>>> call_TeX_handler(identifier)
+	>>> T.l_tmpa_tl.tl()
+	<BalancedTokenList: 4₁₂ 5₁₂ 6₁₂ ,₁₂ 1₁₂ 2₁₂ 3₁₂>
+	>>> remove_TeX_handler(identifier)
+	"""
+	if not continue_included: t=t+[T.pythonimmediatecontinuenoarg]
+	identifier=get_random_TeX_identifier()
+	if isinstance(param, int): param=_make_param_spec(param)
+	BalancedTokenList([T.gdef, P["run_"+identifier+":"], *param, t]).execute()
+	return identifier
+
+def add_TeX_handler(t: BalancedTokenList, *, continue_included: bool=False)->str:
+	r"""
+	See :func:`call_TeX_handler`.
+
+	:param continue_included: If this is set to True, ``\pythonimmediatecontinuenoarg`` token should be put when you want to return control to Python.
+
+		>>> with group: identifier=add_TeX_handler(BalancedTokenList(
+		...		r"\afterassignment\pythonimmediatecontinuenoarg \toks0="), continue_included=True)
+		>>> BalancedTokenList([["abc"]]).put_next()
+		>>> call_TeX_handler(identifier)  # this will assign \toks0 to be the following braced group
+		>>> toks[0]
+		<BalancedTokenList: a₁₁ b₁₁ c₁₁>
+	"""
+	if not continue_included: t=t+[T.pythonimmediatecontinuenoarg]
 	identifier=get_random_TeX_identifier()
 	P["run_"+identifier+":"].tl(t, global_=True)
 	return identifier
-
-def add_TeX_handler(t: BalancedTokenList)->str:
-	"""
-	See :func:`call_TeX_handler`.
-	"""
-	return add_TeX_handler_continue_included(t + [T.pythonimmediatecontinuenoarg])
 
 def call_TeX_handler_returns(identifier: str)->str:
 	if engine.status==EngineStatus.error:
