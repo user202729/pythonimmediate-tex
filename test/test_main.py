@@ -260,3 +260,6 @@ class TestBenchmarkTl:
 			@benchmark
 			def _():
 				toks[1]
+
+def test_bench_import(benchmark)->None:
+	benchmark(subprocess.run, ["python", "-c", "from pythonimmediate import*"], check=True)
