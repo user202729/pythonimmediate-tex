@@ -352,16 +352,31 @@ class DefaultEngine(Engine, threading.local):
 		"""
 
 	def set_engine(self, engine: Optional[Engine])->_SetDefaultEngineContextManager:
-		"""
+		r"""
 		Set the default engine to another engine.
 
 		Can also be used as a context manager to revert to the original engine.
 		Example::
 
-			with default_engine.set_engine(new_engine) as engine:  # only for this thread
-				assert engine is new_engine
-				execute("hello world")
-			# now the original engine is restored
+		>>> from pythonimmediate import execute
+		>>> new_engine=ChildProcessEngine("pdftex")
+		>>> with default_engine.set_engine(new_engine) as engine:  # only for this thread
+		... 	assert engine is new_engine
+		... 	assert default_engine.engine is new_engine
+		... 	execute(r"\count0=5")
+		>>> # now the original engine is restored
+		>>> new_engine.close()
+
+		Note that the following form, while allowed, is discouraged because it may cause resource leak
+		(the engine may keeps running even after the block exits depends on whether it's garbage-collected):
+
+		>>> with default_engine.set_engine(ChildProcessEngine("pdftex")):
+		...		pass
+
+		It's recommended to write the following instead, which will close ``e`` at the end of the block:
+
+		>>> with ChildProcessEngine("pdftex") as e, default_engine.set_engine(e):
+		...		pass
 		"""
 		assert engine is not self
 		result=_SetDefaultEngineContextManager(old_engine=self.engine, new_engine=engine)
