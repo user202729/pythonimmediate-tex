@@ -2,6 +2,8 @@
 Abstract engine class.
 """
 
+from __future__ import annotations
+
 from typing import Optional, Literal, Iterable, List, Dict, Tuple, Callable
 from abc import ABC, abstractmethod
 import sys
@@ -514,7 +516,7 @@ class ChildProcessEngine(Engine):
 		A temporary working directory for the engine.
 		"""
 
-		self.process: Optional[subprocess.Popen]=None  # guard like this so that __del__ does not blow up if Popen() fails
+		self._process: Optional[subprocess.Popen]=None  # guard like this so that __del__ does not blow up if Popen() fails
 		self._start_process()
 
 	def _create_directory(self)->None:
@@ -533,10 +535,10 @@ class ChildProcessEngine(Engine):
 		#	# we assume nothing maliciously create a file named `.symlink-to-stderr` that is not a symlink to stderr...
 		#	pass
 
-		assert self.process is None
+		assert self._process is None
 		if not self.directory.is_dir(): self._create_directory()
 		self.status=EngineStatus.waiting
-		self.process=subprocess.Popen(
+		self._process=subprocess.Popen(
 				[
 					engine_name_to_latex_executable[self._name], "--shell-escape",
 						*self._args, r"\RequirePackage[child-process]{pythonimmediate}\pythonimmediatelisten\stop"],
@@ -583,21 +585,21 @@ class ChildProcessEngine(Engine):
 		s = f"ChildProcessEngine('{self.name}')"
 		if self.status==EngineStatus.error:
 			return f"<{s} error>"
-		if not self.process:
+		if not self._process:
 			return f"<{s} closed>"
 		return s
 
 	def _stdout_thread_func(self)->None:
-		assert self.process is not None
-		assert self.process.stdin is not None
-		assert self.process.stdout is not None
+		assert self._process is not None
+		assert self._process.stdin is not None
+		assert self._process.stdout is not None
 
 		self._error_marker_line_seen: bool=False
 		self._stdout_lines: List[bytes]=[]  # Note that this is asynchronously populated so values may not be always correct
 		self._stdout_buffer=bytearray()  # remaining part that does not fit in any line
 
 		while True:
-			line: bytes=self.process.stdout.read1()  # type: ignore
+			line: bytes=self._process.stdout.read1()  # type: ignore
 			if not line: break
 
 			self._stdout_buffer+=line
@@ -610,22 +612,22 @@ class ChildProcessEngine(Engine):
 				self._stdout_buffer=parts[-1]
 				if b'!  ==> Fatal error occurred, no output PDF file produced!' in parts[:-1]:
 					self.status=EngineStatus.error
-					self.process.wait()
+					self._process.wait()
 
 			# check potential error
 			if self._stdout_buffer == b"? " and self._error_marker_line_seen:
 				self.status=EngineStatus.error
-				self.process.stdin.close()  # close the stdin so process will terminate
-				self.process.wait()
+				self._process.stdin.close()  # close the stdin so process will terminate
+				self._process.wait()
 				# this is a simple way to break out _read() but it will not allow error recovery
 
 			# debug logging
 			#sys.stderr.write(f" | {self._stdout_lines=} | {self._stdout_buffer=} | {self._error_marker_line_seen=} | {self.status=}\n")
 
 	def get_process(self)->subprocess.Popen:
-		if self.process is None:
+		if self._process is None:
 			raise RuntimeError("process is already closed")
-		return self.process
+		return self._process
 
 	def _read_log(self)->bytes:
 		return (self.directory/"texput.log").read_bytes()
@@ -720,18 +722,18 @@ class ChildProcessEngine(Engine):
 		if self.status!=EngineStatus.error:
 			self.status=EngineStatus.exited
 
-		self.process=None
+		self._process=None
 		self._directory.cleanup()
 
 	def __del__(self)->None:
-		if self.process is not None:
+		if self._process is not None:
 			self.close()
 
-	def __enter__(self)->Engine:
+	def __enter__(self)->ChildProcessEngine:
 		return self
 
 	def __exit__(self, exc_type, exc_val, exc_tb)->None:
-		if self.process is not None:
+		if self._process is not None:
 			self.close()
 
 

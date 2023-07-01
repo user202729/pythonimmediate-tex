@@ -3,6 +3,7 @@ import tempfile
 from typing import List
 import re
 
+import psutil
 import pytest
 
 import pythonimmediate
@@ -217,19 +218,45 @@ class Test:
 				t.start()
 				t.join()
 
+def test_process_leak()->None:
+	with ChildProcessEngine("pdftex") as e:
+		assert e._process is not None
+		p=psutil.Process(e._process.pid)
+		assert p.is_running()
+	assert not p.is_running()
+
+def test_process_leak_2()->None:
+	with ChildProcessEngine("pdftex") as e:
+		assert e._process is not None
+		p=psutil.Process(e._process.pid)
+		with default_engine.set_engine(e):
+			assert p.is_running()
+		assert p.is_running()
+	assert not p.is_running()
+
+@pytest.mark.parametrize("explicitly_collect", [True, False])
+def test_process_garbage_collection(explicitly_collect: bool)->None:
+	with default_engine.set_engine(ChildProcessEngine("pdftex")):
+		p=psutil.Process(default_engine.engine._process.pid)  # type: ignore
+		assert p.is_running()
+	if explicitly_collect:
+		import gc
+		gc.collect()
+	assert not p.is_running()
+
 @pytest.mark.parametrize("engine_name", engine_names)
 @pytest.mark.parametrize("cat", [C.other, C.letter, C.param, C.alignment, C.space])
 class TestBenchmarkTl:
-	def test_bench_send_simple_tl(self, engine_name: str, benchmark, cat: Catcode)->None:
+	def test_bench_send_simple_tl(self, engine_name: EngineName, benchmark, cat: Catcode)->None:
 		with ChildProcessEngine(engine_name) as e, default_engine.set_engine(e):
 			t=BalancedTokenList([r"\toks0=", [cat("?")]*500])
 			@benchmark
 			def _():
 				t.execute()
 
-	def test_bench_recv_simple_tl(self, engine_name: str, benchmark, cat: Catcode)->None:
+	def test_bench_recv_simple_tl(self, engine_name: EngineName, benchmark, cat: Catcode)->None:
 		with ChildProcessEngine(engine_name) as e, default_engine.set_engine(e):
-			toks[1]=[cat("?")]*500
+			toks[1]=BalancedTokenList([cat("?")])*500
 			@benchmark
 			def _():
 				toks[1]
