@@ -130,7 +130,7 @@ debug=lambda *args, **kwargs: None  # type: ignore
 
 
 expansion_only_can_call_Python=False  # normally. May be different in LuaTeX etc.
-from .engine import Engine, default_engine, default_engine as engine, ParentProcessEngine, EngineStatus, TeXProcessError, ChildProcessEngine
+from .engine import Engine, default_engine, default_engine as engine, ParentProcessEngine, EngineStatus, TeXProcessError, TeXProcessExited, ChildProcessEngine
 
 
 debugging: bool=True

@@ -8,7 +8,7 @@ import pytest
 
 import pythonimmediate
 from pythonimmediate.engine import ChildProcessEngine, default_engine, engine_names, engine_name_to_latex_executable, EngineName, EngineStatus
-from pythonimmediate import TokenList, ControlSequenceToken, BalancedTokenList, Catcode, C, toks
+from pythonimmediate import TokenList, ControlSequenceToken, BalancedTokenList, Catcode, C, toks, execute, TeXProcessExited
 
 T=ControlSequenceToken.make
 
@@ -263,3 +263,11 @@ class TestBenchmarkTl:
 
 def test_bench_import(benchmark)->None:
 	benchmark(subprocess.run, ["python", "-c", "from pythonimmediate import*"], check=True)
+
+@pytest.mark.parametrize("engine_name", engine_names)
+def test_bench_start_child_process(benchmark, engine_name: EngineName)->None:
+	@benchmark
+	def _()->None:
+		with ChildProcessEngine(engine_name) as e, default_engine.set_engine(e):
+			try: execute(r'\documentclass{article}\begin{document}hello world\end{document}')
+			except TeXProcessExited: pass
