@@ -1,4 +1,6 @@
 return function(cmd)
+	-- as mentioned in the .sty file this allows explicit flush after each write
+	-- it's not easy to eliminate having to spawn 2 Python processes even with Lua https://stackoverflow.com/questions/8716527/interactive-popen-lua-call
 	local process = io.popen(cmd, "w")
 
 	local function_table=lua.get_functions_table()
