@@ -1006,10 +1006,15 @@ r"""
 	\endgroup
 	\tl_set_eq:NN #1 \__gtmp
 }
+}
 
-"""
+% deserialize as above but #2 does not end with '.'.
+\cs_new_protected:Npn \__tldeserialize_nodot:Nn #1 #2 {
+	\__tldeserialize_dot:Nn #1 {#2 .}
+}
+""")
 
-+
+mark_bootstrap(
 
 # callback will be called exactly once with the serialized result (either other or space catcode)
 # and, as usual, with nothing leftover following in the input stream
@@ -1037,6 +1042,8 @@ r"""
 		\__process_gobble {#char} #cat
 	}
 }
+
+\precattl_exec:n {
 
 \def \__frozen_relax_container { \cFrozenRelax }
 \def \__null_cs_container { \cC{} }
@@ -1123,28 +1130,26 @@ r"""
 .replace("#token", "#3")
 .replace("#callback", "#4")
 
-).replace("__", "__tlserialize_")
-
 +
 
 r"""
-
-}
-
-% deserialize as above but #2 does not end with '.'.
-\cs_new_protected:Npn \__tldeserialize_nodot:Nn #1 #2 {
-	\__tldeserialize_dot:Nn #1 {#2 .}
 }
 
 % serialize token list in #2 store to #1.
-\cs_new_protected:Npn \__tlserialize_nodot_unchecked:Nn #1 #2 {
+\cs_new_protected:Npn \__nodot_unchecked:Nn #1 #2 {
 	\tl_build_begin:N #1
-	\tl_set:Nn \__tlserialize_callback { \tl_build_put_right:Nn #1 }
+	\tl_set:Nn \__callback { \tl_build_put_right:Nn #1 }
 	\tl_analysis_map_inline:nn {#2} {
-		\__tlserialize_char_unchecked:nNnN {##2}##3{##1} \__tlserialize_callback
+		\__char_unchecked:nNnN {##2}##3{##1} \__callback
 	}
 	\tl_build_end:N #1
 }
+"""
+
+).replace("__", "__tlserialize_"))
+
+mark_bootstrap(
+r"""
 
 % serialize token list in #2 store to #1. Call T or F branch depends on whether serialize is successful.
 % #1 must be different from \__tlserialize_tmp.
