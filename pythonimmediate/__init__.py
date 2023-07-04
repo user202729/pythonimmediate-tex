@@ -159,6 +159,14 @@ Contains functions that takes an engine object and returns some code before :met
 def mark_bootstrap(code: str)->None:
 	bootstrap_code_functions.append(lambda _engine: code)
 
+# check TeX package version.
+mark_bootstrap(r"""
+\exp_args:Nx \str_if_in:nnF {\csname ver@pythonimmediate.sty\endcsname} {%} {
+	\msg_new:nnn {pythonimmediate} {incompatible-version} {Incompatible~ TeX~ package~ version~ (#1)~ installed!~ Need~ at~ least~ %.}
+	\msg_error:nnx {pythonimmediate} {incompatible-version} {\csname ver@pythonimmediate.sty\endcsname}
+}
+""".replace("%", "v0.5.0"))
+
 def substitute_private(code: str)->str:
 	assert "_pythonimmediate_" not in code  # avoid double-apply this function
 	return (code
@@ -167,7 +175,7 @@ def substitute_private(code: str)->str:
 		 )
 
 def postprocess_send_code(s: str, put_sync: bool)->str:
-	assert have_naive_replace(s)
+	assert have_naive_replace(s), s
 	if put_sync:
 		# keep the naive-sync operation
 		pass
@@ -211,6 +219,7 @@ def naive_replace(code: str, x: Union[Engine, bool])->str:
 		code1=code1.replace("%naive_inline%", "")
 		code1=code1.replace("%naive_flush%", "")
 		code1=code1.replace("%naive_send%", "")
+	code1=code1.replace("%naive_ignore%", "")
 	return code1
 
 def have_naive_replace(code: str)->bool:
@@ -782,8 +791,16 @@ class Token(NToken):
 		else:
 			return Token.deserialize(data)
 
+	@typing.overload
 	@staticmethod
-	def get_next()->"Token":
+	def get_next()->Token: ...
+
+	@typing.overload
+	@staticmethod
+	def get_next(count: int)->TokenList: ...
+
+	@staticmethod
+	def get_next(count: Optional[int]=None)->Token|TokenList:
 		r"""
 		Get the following token.
 
@@ -796,7 +813,7 @@ class Token(NToken):
 			tokenize up to 2 tokens ahead (including the returned token),
 			as well as occasionally return the wrong token in unavoidable cases.
 		"""
-		return Token.deserialize_bytes(
+		if count is None: return Token.deserialize_bytes(
 			typing.cast(Callable[[], TTPRawLine], Python_call_TeX_local(
 				r"""
 				\cs_new_protected:Npn \__get_next_callback #1 {
@@ -808,6 +825,8 @@ class Token(NToken):
 					}
 				}
 				""", recursive=False))())
+		assert count>=0
+		return TokenList([Token.get_next() for __ in range(count)])
 
 	@staticmethod
 	def peek_next()->"Token":
@@ -1014,15 +1033,16 @@ r"""
 }
 """)
 
-mark_bootstrap(
-
 # callback will be called exactly once with the serialized result (either other or space catcode)
 # and, as usual, with nothing leftover following in the input stream
 
 # the token itself can be gobbled or \edef-ed to discard it.
 # if it's active outer or control sequence outer then gobble fails.
 # if it's { or } then edef fails.
-(
+@bootstrap_code_functions.append
+def _tlserialize(engine: Engine)->str:
+	#if engine.name=="luatex": return ""
+	return (
 
 r"""
 
@@ -1135,6 +1155,13 @@ r"""
 r"""
 }
 
+"""
+
++
+
+(
+		"" if engine.name=="luatex" else 
+r"""
 % serialize token list in #2 store to #1.
 \cs_new_protected:Npn \__nodot_unchecked:Nn #1 #2 {
 	\tl_build_begin:N #1
@@ -1144,9 +1171,9 @@ r"""
 	}
 	\tl_build_end:N #1
 }
-"""
+""")
 
-).replace("__", "__tlserialize_"))
+).replace("__", "__tlserialize_")
 
 mark_bootstrap(
 r"""
@@ -1166,11 +1193,11 @@ r"""
 
 \cs_new_protected:Npn \__tlserialize_nodot:NnT #1 #2 #3 { \__tlserialize_nodot:NnTF #1 {#2} {#3} {} }
 
-\msg_new:nnn {pythonimmediate} {cannot-serialize} {Token~list~cannot~be~serialized}
+\msg_new:nnn {pythonimmediate} {cannot-serialize} {Token~list~cannot~be~serialized~<#1>}
 
 \cs_new_protected:Npn \__tlserialize_nodot:Nn #1 #2{
 	\__tlserialize_nodot:NnF #1 {#2} {
-		\msg_error:nn {pythonimmediate} {cannot-serialize}
+		\msg_error:nnx {pythonimmediate} {cannot-serialize} {\detokenize{#2} -> #1}
 	}
 }
 
@@ -2425,9 +2452,19 @@ class TTPEBlock(TeXToPyData, str):
 	def read()->"TTPEBlock":
 		return TTPEBlock(_read_block())
 
+@bootstrap_code_functions.append
+def _send_balanced_tl(engine: Engine)->str:
+	if engine.name=="luatex": return ""
+	return naive_replace(r"""
+	\cs_new_protected:Npn \__send_balanced_tl:n #1 {
+		\__tlserialize_nodot:Nn \__tmp { #1 }
+		\__send_content%naive_send%:e {\unexpanded\expandafter{ \__tmp } }
+	}
+	""", engine)
+
 class TTPBalancedTokenList(TeXToPyData, BalancedTokenList):
-	send_code=r"\__tlserialize_nodot:Nn \__tmp {{ {} }} \__send_content%naive_send%:e {{\unexpanded\expandafter{{ \__tmp }} }}".format
-	send_code_var=r"\__tlserialize_nodot:NV \__tmp {} \__send_content%naive_send%:e {{\unexpanded\expandafter{{ \__tmp }} }}".format
+	send_code=r"\__send_balanced_tl:n {{ {} }}%naive_ignore%".format
+	send_code_var=r"\exp_args:NV \__send_balanced_tl:n {}%naive_ignore%".format
 	def __repr__(self):
 		return repr(BalancedTokenList(self))
 	@staticmethod
@@ -3192,7 +3229,7 @@ def remove_TeX_handler(identifier: str)->None:
 
 _execute_cache: Dict[Engine, Dict[tuple[Token, ...], str]]={}
 
-def _execute_cached0(e: BalancedTokenList)->None:
+def _execute_cached0(e: BalancedTokenList, *, continue_included: bool=False)->None:
 	r"""
 	Internal function, identical to :meth:`BalancedTokenList.execute` but cache the value of ``e``
 	such that re-execution of the same token list will be faster.
@@ -3209,7 +3246,16 @@ def _execute_cached0(e: BalancedTokenList)->None:
 	l=_defaultget_with_cleanup(_execute_cache, dict)
 	identifier=l.get(tuple(e))
 	if identifier is None:
-		identifier=l[tuple(e)]=add_TeX_handler(e)
+		identifier=l[tuple(e)]=add_TeX_handler(e, continue_included=continue_included)
+	call_TeX_handler(identifier)
+
+_execute_arg_cache: Dict[Engine, Dict[tuple[int, tuple[Token, ...]], str]]={}
+def _execute_cached0_arg(e: BalancedTokenList, count: int)->None:
+	assert e.is_balanced()
+	l=_defaultget_with_cleanup(_execute_arg_cache, dict)
+	identifier=l.get((count, tuple(e)))
+	if identifier is None:
+		identifier=l[(count, tuple(e))]=add_TeX_handler_param(e, count)
 	call_TeX_handler(identifier)
 
 _arg_tokens=[P.arga, P.argb, P.argc]
@@ -3229,6 +3275,21 @@ def _store_to_arg1(e: BalancedTokenList)->None:
 		_arg1.str(e.str())
 	else:
 		_arg1.tl(e)
+
+def _putnext_braced_arg1()->None:
+	"""
+	>>> _store_to_arg1(BalancedTokenList('ab'))
+	>>> _putnext_braced_arg1()
+	>>> Token.get_next(4)
+	<TokenList: {₁ a₁₁ b₁₁ }₂>
+	"""
+	typing.cast(Callable[[], None], Python_call_TeX_local(
+		r"""
+		\cs_new_protected:Npn %name% {
+			%optional_sync%
+			\expandafter \pythonimmediatelisten \expandafter { \__arga }
+		}
+		""", recursive=False))()
 
 def _copy_arg1_to(e: Token)->None:
 	if e==P.argb:
@@ -3258,6 +3319,13 @@ def _execute_cached(e: BalancedTokenList|str, *args: BalancedTokenList|str)->Non
 		_store_to_arg1(BalancedTokenList.fstr(a) if isinstance(a, str) else a)
 		if t!=_arg1: _copy_arg1_to(t)
 	_execute_cached0(BalancedTokenList(e))
+
+def _execute_cached_arg(e: BalancedTokenList|str, *args: BalancedTokenList|str)->None:
+	assert len(args)<=9
+	for a, t in reversed([*zip(args, _arg_tokens)]):
+		_store_to_arg1(BalancedTokenList.fstr(a) if isinstance(a, str) else a)
+		_putnext_braced_arg1()
+	_execute_cached0_arg(BalancedTokenList(e))
 
 
 run_error_finish=typing.cast(Callable[[PTTBlock, PTTBlock], None], Python_call_TeX_local(
@@ -3611,6 +3679,62 @@ def typeout(s: str)->None:
 	Wrapper around LaTeX's ``\typeout``.
 	"""
 	_execute_cached(r'\typeout{\_pythonimmediate_arga}', s)
+
+def _ensure_lua_engine()->None:
+	assert default_engine.engine, "No current engine!"
+	assert default_engine.name=="luatex", f"Current engine is {default_engine.name}, not LuaTeX!"
+
+def lua_exec(s: str)->None:
+	_ensure_lua_engine()
+	_execute_cached_arg(r'\directlua{#1}', s)
+
+def lua_eval(s: str)->str:
+	_ensure_lua_engine()
+	_execute_cached_arg(r'\edef\_pythonimmediate_arga{\directlua{tex.sprint(-2, tostring(#1))}}', s)
+	return P.arga.str()
+
+def _lua_exec_cached(s: str)->None:
+	_ensure_lua_engine()
+	_execute_cached(BalancedTokenList([r'\directlua', BalancedTokenList.fstr(s)]))
+
+def lua_try_eval(s: str)->Optional[str]:
+	_ensure_lua_engine()
+	_store_to_arg1(BalancedTokenList.fstr(s))
+	_execute_cached0(BalancedTokenList([r'\edef\_pythonimmediate_arga{\directlua',
+		BalancedTokenList.fstr(r'''
+		do
+			local s=token.get_macro"_pythonimmediate_arga"
+			local function try_call_print(f)
+				local success, result=pcall(f)
+				if success then
+					if result==nil then
+						tex.sprint(-2, "-")
+					else
+						tex.sprint(-2, "+"..tostring(result))
+					end
+				else
+					tex.sprint(-2, "!"..tostring(result))
+				end
+			end
+			local f, err=load("return "..s..";", "=stdin", "t")
+			if f~=nil then
+				try_call_print(f)
+			else
+				f, err=load(s)
+				if f~=nil then
+					try_call_print(f)
+				else
+					tex.sprint(-2, "!"..tostring(err))
+				end
+			end
+		end
+		'''.strip()), '}']))
+	result=P.arga.str()
+	assert result
+	if result[0]=="+": return result[1:]
+	if result[0]=="!": raise RuntimeError(result[1:])
+	assert result=="-", result
+	return None
 
 def peek_next_meaning()->str:
 	r"""
