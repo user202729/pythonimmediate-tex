@@ -3693,6 +3693,20 @@ def lua_try_eval(s: str)->Optional[str]:
 	Evaluate some Lua code, if fail then execute it.
 	Works like an interactive shell, first try to evaluate it as an expression, if fail execute it.
 
+	If you use IPython shell/Jupyter notebook, it may be desired to add a magic command to execute Lua code.
+	For example in IPython: Create a file ``.ipython/profile_default/startup/lua_magic.py``::
+
+		# Support %l <code> and %%l <newline> <line(s) of code> to execute Lua code in the LuaTeX engine.
+		from typing import Optional
+		from pythonimmediate import lua_try_eval
+		from IPython.core.magic import register_line_magic, register_cell_magic
+		register_line_magic("l")(lambda line: lua_try_eval(line))
+		@register_cell_magic("l")
+		def _cell_magic(line: str, cell: str)->Optional[str]:
+			assert not line.strip(), "first line after %%l must be empty!"
+			return lua_try_eval(cell)
+
+
 	>>> c=default_engine.set_engine(ChildProcessEngine("luatex"))
 	>>> lua_try_eval("2+3")
 	'5'
