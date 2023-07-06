@@ -3325,7 +3325,7 @@ def _execute_cached_arg(e: BalancedTokenList|str, *args: BalancedTokenList|str)-
 	for a, t in reversed([*zip(args, _arg_tokens)]):
 		_store_to_arg1(BalancedTokenList.fstr(a) if isinstance(a, str) else a)
 		_putnext_braced_arg1()
-	_execute_cached0_arg(BalancedTokenList(e))
+	_execute_cached0_arg(BalancedTokenList(e), len(args))
 
 
 run_error_finish=typing.cast(Callable[[PTTBlock, PTTBlock], None], Python_call_TeX_local(

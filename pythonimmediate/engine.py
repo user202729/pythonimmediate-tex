@@ -696,6 +696,12 @@ class ChildProcessEngine(Engine):
 			...
 		pythonimmediate.engine.TeXProcessError: a.lua:1: hello
 
+		>>> with ChildProcessEngine("luatex") as engine, default_engine.set_engine(engine):
+		...		execute(r'\directlua{do)}')
+		Traceback (most recent call last):
+			...
+		pythonimmediate.engine.TeXProcessError: [\directlua]:1: unexpected symbol near ')'.
+
 		>>> execute(r'\loop\begingroup\iftrue\repeat')
 		Traceback (most recent call last):
 			...
@@ -716,7 +722,8 @@ class ChildProcessEngine(Engine):
 
 			error_lines=[line for i, line in enumerate(log_lines)
 			 if line.startswith(b"!") or
-			 (i+1<len(log_lines) and log_lines[i+1]==b"stack traceback:")  # Lua error
+			 (i+1<len(log_lines) and log_lines[i+1]==b"stack traceback:") or  # Lua error
+			 (line.startswith(br"[\directlua]:"))  # Lua error at the very-top level, there will be no stack traceback
 			 ]
 
 			# find the line right before the last "emergency stop" line in error_lines:
