@@ -785,7 +785,11 @@ class ChildProcessEngine(Engine):
 			# process has not terminated (it's possible for process to already terminate if it's killed on error)
 			if self.status==EngineStatus.waiting:
 				with default_engine.set_engine(self):
-					pythonimmediate.run_none_finish()
+					if pythonimmediate.run_none_finish is None:
+						# this may happen when the Python process exits
+						process.kill()
+					else:
+						pythonimmediate.run_none_finish()
 			process.wait()
 
 		process.stdin.close()
