@@ -3684,20 +3684,23 @@ def _ensure_lua_engine()->None:
 	assert default_engine.engine, "No current engine!"
 	assert default_engine.name=="luatex", f"Current engine is {default_engine.name}, not LuaTeX!"
 
-def lua_exec(s: str)->None:
-	_ensure_lua_engine()
-	_execute_cached_arg(r'\directlua{#1}', s)
-
-def lua_eval(s: str)->str:
-	_ensure_lua_engine()
-	_execute_cached_arg(r'\edef\_pythonimmediate_arga{\directlua{tex.sprint(-2, tostring(#1))}}', s)
-	return P.arga.str()
-
 def _lua_exec_cached(s: str)->None:
 	_ensure_lua_engine()
 	_execute_cached(BalancedTokenList([r'\directlua', BalancedTokenList.fstr(s)]))
 
 def lua_try_eval(s: str)->Optional[str]:
+	r"""
+	Evaluate some Lua code, if fail then execute it.
+	Works like an interactive shell, first try to evaluate it as an expression, if fail execute it.
+
+	>>> c=default_engine.set_engine(ChildProcessEngine("luatex"))
+	>>> lua_try_eval("2+3")
+	'5'
+	>>> lua_try_eval("do local a=2; return a+4 end")
+	'6'
+	>>> lua_try_eval("do local a=2 end")
+	>>> c.restore()
+	"""
 	_ensure_lua_engine()
 	_store_to_arg1(BalancedTokenList.fstr(s))
 	_execute_cached0(BalancedTokenList([r'\edef\_pythonimmediate_arga{\directlua',

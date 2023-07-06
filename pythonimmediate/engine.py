@@ -314,6 +314,7 @@ class _SetDefaultEngineContextManager:
 	old_engine: Optional[Engine]
 	new_engine: Optional[Engine]
 	entered: bool=False
+	restored: bool=False
 
 	def __enter__(self)->Optional[Engine]:
 		assert not self.entered, "This context manager is not re-entrant!"
@@ -321,6 +322,12 @@ class _SetDefaultEngineContextManager:
 		return self.new_engine
 
 	def __exit__(self, exc_type, exc_val, exc_tb)->None:
+		assert self.entered, "__exit__ called manually without __enter__ called"
+		if not self.restored: self.restore()
+
+	def restore(self)->None:
+		if self.restored: raise RuntimeError("Already restored!")
+		self.restored=True
 		default_engine.set_engine(self.old_engine)
 
 
