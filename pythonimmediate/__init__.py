@@ -1173,14 +1173,59 @@ r"""
 }
 """)
 
++
+
+r"""
+
+
+% serialize token list in #2 store to #1. Call T or F branch depends on whether serialize is successful.
+% #1 must be different from \__tmp.
+\cs_new_protected:Npn \__nodot:NnTF #1 #2 {
+	\tl_if_eq:onTF {\detokenize{#2}} {#2} \__nodot_string:NnTF \__nodot_general:NnTF
+		#1 {#2}
+}
+\cs_generate_variant:Nn \tl_if_eq:nnTF {o}
+
+% same as above but #1 is guaranteed to be string
+\precattl_exec:n{
+\cs_new_protected:Npn \__nodot_string:NnTF #1 #2 #3 #4 {
+	%\tl_set:Nx #1 { \cC{_ _kernel_str_to_other_fast:n}{#2} }
+	%\tl_set:Nx #1 { \cO\s  \tl_map_function:NN #1 \__process_string }
+	\tl_set:Nx #1 { \cO\s  \str_map_function:nN {#2} \__process_string }
+	#3
+}
+}
+% <string> serialize to 's<the string itself>' with weird characters become \xa0 + (weird character + 64)
+% note that TeX-side deserialization does not handle this but it's not needed
+
+% refer to __if_weird_charcode for detail
+\cs_new:Npn  \__if_weird_charcode_or_esc:n #1 {
+	\ifnum #1 < 32 ~ 1 \fi
+	\ifnum #1 > 126 ~ \ifnum #1 < 161 ~ 1 \fi \fi
+	0
+}
+
+\precattl_exec:n{
+\cs_new:Npn \__process_string #1 {  % similar to \__content_escaper
+	\ifnum 0<\__if_weird_charcode_or_esc:n {`#1} ~
+		\cO\^^a0 \char_generate:nn {`#1+64} {12}
+	\else
+		#1
+	\fi
+}
+}
+
+
+
+"""
+
 ).replace("__", "__tlserialize_")
 
 mark_bootstrap(
 r"""
 
-% serialize token list in #2 store to #1. Call T or F branch depends on whether serialize is successful.
-% #1 must be different from \__tlserialize_tmp.
-\cs_new_protected:Npn \__tlserialize_nodot:NnTF #1 #2 {
+% same as above but #1 is guaranteed to be not-string
+\cs_new_protected:Npn \__tlserialize_nodot_general:NnTF #1 #2 {
 	\__tlserialize_nodot_unchecked:Nn #1 {#2}
 	\__tldeserialize_nodot:NV \__tlserialize_nodot_tmp #1
 
@@ -1952,6 +1997,13 @@ class TokenList(TokenListBaseClass):
 		# hack
 		if isinstance(data, bytes):
 			data="".join(chr(i) for i in data)
+
+		if not data: return cls()
+		if data[0]=="s":
+			return cls([
+				CharacterToken(ord(ch), Catcode.space if ch==' ' else Catcode.other)
+				for ch in re.sub("\xA0(.)", lambda match: chr(ord(match[1])-0x40), data[1:])
+				])
 
 		while i<len(data):
 

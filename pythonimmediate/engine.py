@@ -81,6 +81,7 @@ class Engine(ABC):
 		self._config=GlobalConfiguration()  # dummy value
 		self.status=EngineStatus.waiting
 		self._on_close_list: List[Callable[[], None]]=[]
+		self._log: Optional[bytes]=None
 
 	def add_on_close(self, f: Callable[[], None])->None:
 		r"""
@@ -358,6 +359,12 @@ class DefaultEngine(Engine, threading.local):
 		Normally there's no reason to access the internal engine directly, as ``self`` can be used
 		like the engine inside.
 		"""
+
+	def _print_log(self)->None:
+		"""
+		For debug purpose only. If the engine is still running there's a chance the log is not flushed when this function is called.
+		"""
+		print((self._read_log() if self._log is None else self._log).decode('u8', "replace"))
 
 	def set_engine(self, engine: Optional[Engine])->_SetDefaultEngineContextManager:
 		r"""
