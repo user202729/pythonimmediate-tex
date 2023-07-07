@@ -571,7 +571,10 @@ class NToken(ABC):
 		if escapechar is not None:
 			tmp=count["escapechar"]
 			count["escapechar"]=_get_charcode(escapechar)
-		result=NTokenList([T.meaning, self]).expand_x().str()
+		if self.degree()==0 and isinstance(self, Token):
+			result=BalancedTokenList([T.meaning, self]).expand_o().str()
+		else:
+			result=NTokenList([T.meaning, self]).expand_x().str()
 		if escapechar is not None:
 			count["escapechar"]=tmp
 		return result
@@ -2399,7 +2402,7 @@ class NTokenList(NTokenListBaseClass):
 		See :meth:`BalancedTokenList.expand_x`.
 		"""
 		NTokenList([T.edef, P.tmp, bgroup, *self, egroup]).execute()
-		return BalancedTokenList([P.tmp]).expand_o()
+		return P.tmp.tl()
 
 
 class TeXToPyData(ABC):
