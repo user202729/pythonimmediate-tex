@@ -3209,6 +3209,8 @@ def add_TeX_handler_param(t: BalancedTokenList, param: int|BalancedTokenList, *,
 	r"""
 	Similar to :func:`add_TeX_handler`, however it will take parameters following in the input stream.
 
+	:param continue_included: See :func:`add_TeX_handler`.
+
 	>>> identifier=add_TeX_handler_param(BalancedTokenList(r"\def\l_tmpa_tl{#2,#1}"), 2)
 	>>> BalancedTokenList(r'{123}{456}').put_next()
 	>>> call_TeX_handler(identifier)
@@ -3287,6 +3289,8 @@ def _execute_cached0(e: BalancedTokenList, *, continue_included: bool=False)->No
 	r"""
 	Internal function, identical to :meth:`BalancedTokenList.execute` but cache the value of ``e``
 	such that re-execution of the same token list will be faster.
+
+	:param continue_included: See :func:`add_TeX_handler`.
 
 	>>> count[0]=5
 	>>> _execute_cached0(BalancedTokenList(r'\advance\count0 by 1'))
@@ -3810,17 +3814,18 @@ def lua_try_eval(s: str)->Optional[str]:
 	_execute_cached0(BalancedTokenList([r'\edef\_pythonimmediate_arga{\directlua',
 		BalancedTokenList.fstr(r'''
 		do
+			local result
 			local s=token.get_macro"_pythonimmediate_arga"
 			local function try_call_print(f)
-				local success, result=pcall(f)
+				local success, f_result=pcall(f)
 				if success then
-					if result==nil then
-						tex.sprint(-2, "-")
+					if f_result==nil then
+						result="-"
 					else
-						tex.sprint(-2, "+"..tostring(result))
+						result="+"..tostring(f_result)
 					end
 				else
-					tex.sprint(-2, "!"..tostring(result))
+					result="!"..tostring(f_result)
 				end
 			end
 			local f, err=load("return "..s..";", "=stdin", "t")
@@ -3831,11 +3836,12 @@ def lua_try_eval(s: str)->Optional[str]:
 				if f~=nil then
 					try_call_print(f)
 				else
-					tex.sprint(-2, "!"..tostring(err))
+					result="!"..tostring(err)
 				end
 			end
+			tex.sprint(-2, result)
 		end
-		'''.strip()), '}']))
+		'''.strip()), r'}']))
 	result=P.arga.str()
 	assert result
 	if result[0]=="+": return result[1:]
