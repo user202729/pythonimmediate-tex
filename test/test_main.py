@@ -234,6 +234,20 @@ def test_process_leak_2()->None:
 		assert p.is_running()
 	assert not p.is_running()
 
+def test_process_leak_3()->None:
+	with default_engine.set_engine(None):
+		assert default_engine.engine is None
+
+		c=default_engine.set_engine(ChildProcessEngine("pdftex"))
+		assert default_engine.engine is not None
+		assert default_engine.engine._process is not None
+		p=psutil.Process(default_engine.engine._process.pid)
+		assert p.is_running()
+
+		c.restore()
+		assert default_engine.engine is None
+		assert not p.is_running()
+
 @pytest.mark.parametrize("explicitly_collect", [True, False])
 def test_process_garbage_collection(explicitly_collect: bool)->None:
 	with default_engine.set_engine(ChildProcessEngine("pdftex")):

@@ -312,15 +312,17 @@ class _SetDefaultEngineContextManager:
 	"""
 	Context manager, used in conjunction with default_engine.set_engine(...) to revert to the original engine.
 	"""
-	old_engine: Optional[Engine]
-	new_engine: Optional[Engine]
+	_old_engine: Optional[Engine]
+	_new_engine: Optional[Engine]
 	entered: bool=False
 	restored: bool=False
 
 	def __enter__(self)->Optional[Engine]:
 		assert not self.entered, "This context manager is not re-entrant!"
 		self.entered=True
-		return self.new_engine
+		result=self._new_engine
+		self._new_engine=None
+		return result
 
 	def __exit__(self, exc_type, exc_val, exc_tb)->None:
 		assert self.entered, "__exit__ called manually without __enter__ called"
@@ -329,7 +331,9 @@ class _SetDefaultEngineContextManager:
 	def restore(self)->None:
 		if self.restored: raise RuntimeError("Already restored!")
 		self.restored=True
-		default_engine.set_engine(self.old_engine)
+		default_engine.set_engine(self._old_engine)
+		self._old_engine=None
+		self._new_engine=None  # allow the engine to be garbage collected
 
 
 class DefaultEngine(Engine, threading.local):
@@ -374,13 +378,13 @@ class DefaultEngine(Engine, threading.local):
 		Example::
 
 		>>> from pythonimmediate import execute
-		>>> new_engine=ChildProcessEngine("pdftex")
-		>>> with default_engine.set_engine(new_engine) as engine:  # only for this thread
-		... 	assert engine is new_engine
-		... 	assert default_engine.engine is new_engine
+		>>> _new_engine=ChildProcessEngine("pdftex")
+		>>> with default_engine.set_engine(_new_engine) as engine:  # only for this thread
+		... 	assert engine is _new_engine
+		... 	assert default_engine.engine is _new_engine
 		... 	execute(r"\count0=5")
 		>>> # now the original engine is restored
-		>>> new_engine.close()
+		>>> _new_engine.close()
 
 		Note that the following form, while allowed, is discouraged because it may cause resource leak
 		(the engine may keeps running even after the block exits depends on whether it's garbage-collected):
@@ -394,7 +398,7 @@ class DefaultEngine(Engine, threading.local):
 		...		pass
 		"""
 		assert engine is not self
-		result=_SetDefaultEngineContextManager(old_engine=self.engine, new_engine=engine)
+		result=_SetDefaultEngineContextManager(_old_engine=self.engine, _new_engine=engine)
 		self.engine=engine
 		return result
 
