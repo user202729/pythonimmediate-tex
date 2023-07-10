@@ -104,7 +104,7 @@ import inspect
 import contextlib
 import io
 import functools
-from typing import Optional, Union, Callable, Any, Iterator, Protocol, Iterable, Sequence, Type, Tuple, List, Dict, IO
+from typing import Optional, Union, Callable, Any, Iterator, Protocol, Iterable, Sequence, Type, Tuple, List, Dict, IO, Set
 import typing
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -3283,7 +3283,6 @@ def remove_TeX_handler(identifier: str)->None:
 	P["run_"+identifier+":"].set_eq(T.relax, global_=True)
 
 _execute_cache: Dict[Engine, Dict[tuple[Token, ...], str]]={}
-
 def _execute_cached0(e: BalancedTokenList, *, continue_included: bool=False)->None:
 	r"""
 	Internal function, identical to :meth:`BalancedTokenList.execute` but cache the value of ``e``
@@ -3303,6 +3302,42 @@ def _execute_cached0(e: BalancedTokenList, *, continue_included: bool=False)->No
 	if identifier is None:
 		identifier=l[tuple(e)]=add_TeX_handler(e, continue_included=continue_included)
 	call_TeX_handler(identifier)
+
+_execute_cache: Dict[Engine, Set[tuple[Token, ...]]]={}
+def _execute_once(e: BalancedTokenList)->bool:
+	r"""
+	Execute the token list, but only the first time for each engine.
+
+	>>> count[0]=5
+	>>> _execute_once(BalancedTokenList(r'\advance\count0 by 1'))
+	True
+	>>> count[0]
+	6
+	>>> _execute_once(BalancedTokenList(r'\advance\count0 by 1'))
+	False
+	>>> count[0]
+	6
+	>>> with default_engine.set_engine(luatex_engine):
+	... 	count[0]=7
+	... 	_execute_once(BalancedTokenList(r'\advance\count0 by 1'))  # still executed because new engine
+	... 	count[0]
+	... 	_execute_once(BalancedTokenList(r'\advance\count0 by 1'))  # not executed
+	... 	count[0]
+	True
+	8
+	False
+	8
+	>>> count[0]  # old engine
+	6
+	"""
+	assert e.is_balanced()
+	l=_defaultget_with_cleanup(_execute_cache, set)
+	t=tuple(e)
+	if t not in l:
+		l.add(t)
+		e.execute()
+		return True
+	return False
 
 _execute_arg_cache: Dict[Engine, Dict[tuple[int, tuple[Token, ...]], str]]={}
 def _execute_cached0_arg(e: BalancedTokenList, count: int)->None:
