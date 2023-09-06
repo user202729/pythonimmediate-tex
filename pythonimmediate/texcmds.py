@@ -155,6 +155,32 @@ def pycode(code: TTPBlock, lineno_: TTPLine, filename: TTPLine, fileabspath: TTP
 	
 bootstrap_code_functions.append(define_TeX_call_Python(pycode, name="__pycodex"))
 
+def pycodefuzzy(code: TTPBlock, lineno_: TTPLine)->None:
+	r"""
+	Same as :func:`pycode`, but may mangle the code (strip trailing spaces, etc. Refer to :func:`can_be_mangled_to` for technical details).
+	Not recommended unless you don't have ``[abspath]currfile`` package loaded.
+	"""
+	if not code: return
+	lineno=int(lineno_)
+	code_lines=code.splitlines(keepends=True)
+	def tmp()->None:
+		code_="\n"*(lineno-len(code_lines)-1)+code
+		exec(code_, get_user_scope())
+	run_code_redirect_print_TeX(tmp)
+
+bootstrap_code_functions.append(define_TeX_call_Python(pycodefuzzy, name="__pycodefuzzyx"))
+mark_bootstrap(
+r"""
+\NewDocumentEnvironment{pycodefuzzy}{}{
+	\saveenvreinsert \__code {
+		\exp_last_unbraced:Nx \__pycodefuzzyx {{\__code} {\the\inputlineno}}
+	}
+}{
+	\endsaveenvreinsert
+}
+""")
+
+
 @define_internal_handler
 def pyc(code: TTPEBlock)->None:
 	r"""
