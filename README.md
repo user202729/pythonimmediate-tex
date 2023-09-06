@@ -5,6 +5,25 @@
 A library to facilitate bidirectional communication between Python and TeX,
 with support of manipulating TeX tokens as Python objects.
 
+Background: this library started as...
+* I get annoyed at programming in TeX and want to use a proper programming language, and
+* Almost all the current packages that allow programming in Python runs a separate Python pass from TeX,
+which requires using temporary file and
+* `pythontex` does not work on Overleaf.
+
+Thus, the library name is named after the second point -- the `python` and `tex` process are run in parallel,
+bidirectional communications are supported.
+
+Since then, the library has grown considerably, although not in a particular direction, as I add features when I need it.
+Occasionally (but rarely), refactors are done.
+
+As such, I don't guarantee any particular use case for this library -- except for my own use cases.
+Along the way, I added some useful features to use Python inside packages. (`\pycodekpse`)
+
+A handful of my packages are written using this library, directly or indirectly. (`typstmathinput`, `unicode-math-input`)
+
+------
+
 The TeX package is available on CTAN: https://ctan.org/pkg/pythonimmediate
 
 The Python package is available on PyPI: https://pypi.org/project/pythonimmediate-tex/
