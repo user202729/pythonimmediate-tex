@@ -905,6 +905,25 @@ class Token(NToken):
 			return content
 		return BalancedTokenList([self]).expand_o()
 
+	def estr(self)->str:
+		r"""
+		Expand this token according to :ref:`estr-expansion`.
+
+		It's undefined behavior if the expansion result is unbalanced.
+
+		>>> T.l_tmpa_tl.tl(BalancedTokenList(r'ab\l_tmpb_tl'))
+		<BalancedTokenList: a₁₁ b₁₁ \l_tmpb_tl>
+		>>> T.l_tmpb_tl.tl(BalancedTokenList(r'cd123+$'))
+		<BalancedTokenList: c₁₁ d₁₁ 1₁₂ 2₁₂ 3₁₂ +₁₂ $₃>
+		>>> T.l_tmpa_tl.estr()
+		'abcd123+$'
+
+		..seealso::
+			:meth:`BalancedTokenList.expand_estr`
+		"""
+		BalancedTokenList([self]).put_next()
+		return get_arg_estr()
+
 	def str(self, val: Optional[str]=None)->str:
 		r"""
 		Manipulate an expl3 str variable.
