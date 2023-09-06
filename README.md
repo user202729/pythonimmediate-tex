@@ -1,5 +1,7 @@
 # pythonimmediate-tex
 
+[![PyPI](https://img.shields.io/pypi/v/pythonimmediate-tex?style=flat)](https://pypi.python.org/pypi/pythonimmediate-tex/)
+
 A library to facilitate bidirectional communication between Python and TeX,
 with support of manipulating TeX tokens as Python objects.
 

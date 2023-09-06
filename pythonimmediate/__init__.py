@@ -116,6 +116,8 @@ import re
 import collections
 from collections import defaultdict
 import enum
+from weakref import WeakKeyDictionary
+import weakref
 
 T1 = typing.TypeVar("T1")
 
@@ -326,8 +328,13 @@ r"""
 
 # ========
 
+
+
+
 _handlers: Dict[str, Callable[[], None]]={}
-_per_engine_handlers: Dict[Engine, Dict[str, Callable[[], None]]]={}
+_per_engine_handlers: WeakKeyDictionary[Engine, Dict[str, Callable[[], None]]]=WeakKeyDictionary()
+
+
 
 def add_handler_async(f: Callable[[], None], *, all_engines: bool=False)->str:
 	r"""
@@ -481,14 +488,16 @@ def check_line(line: str, *, braces: bool, newline: bool, continue_: Optional[bo
 	elif continue_==False: assert "pythonimmediatecontinue" not in line
 
 
-_user_scope: Dict[Engine, Dict[str, Any]]={}
+_user_scope: WeakKeyDictionary[Engine, Dict[str, Any]]=WeakKeyDictionary()
 
-def _defaultget_with_cleanup(d: Dict[Engine, T1], default: Callable[[], T1])->T1:
+def _defaultget_with_cleanup(d: WeakKeyDictionary[Engine, T1], default: Callable[[], T1])->T1:
 	e=default_engine.get_engine()
 	if e not in d:
 		d[e]=default()
-		def cleanup()->None: del d[e]
-		e.add_on_close(cleanup)
+		#def cleanup()->None:
+		#	try: del d[e]
+		#	except KeyError: pass
+		#e.add_on_close(cleanup)
 	return d[e]
 
 def get_user_scope()->Dict[str, Any]:
@@ -2756,7 +2765,8 @@ def exec_or_eval_with_linecache(code: str, globals: dict, mode: str)->Any:
 	linecache.cache[sourcename] = len(code), None, lines, sourcename
 
 	compiled_code=compile(code, sourcename, mode)
-	return (exec if mode=="exec" else eval)(compiled_code, globals)
+	if mode=="exec": exec(compiled_code, globals)
+	else: eval(compiled_code, globals)
 
 	#del linecache.cache[sourcename]
 	# we never delete the cache, in case some function is defined here then later are called...
@@ -3284,7 +3294,7 @@ def remove_TeX_handler(identifier: str)->None:
 	"""
 	P["run_"+identifier+":"].set_eq(T.relax, global_=True)
 
-_execute_cache: Dict[Engine, Dict[tuple[Token, ...], str]]={}
+_execute_cache: WeakKeyDictionary[Engine, Dict[tuple[Token, ...], str]]=WeakKeyDictionary()
 def _execute_cached0(e: BalancedTokenList, *, continue_included: bool=False)->None:
 	r"""
 	Internal function, identical to :meth:`BalancedTokenList.execute` but cache the value of ``e``
@@ -3307,7 +3317,7 @@ def _execute_cached0(e: BalancedTokenList, *, continue_included: bool=False)->No
 		identifier=l[tuple(e)]=add_TeX_handler(e, continue_included=continue_included)
 	call_TeX_handler(identifier)
 
-_execute_cache: Dict[Engine, Set[tuple[Token, ...]]]={}
+_execute_once_cache: WeakKeyDictionary[Engine, Set[tuple[Token, ...]]]=WeakKeyDictionary()
 def _execute_once(e: BalancedTokenList)->bool:
 	r"""
 	Execute the token list, but only the first time for each engine.
@@ -3335,7 +3345,7 @@ def _execute_once(e: BalancedTokenList)->bool:
 	6
 	"""
 	assert e.is_balanced()
-	l=_defaultget_with_cleanup(_execute_cache, set)
+	l=_defaultget_with_cleanup(_execute_once_cache, set)
 	t=tuple(e)
 	if t not in l:
 		l.add(t)
@@ -3343,7 +3353,7 @@ def _execute_once(e: BalancedTokenList)->bool:
 		return True
 	return False
 
-_execute_arg_cache: Dict[Engine, Dict[tuple[int, tuple[Token, ...]], str]]={}
+_execute_arg_cache: WeakKeyDictionary[Engine, Dict[tuple[int, tuple[Token, ...]], str]]=WeakKeyDictionary()
 def _execute_cached0_arg(e: BalancedTokenList, count: int)->None:
 	assert e.is_balanced()
 	l=_defaultget_with_cleanup(_execute_arg_cache, dict)

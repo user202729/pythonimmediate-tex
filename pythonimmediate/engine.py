@@ -25,6 +25,13 @@ from .communicate import GlobalConfiguration
 EngineName=Literal["pdftex", "xetex", "luatex"]
 engine_names: Tuple[EngineName, ...]=EngineName.__args__  # type: ignore
 
+_DEFAULT_TIMEOUT=5
+"""
+Internal setting.
+
+When we know the process should exit soon, wait for at most this long.
+Normally it should terminate before timeout is over, if it isn't then there's an internal error.
+"""
 
 mark_to_engine_names: Dict[str, EngineName]={
 		"p": "pdftex",
@@ -661,7 +668,7 @@ class ChildProcessEngine(Engine):
 		while True:
 			line: bytes=process.stdout.read1()  # type: ignore
 			if not line:
-				process.wait(timeout=1)
+				process.wait(timeout=_DEFAULT_TIMEOUT)
 				break
 
 			_stdout_buffer+=line
@@ -674,14 +681,14 @@ class ChildProcessEngine(Engine):
 				_stdout_buffer=parts[-1]
 				if b'!  ==> Fatal error occurred, no output PDF file produced!' in parts[:-1]:
 					get_engine().status=EngineStatus.error
-					process.wait()
+					process.wait(timeout=_DEFAULT_TIMEOUT)
 					break
 
 			# check potential error
 			if _stdout_buffer == b"? " and _error_marker_line_seen:
 				get_engine().status=EngineStatus.error
 				process.stdin.close()  # close the stdin so process will terminate
-				process.wait()
+				process.wait(timeout=_DEFAULT_TIMEOUT)
 				break
 				# this is a simple way to break out _read() but it will not allow error recovery
 
@@ -761,7 +768,7 @@ class ChildProcessEngine(Engine):
 		line=process.stderr.readline()
 		self._check_no_error()
 		if not line:
-			process.wait()
+			process.wait(timeout=_DEFAULT_TIMEOUT)
 			self.close()
 			if self._autorestart:
 				self._start_process()
@@ -787,14 +794,15 @@ class ChildProcessEngine(Engine):
 
 		if not process.poll():
 			# process has not terminated (it's possible for process to already terminate if it's killed on error)
-			if self.status==EngineStatus.waiting:
+			if (
+					self.status==EngineStatus.waiting
+					and pythonimmediate.run_none_finish is not None  # this may fail when the Python process exits
+					):
 				with default_engine.set_engine(self):
-					if pythonimmediate.run_none_finish is None:
-						# this may happen when the Python process exits
-						process.kill()
-					else:
-						pythonimmediate.run_none_finish()
-			process.wait()
+					pythonimmediate.run_none_finish()
+			else:
+				process.kill()
+			process.wait(timeout=_DEFAULT_TIMEOUT)
 
 		process.stdin.close()
 		process.stderr.close()

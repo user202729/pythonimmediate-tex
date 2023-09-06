@@ -219,9 +219,12 @@ class Test:
 				t.join()
 
 def test_process_leak()->None:
+	from pythonimmediate import _execute_once, add_handler
 	with ChildProcessEngine("pdftex") as e:
 		assert e._process is not None
 		p=psutil.Process(e._process.pid)
+		_execute_once(BalancedTokenList(r'\relax'))
+		add_handler(lambda: None)
 		assert p.is_running()
 	assert not p.is_running()
 
@@ -250,9 +253,12 @@ def test_process_leak_3()->None:
 
 @pytest.mark.parametrize("explicitly_collect", [True, False])
 def test_process_garbage_collection(explicitly_collect: bool)->None:
+	from pythonimmediate import _execute_once, add_handler
 	with default_engine.set_engine(ChildProcessEngine("pdftex")):
 		p=psutil.Process(default_engine.engine._process.pid)  # type: ignore
 		assert p.is_running()
+		_execute_once(BalancedTokenList(r'\relax'))
+		add_handler(lambda: None)
 	if explicitly_collect:
 		import gc
 		gc.collect()
