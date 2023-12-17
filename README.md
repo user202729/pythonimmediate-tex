@@ -2,6 +2,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/pythonimmediate-tex?style=flat)](https://pypi.python.org/pypi/pythonimmediate-tex/)
 [![Read the Docs](https://img.shields.io/readthedocs/pythonimmediate)](https://pythonimmediate.readthedocs.io)
+[![CTAN](https://img.shields.io/ctan/l/pythonimmediate)](https://ctan.org/pkg/pythonimmediate)
 
 A library to facilitate bidirectional communication between Python and TeX,
 with support of manipulating TeX tokens as Python objects.
