@@ -6,7 +6,8 @@
 \usetikzlibrary{arrows.meta}
 \EnableCrossrefs
 \CodelineIndex
-\fvset{breaklines=true,gobble=0,tabsize=4,frame=single,numbers=left,numbersep=3pt}
+\fvset{breaklines=true,breakanywhere,gobble=0,tabsize=4,frame=single,numbers=left,numbersep=3pt}
+\usepackage{cleveref}
 
 \AtBeginDocument{\DeleteShortVerb\"}  % https://tex.stackexchange.com/a/650966/250119
 \MakeOuterQuote{"}
@@ -74,8 +75,6 @@ Instruction:
 \begin{itemize}
 	\item Download the following files and place it in the root folder of Overleaf:
 		\begin{itemize}
-			\item \file{saveenv.sty}
-			\item \file{precattl.sty}
 			\item \file{pythonimmediate.sty}
 			\item \file{pythonimmediate_helper.lua}
 			\item \file{pythonimmediate-tex-0.6.0.zip}
@@ -84,13 +83,19 @@ Instruction:
 		of the Python package.
 
 		The |.sty| files can be downloaded from CTAN at 
-		\url{https://ctan.org/pkg/saveenv},
-		\url{https://ctan.org/pkg/precattl},
-		\url{https://ctan.org/pkg/pythonimmediate}
-		respectively.
+		\url{https://ctan.org/pkg/pythonimmediate}.
 
 		The |.zip| file containing Python source code
 		can be downloaded from PyPI: \url{https://pypi.org/project/pythonimmediate-tex/\#files}.
+
+		Remark: Currently the \LaTeX\ package version 0.4.0 is included in \TeX\ Live 2023, you would need to download \LaTeX\ version 0.5.0 from CTAN.
+
+	\item In older \TeX\ Live versions (2022 or less), you will in addition need to download the following files:
+		\begin{itemize}
+			\item \file{saveenv.sty} (from \url{https://ctan.org/pkg/saveenv}),
+			\item \file{precattl.sty} (from \url{https://ctan.org/pkg/precattl}).
+		\end{itemize}
+		Also place in the root folder of Overleaf.
 
 	\item Write the following in the preamble:
 \begin{verbatim}
@@ -99,14 +104,14 @@ Instruction:
 \end{verbatim}
 As above, replace both occurrences of |0.6.0| with the downloaded version specified in the zip file above.
 
-Refer to \ref{troubleshoot-source-file-not-found} for explanation of the |abspath| option.
+Refer to \cref{troubleshoot-source-file-not-found} for explanation of the |abspath| option.
 \end{itemize}
 
 For some unknown reason in the default mode on Overleaf (|\nonstopmode|), when there's an error
 the log file might be truncated,
 so in that case consider writing |\errorstopmode|.
 
-Refer to \ref{troubleshoot-Python-error} to read the error traceback in case of Python error.
+Refer to \cref{troubleshoot-Python-error} to read the error traceback in case of Python error.
 
 Some construct inside the |pycode| block might make the code editor on Overleaf report an error,
 even though the code is valid. Refer to \url{https://www.overleaf.com/learn/how-to/Code_Check#Code_Check_Limitations}.
@@ -132,7 +137,7 @@ The documentation is also available at
 The name/path to the Python executable. Default to |python3|.
 
 Can also be used to provide environment variables to the Python process.
-An example how to do that is explained in \ref{installation-on-overleaf}.
+An example how to do that is explained in \cref{installation-on-overleaf}.
 
 \DescribeOption{python-flags=}
 Flags to be passed to the Python interpreter. For example pass |-O| to disable assertions.
@@ -203,7 +208,7 @@ Execute some Python code provided as an argument (the argument will be interpret
 
 The command is not expandable -- roughly speaking, you can only use this at "top level".
 
-Any output (as described in \ref{print-to-TeX}) will be typesetted.
+Any output (as described in \cref{print-to-TeX}) will be typesetted.
 
 The difference between |\py| and |\pyc| is that the argument of |\py| should be a Python expression
 (suitable for passing into |eval()| Python function) while the argument of |\pyc| should be a Python
@@ -218,7 +223,7 @@ Therefore,
 \end{itemize}
 
 \DescribeMacro{\pycq}
-Same as above, but output (\ref{print-to-TeX}) will not be typesetted.
+Same as above, but output (\cref{print-to-TeX}) will not be typesetted.
 
 \DescribeMacro{\pyfile}
 Given an argument being the file name, execute that file.
@@ -241,7 +246,7 @@ pythonimmediate.print("123")
 
 Special note: white spaces at the end of lines are preserved.
 
-Any output (as described in \ref{print-to-TeX}) will be typesetted.
+Any output (as described in \cref{print-to-TeX}) will be typesetted.
 
 \DescribeEnv{pycodeq}
 Same as above, but output will not be typesetted.
@@ -367,7 +372,7 @@ $f(x)=1$, $f_i(x)=2$, $f_{ij}(x)=3$
 \DescribePython{.get_arg_estr()}
 \DescribePython{.get_optional_arg_estr()}
 Similar to some functions above, except that the argument is fully expanded and "escapes" of common characters are handled correctly,
-similar to how |\py| command (\ref{py-command}) reads its arguments.
+similar to how |\py| command (\cref{py-command}) reads its arguments.
 
 \DescribePython{.execute()}
 Takes a string and execute it immediately. (so that any |.execute()| will be executed before any |.print_TeX()|)
@@ -398,6 +403,11 @@ each |\draw| command will be executed immediately when the Python |.execute()| f
 and as the second line throws an error, the Python traceback will point to that line.
 
 \section{Troubleshooting}
+
+\subsection{"Incompatible TeX package version" error message}\label{troubleshoot-incompatible-version}
+Exactly what it means. You can upgrade both the Python package and the TeX package to the latest version.
+
+Alternatively, you can also \emph{downgrade} whichever package that is newer. For instance, Python package version 0.5.0 (download from \url{https://pypi.org/project/pythonimmediate-tex/0.5.0/#files}) is compatible with \LaTeX\ package version 0.4.0.
 
 \subsection{"Source file not found!" error message}\label{troubleshoot-source-file-not-found}
 
