@@ -15,6 +15,8 @@ There are different sections of the documentation:
 - :mod:`pythonimmediate.texcmds` -- list of all TeX commands/environments, such as ``\py``, ``pycode`` etc.
   These are also (mostly) available in the documentation of the `TeX package <https://www.ctan.org/pkg/pythonimmediate>`_.
 
+  **For getting started, it's recommended to read the documentation of the TeX package linked above first.**
+
 - :mod:`pythonimmediate.simple` -- interface that "just works" for typical users of the
   ``pythonimmediate`` TeX package, to use Python coding from TeX,
   who does not know TeX inner details such as category codes.
