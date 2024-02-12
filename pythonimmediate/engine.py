@@ -489,7 +489,7 @@ class ChildProcessEngine(Engine):
 	r"""
 	An object that represents a [TeX] engine that runs as a subprocess of this process.
 
-	Can be used as a context manager to automatically close the subprocess when the context is exited. Alternatively :meth:`close` can be used to manually terminate the subprocess.
+	Can be used as a context manager to automatically close the subprocess when the context is exited. Alternatively :meth:`~Engine.close` can be used to manually terminate the subprocess.
 
 	For example, the following Python code, if run alone, will spawn a [TeX] process and use it to write "Hello world" to a file named ``a.txt`` in the temporary directory:
 
@@ -509,8 +509,17 @@ class ChildProcessEngine(Engine):
 	>>> (Path(engine.directory)/"a.txt").is_file()
 	False
 
-	Note that explicit ``engine`` argument must be passed in most functions.
-	See :class:`DefaultEngine` for a way to bypass that.
+	You can also use this to generate PDF file programmatically:
+
+	>>> with ChildProcessEngine("pdftex") as engine, default_engine.set_engine(engine):
+	... 	execute(r'\documentclass{article}')
+	... 	execute(r'\begin{document}')
+	... 	execute(r'Hello world')
+	... 	engine.terminate()
+	... 	print(engine.read_output_file()[:9])
+	b'%PDF-1.5\n'
+
+	See :class:`DefaultEngine` for how to use the resulting engine object.
 
 	We attempt to do correct error detection on the Python side by parsing the output/log file:
 
@@ -700,8 +709,18 @@ class ChildProcessEngine(Engine):
 			raise RuntimeError("process is already closed")
 		return self._process
 
+	def read_output_file(self, extension: str="pdf")->bytes:
+		"""
+		Read the output file with the given extension.
+
+		This is only reliable when the process has already been terminated. Refer to :meth:`terminate`.
+
+		See :class:`ChildProcessEngine` for an usage example.
+		"""
+		return (self.directory/("texput."+extension)).read_bytes()
+
 	def _read_log(self)->bytes:
-		return (self.directory/"texput.log").read_bytes()
+		return self.read_output_file("log")
 
 	def _check_no_error(self)->None:
 		r"""
@@ -741,7 +760,7 @@ class ChildProcessEngine(Engine):
 			self._log=self._read_log()
 			log_lines=self._log.splitlines()
 
-			self.close()
+			self.terminate()
 			if self._autorestart:
 				self._start_process()
 
@@ -784,6 +803,17 @@ class ChildProcessEngine(Engine):
 
 	def _close(self)->None:
 		# this might be called from :meth:`__del__` so do not import anything here
+		self.terminate()
+		self._directory.cleanup()
+
+	def terminate(self)->None:
+		"""
+		Terminate the current process.
+
+		This must be used in place of :meth:`~Engine.close` in order to stop the process but still keep the generated files.
+
+		See :class:`ChildProcessEngine` for an usage example.
+		"""
 		process=self.get_process()
 		assert process.stdin is not None
 		assert process.stderr is not None
@@ -812,7 +842,6 @@ class ChildProcessEngine(Engine):
 			self.status=EngineStatus.exited
 
 		self._process=None
-		self._directory.cleanup()
 
 	def __del__(self)->None:
 		if self._process is not None:
