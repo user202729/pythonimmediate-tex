@@ -1958,6 +1958,7 @@ class TokenList(TokenListBaseClass):
 		<BalancedTokenList: a₁₂ b₁₂ \\₁₂ c₁₂  ₁₀  ₁₀ d₁₂ \n₁₂  ₁₀ \t₁₂>
 
 		Some care need to be taken for Unicode strings.
+
 		>>> with default_engine.set_engine(None): BalancedTokenList.fstr('α')
 		Traceback (most recent call last):
 			...
@@ -2475,18 +2476,24 @@ class TeXToPyData(ABC):
 #	#def send_code()->str:
 #	#	...
 
+def _format(s: str)->Callable:
+	def _result(*args: str)->str:
+		"""
+		"""
+		return s.format(*args)
+	return _result
 
 class TTPRawLine(TeXToPyData, bytes):
-	send_code=r"\__send_content%naive_send%:n {{ {} }}".format
-	send_code_var=r"\__send_content%naive_send%:n {{ {} }}".format
+	send_code=_format(r"\__send_content%naive_send%:n {{ {} }}")
+	send_code_var=_format(r"\__send_content%naive_send%:n {{ {} }}")
 	@staticmethod
 	def read()->"TTPRawLine":
 		line=engine.read()
 		return TTPRawLine(line)
 
 class TTPLine(TeXToPyData, str):
-	send_code=r"\__send_content%naive_send%:n {{ {} }}".format
-	send_code_var=r"\__send_content%naive_send%:n {{ {} }}".format
+	send_code=_format(r"\__send_content%naive_send%:n {{ {} }}")
+	send_code_var=_format(r"\__send_content%naive_send%:n {{ {} }}")
 	@staticmethod
 	def read()->"TTPLine":
 		return TTPLine(_readline())
@@ -2495,8 +2502,8 @@ class TTPELine(TeXToPyData, str):
 	"""
 	Same as :class:`TTPEBlock`, but for a single line only.
 	"""
-	send_code=r"\__begingroup_setup_estr: \__send_content%naive_send%:e {{ {} }} \endgroup".format
-	send_code_var=r"\__begingroup_setup_estr: \__send_content%naive_send%:e {{ {} }} \endgroup".format
+	send_code=_format(r"\__begingroup_setup_estr: \__send_content%naive_send%:e {{ {} }} \endgroup")
+	send_code_var=_format(r"\__begingroup_setup_estr: \__send_content%naive_send%:e {{ {} }} \endgroup")
 	@staticmethod
 	def read()->"TTPELine":
 		return TTPELine(_readline())
@@ -2513,8 +2520,8 @@ class TTPEmbeddedLine(TeXToPyData, str):
 		raise RuntimeError("Must be manually handled")
 
 class TTPBlock(TeXToPyData, str):
-	send_code=r"\__send_block:n {{ {} }} %naive_flush%".format
-	send_code_var=r"\__send_block:V {} %naive_flush%".format
+	send_code=_format(r"\__send_block:n {{ {} }} %naive_flush%")
+	send_code_var=_format(r"\__send_block:V {} %naive_flush%")
 	@staticmethod
 	def read()->"TTPBlock":
 		return TTPBlock(_read_block())
@@ -2529,8 +2536,8 @@ class TTPEBlock(TeXToPyData, str):
 
 	Refer to :ref:`estr-expansion` for more details.
 	"""
-	send_code=r"\__begingroup_setup_estr: \__send_block%naive_send%:e {{ {} }} \endgroup".format
-	send_code_var=r"\__begingroup_setup_estr: \__send_block%naive_send%:e {{ {} }} \endgroup".format
+	send_code=_format(r"\__begingroup_setup_estr: \__send_block%naive_send%:e {{ {} }} \endgroup")
+	send_code_var=_format(r"\__begingroup_setup_estr: \__send_block%naive_send%:e {{ {} }} \endgroup")
 	@staticmethod
 	def read()->"TTPEBlock":
 		return TTPEBlock(_read_block())
@@ -2546,8 +2553,8 @@ def _send_balanced_tl(engine: Engine)->str:
 	""", engine)
 
 class TTPBalancedTokenList(TeXToPyData, BalancedTokenList):
-	send_code=r"\__send_balanced_tl:n {{ {} }}%naive_ignore%".format
-	send_code_var=r"\exp_args:NV \__send_balanced_tl:n {}%naive_ignore%".format
+	send_code=_format(r"\__send_balanced_tl:n {{ {} }}%naive_ignore%")
+	send_code_var=_format(r"\exp_args:NV \__send_balanced_tl:n {}%naive_ignore%")
 	def __repr__(self):
 		return repr(BalancedTokenList(self))
 	@staticmethod
@@ -2570,7 +2577,7 @@ class PyToTeXData(ABC):
 		Takes an argument, the variable name (with backslash prefixed such as ``"\abc"``.)
 
 		:return: some [TeX] code that when executed in expl3 category code regime,
-		will read a value of the specified data type and assign it to the variable.
+			will read a value of the specified data type and assign it to the variable.
 		"""
 		...
 	@abstractmethod
@@ -2587,7 +2594,7 @@ class PTTVerbatimRawLine(PyToTeXData):
 	The trailing newline is not included, i.e. it's read under ``\endlinechar=-1``.
 	"""
 	data: bytes
-	read_code=r"\__str_get:N {} ".format
+	read_code=_format(r"\__str_get:N {} ")
 	def valid(self)->bool:
 		return b"\n" not in self.data and self.data.rstrip()==self.data
 	def serialize(self)->bytes:
@@ -2620,7 +2627,7 @@ class PTTTeXLine(PyToTeXData):
 	The trailing newline is not included, i.e. it's tokenized under ``\endlinechar=-1``.
 	"""
 	data: str
-	read_code=r"\exp_args:Nno \use:nn {{ \endlinechar-1 \ior_get:NN \__read_file {} \endlinechar}} {{\the\endlinechar\relax}}".format
+	read_code=_format(r"\exp_args:Nno \use:nn {{ \endlinechar-1 \ior_get:NN \__read_file {} \endlinechar}} {{\the\endlinechar\relax}}")
 	def serialize(self)->bytes:
 		assert "\n" not in self.data
 		return (self.data+"\n").encode('u8')
@@ -2628,7 +2635,7 @@ class PTTTeXLine(PyToTeXData):
 @dataclass
 class PTTBlock(PyToTeXData):
 	data: str
-	read_code=r"\__read_block:N {}".format
+	read_code=_format(r"\__read_block:N {}")
 
 	@staticmethod
 	def ignore_last_space(s: str)->PTTBlock:
@@ -2654,7 +2661,7 @@ class PTTBlock(PyToTeXData):
 @dataclass
 class PTTBalancedTokenList(PyToTeXData):
 	data: BalancedTokenList
-	read_code=r"\__str_get:N {0}  \__tldeserialize_dot:NV {0} {0}".format
+	read_code=_format(r"\__str_get:N {0}  \__tldeserialize_dot:NV {0} {0}")
 	def serialize(self)->bytes:
 		return PTTVerbatimRawLine(self.data.serialize_bytes()+b".").serialize()
 

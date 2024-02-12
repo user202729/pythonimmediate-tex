@@ -382,7 +382,7 @@ class DefaultEngine(Engine, threading.local):
 		Set the default engine to another engine.
 
 		Can also be used as a context manager to revert to the original engine.
-		Example::
+		Example:
 
 		>>> from pythonimmediate import execute
 		>>> _new_engine=ChildProcessEngine("pdftex")
