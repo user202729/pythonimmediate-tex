@@ -4,6 +4,7 @@ then pass to [TeX].
 
 User code are not executed here.
 
+**For Python-inside-[TeX] only** (does not apply to :class:`~pythonimmediate.engine.ChildProcessEngine`):
 Anything that is put in ``pythonimmediatedebugextraargs`` environment variable
 will be appended to the command-line arguments. For example you could invoke [TeX] with
 ``pythonimmediatedebugextraargs='--debug-log-communication=/tmp/a.diff --debug=5' pdflatex test.tex``

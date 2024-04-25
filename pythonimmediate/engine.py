@@ -79,10 +79,33 @@ class EngineStatus(enum.Enum):
 	exited =enum.auto()
 
 
+def _try_close_log_communication_file(o: Any)->None:
+	def f()->None:
+		p=o()
+		if p:
+			p.close_log_communication_file()
+	return f
+
 class Engine(ABC):
 	_name: EngineName
 	_config: GlobalConfiguration
 	status: EngineStatus
+	_log_communication_file: Any=None
+
+	def _log_communication(self, s: bytes)->None:
+		if self._log_communication_file:
+			self._log_communication_file.write(s)
+			self._log_communication_file.flush()
+
+	def set_log_communication_file(self, path: Path)->None:
+		print(f"[All communications will be logged to {path}]", flush=True)
+		self._log_communication_file=open(path, "wb")
+		self._log_communication(b"Communication log ['>': TeX to Python - include i/r distinction, '<': Python to TeX]:\n")
+		atexit.register(_try_close_log_communication_file(weakref.ref(self)))
+
+	def close_log_communication_file(self)->None:
+		if self._log_communication_file:
+			self._log_communication_file.close()
 
 	def __init__(self)->None:
 		self._config=GlobalConfiguration()  # dummy value
@@ -154,19 +177,26 @@ class Engine(ABC):
 		if self.status==EngineStatus.error: raise RuntimeError("TeX error!")
 		assert self.status==EngineStatus.running, self.status
 		while True:
-			result=self._read()
-			if result.rstrip()!=b"pythonimmediate-naive-flush-line":
+			line=self._read()
+			if line:
+				assert line.endswith(b'\n') and line.count(b'\n')==1, line
+				self._log_communication(b">"+line)
+			if line.rstrip()!=b"pythonimmediate-naive-flush-line":
 				break
 			else:
 				# ignore this line
 				assert self.config.naive_flush
 		if self.status==EngineStatus.error: raise RuntimeError("TeX error!")
-		assert result[-1]==10, result  # 10: '\n'
-		return result[:-1]
+		assert line[-1]==10, line  # 10: '\n'
+		return line[:-1]
 
 	def write(self, s: bytes)->None:
 		if self.status==EngineStatus.error: raise RuntimeError("TeX error!")
 		assert self.status==EngineStatus.waiting, self.status
+		if s:
+			lines=s.split(b'\n')
+			for line in lines[:-1]: self._log_communication(b"<"+line+b'\n')
+			if lines[-1]: self._log_communication(b"<"+lines[-1]+b"...\n")
 		self._write(s)
 
 	@abstractmethod
@@ -192,6 +222,7 @@ class Engine(ABC):
 		Terminates the [TeX] subprocess gracefully.
 		"""
 		self._close()
+		self.close_log_communication_file()
 		l=self._on_close_list
 		self._on_close_list=[]
 		for f in l: f()
@@ -213,10 +244,6 @@ class ParentProcessEngine(Engine):
 
 	This should not be instantiated directly. Only :func:`pythonimmediate.textopy.main` should instantiate this.
 	"""
-	def _log_communication(self, s: bytes)->None:
-		self._log_communication_file.write(s)
-		self._log_communication_file.flush()
-
 	def __init__(self, pseudo_config: GlobalConfiguration)->None:
 		super().__init__()
 
@@ -279,10 +306,7 @@ class ParentProcessEngine(Engine):
 		if self.config.debug_log_communication is not None:
 			from string import Template
 			debug_log_communication = Path(Template(self.config.debug_log_communication).safe_substitute(pid=os.getpid()))
-			print(f"[All communications will be logged to {debug_log_communication}]", flush=True)
-			self._log_communication_file=open(debug_log_communication, "wb")
-			self._log_communication_file.write(b"Communication log ['>': TeX to Python - include i/r distinction, '<': Python to TeX]:\n")
-			atexit.register(lambda: self._log_communication_file.close())
+			self.set_log_communication_file(debug_log_communication)
 
 		from . import surround_delimiter, substitute_private, get_bootstrap_code
 		self.write(surround_delimiter(substitute_private(get_bootstrap_code(self))).encode('u8'))
@@ -297,17 +321,10 @@ class ParentProcessEngine(Engine):
 			break
 
 		if not line: self.status=EngineStatus.error
-		if self.config.debug_log_communication is not None and line:
-			assert line.endswith(b'\n') and line.count(b'\n')==1, line
-			self._log_communication(b">"+line)
 		return line
 
 	def _write(self, s: bytes)->None:
 		self.config.communicator.send(s)
-		if self.config.debug_log_communication is not None and s:
-			lines=s.split(b'\n')
-			for line in lines[:-1]: self._log_communication(b"<"+line+b'\n')
-			if lines[-1]: self._log_communication(b"<"+lines[-1]+b"...\n")
 
 	def _close(self)->None:
 		assert False
@@ -589,8 +606,10 @@ class ChildProcessEngine(Engine):
 
 	"""
 
-	def __init__(self, engine_name: EngineName, args: Iterable[str]=(), env=None, autorestart: bool=False)->None:
+	def __init__(self, engine_name: EngineName, args: Iterable[str]=(), env=None, autorestart: bool=False, debug_log_communication: Optional[str|Path]=None)->None:
 		super().__init__()
+		if debug_log_communication is not None:
+			self.set_log_communication_file(debug_log_communication)
 		self._name=engine_name
 		assert not isinstance(args, str), "Pass a list/tuple of strings as args"
 		self._args=args
