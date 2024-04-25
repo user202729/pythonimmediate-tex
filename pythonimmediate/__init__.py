@@ -606,7 +606,7 @@ class NToken(ABC):
 		...
 
 	@abstractmethod
-	def put_next(self):
+	def put_next(self)->None:
 		"""
 		Put this token forward in the input stream.
 		"""
@@ -2555,7 +2555,7 @@ def _send_balanced_tl(engine: Engine)->str:
 class TTPBalancedTokenList(TeXToPyData, BalancedTokenList):
 	send_code=_format(r"\__send_balanced_tl:n {{ {} }}%naive_ignore%")
 	send_code_var=_format(r"\exp_args:NV \__send_balanced_tl:n {}%naive_ignore%")
-	def __repr__(self):
+	def __repr__(self)->str:
 		return repr(BalancedTokenList(self))
 	@staticmethod
 	def read()->"TTPBalancedTokenList":
@@ -2996,7 +2996,7 @@ def build_Python_call_TeX(T: Type, TeX_code: str, *, recursive: bool=True, sync:
 			code, result1=define_Python_call_TeX(TeX_code=TeX_code, ptt_argtypes=[*extra.ptt_argtypes], ttp_argtypes=[ttp_argtypes],
 																  recursive=recursive, sync=sync, finish=finish,
 																  )
-			def result(*args):
+			def result(*args)->Any:
 				tmp=result1(*args)
 				assert tmp is not None
 				assert len(tmp)==1
@@ -3590,11 +3590,11 @@ class _GroupManager:
 
 	:meta public:
 	"""
-	def begin(self):
+	def begin(self)->None:
 		TokenList(r"\begingroup").execute()
 	def __enter__(self)->None:
 		self.begin()
-	def end(self):
+	def end(self)->None:
 		TokenList(r"\endgroup").execute()
 	def __exit__(self, _exc_type, _exc_value, _traceback)->None:
 		self.end()

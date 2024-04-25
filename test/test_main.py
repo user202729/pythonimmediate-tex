@@ -142,7 +142,7 @@ class Test:
 		assert b"ZeroDivisionError" in content
 		assert b"Transcript written on" in content
 
-	def test_python_flags(self):
+	def test_python_flags(self)->None:
 		"""
 		pass -O to the Python executable and check if assertions are disabled
 		"""
@@ -160,20 +160,20 @@ class Test:
 				cwd=tempfile.gettempdir(),
 				)
 
-	def test_set_globals_locals(self):
-		def f():
+	def test_set_globals_locals(self)->None:
+		def f()->None:
 			f_var = 1
 			g()
 
-		def g():
+		def g()->None:
 			g_var = 2
 			h()
 
-		def h():
+		def h()->None:
 			h_var = 3
 			i()
 
-		def i():
+		def i()->None:
 			g, l = pythonimmediate.simple.set_globals_locals(None, None)
 			assert "f_var" not in l
 			assert "g_var" not in l
@@ -181,13 +181,14 @@ class Test:
 
 		f()
 
-		def h():
+		def h()->None:
 			h_var = 4
 			x = 5
 			[list(i() for x in range(1)) for y in range(1, 2)]
 
-		def i():
+		def i()->None:
 			g, l = pythonimmediate.simple.set_globals_locals(None, None)
+			assert l is not None
 			assert "f_var" not in l
 			assert "g_var" not in l
 			assert l["h_var"] == 4
@@ -196,14 +197,14 @@ class Test:
 
 		f()
 
-	def test_f1(self):
+	def test_f1(self)->None:
 		from pythonimmediate.simple import f1
-		def f():
+		def f()->None:
 		    k = 1
 		    return [f"j={j}, k={k}" for j in range(5)]
 		assert f() == ['j=0, k=1', 'j=1, k=1', 'j=2, k=1', 'j=3, k=1', 'j=4, k=1']
 
-		def f():
+		def f()->None:
 		    k = 1
 		    return [f1("j=`j`, k=`k`") for j in range(5)]
 		assert f() == ['j=0, k=1', 'j=1, k=1', 'j=2, k=1', 'j=3, k=1', 'j=4, k=1']
@@ -271,14 +272,14 @@ class TestBenchmarkTl:
 		with ChildProcessEngine(engine_name) as e, default_engine.set_engine(e):
 			t=BalancedTokenList([r"\toks0=", [cat("?")]*500])
 			@benchmark
-			def _():
+			def _()->None:
 				t.execute()
 
 	def test_bench_recv_simple_tl(self, engine_name: EngineName, benchmark, cat: Catcode)->None:
 		with ChildProcessEngine(engine_name) as e, default_engine.set_engine(e):
 			toks[1]=BalancedTokenList([cat("?")])*500
 			@benchmark
-			def _():
+			def _()->None:
 				toks[1]
 
 def test_bench_import(benchmark)->None:

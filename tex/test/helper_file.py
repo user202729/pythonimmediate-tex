@@ -440,7 +440,7 @@ class Test(unittest.TestCase):
 
 	def test_set_func_and_group(self)->None:
 		a=1
-		def f():
+		def f()->None:
 			nonlocal a
 			a=2
 		handler_f=T.abc.set_func(f)
@@ -451,7 +451,7 @@ class Test(unittest.TestCase):
 
 		for global_ in [False, True]:
 			with group:
-				def g():
+				def g()->None:
 					nonlocal a
 					a=3
 				handler_g=T.abc.set_func(g, global_=global_)
@@ -543,7 +543,7 @@ class Test(unittest.TestCase):
 				a = 1
 
 				@simple.define_char(c)
-				def f():
+				def f()->None:
 					nonlocal a
 					a = 2
 
@@ -557,7 +557,7 @@ class Test(unittest.TestCase):
 		import random
 		l=[]
 		@simple.newenvironment("myenv")
-		def	myenv():
+		def	myenv()->None:
 			x=random.randint(1, 10**18)
 			l.append(f"begin {x}")
 			yield
@@ -582,7 +582,7 @@ class Test(unittest.TestCase):
 	def test_new_verbatim_environment(self)->None:
 		a=0
 		@simple.newenvironment_verb("myenv*")
-		def myenv(s: str):
+		def myenv(s: str)->None:
 			nonlocal a
 			a=1
 			self.assertEqual(s, "hello world\n \\#^&%$\n")
@@ -600,7 +600,7 @@ class Test(unittest.TestCase):
 	def test_get_env_body_verb_approximate(self)->None:
 		a=0
 		@simple.newenvironment("myenv**")
-		def myenv():
+		def myenv()->None:
 			s, _, _=get_env_body_verb_approximate()
 			nonlocal a
 			a=1
