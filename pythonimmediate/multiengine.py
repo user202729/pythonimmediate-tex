@@ -104,6 +104,8 @@ class MultiChildProcessEngine(Engine):
 		The actual explanation is a bit complicated, and depends on the implementation detail.
 		When a child process is restarted, everything is replayed from the beginning.
 
+		In addition, in an transient context, only the first child process is used.
+
 		>>> from pythonimmediate import T, execute, default_engine
 		>>> with MultiChildProcessEngine("pdftex", 2) as engine, default_engine.set_engine(engine):
 		... 	T.l_tmpa_tl.str("Hello world") # mutates the state, cannot be put in transient context
@@ -122,16 +124,18 @@ class MultiChildProcessEngine(Engine):
 		action=ReadAction(line)
 		if not self._in_transient_context:
 			self._action_log.append(action)
-		for child_process in self._child_processes[1:]:
-			action(child_process)
+			for child_process in self._child_processes[1:]:
+				action(child_process)
 		return line
 
 	def _write(self, data: bytes)->None:
 		action=WriteAction(data)
-		if not self._in_transient_context:
+		if self._in_transient_context:
+			action(self._child_processes[0])
+		else:
 			self._action_log.append(action)
-		for child_process in self._child_processes:
-			action(child_process)
+			for child_process in self._child_processes:
+				action(child_process)
 
 	@contextlib.contextmanager
 	def extract_one(self, do_replace: bool=True)->Generator[ChildProcessEngine, None, None]:
@@ -141,6 +145,7 @@ class MultiChildProcessEngine(Engine):
 
 		:param do_replace: whether to replace the extracted child process with a new one.
 		"""
+		assert not self._in_transient_context, "Cannot extract child process in transient context"
 		child_process=self._child_processes.pop()
 		if do_replace:
 			self.start_child_process()
