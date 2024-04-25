@@ -469,6 +469,9 @@ class TeXProcessExited(Exception):
 	r"""
 	An exception that will be raised if some operation makes the process exits.
 
+	It is, however, safe to just catch this in case of :class:`ChildProcessEngine`.
+	See there for an example.
+
 	>>> from pythonimmediate import execute, BalancedTokenList
 	>>> execute(r'\documentclass{article}\begin{document}hello world')
 	>>> execute(r'\end{document}')
@@ -539,6 +542,19 @@ class ChildProcessEngine(Engine):
 		^^J%
 		? }
 		\readline -1 to \xx
+
+	As an alternative to :meth:`terminate`, you can also just execute ``\end{document}``, but
+	be sure to catch :class:`TeXProcessExited` if you do so.
+	If you do this, there's no need to call :meth:`terminate`.
+
+	>>> with ChildProcessEngine("pdftex") as engine, default_engine.set_engine(engine):
+	... 	execute(r'\documentclass{article}')
+	... 	execute(r'\begin{document}')
+	... 	execute(r'Hello world')
+	... 	try: execute(r'\end{document}')
+	... 	except TeXProcessExited: pass
+	... 	print(engine.read_output_file()[:9])
+	b'%PDF-1.5\n'
 
 	:param args: List of additional arguments to be passed to the executable, such as ``--recorder`` etc.
 	:param env: See documentation of *env* argument in ``subprocess.Popen``.
@@ -789,7 +805,7 @@ class ChildProcessEngine(Engine):
 		self._check_no_error()
 		if not line:
 			process.wait(timeout=_DEFAULT_TIMEOUT)
-			self.close()
+			self.terminate()
 			if self._autorestart:
 				self._start_process()
 			raise TeXProcessExited
@@ -807,6 +823,8 @@ class ChildProcessEngine(Engine):
 		self.terminate()
 		self._directory.cleanup()
 
+	_EngineStatus=EngineStatus
+
 	def terminate(self)->None:
 		"""
 		Terminate the current process.
@@ -819,15 +837,15 @@ class ChildProcessEngine(Engine):
 		assert process.stdin is not None
 		assert process.stderr is not None
 
-		if self.status==EngineStatus.error:
+		if self.status==self._EngineStatus.error:  # we need to do this because when :meth:`__del__` is called the objects might already be torn down
 			# only _stdout_thread can possibly set status to error, so we just need to wait for _stdout_thread
 			self._stdout_thread.join()
 
 		if not process.poll():
 			# process has not terminated (it's possible for process to already terminate if it's killed on error)
 			if (
-					self.status==EngineStatus.waiting
-					and pythonimmediate.run_none_finish is not None  # this may fail when the Python process exits
+					self.status==self._EngineStatus.waiting
+					and pythonimmediate is not None and pythonimmediate.run_none_finish is not None  # this may fail when the Python process exits
 					):
 				with default_engine.set_engine(self):
 					pythonimmediate.run_none_finish()
@@ -839,8 +857,8 @@ class ChildProcessEngine(Engine):
 		process.stderr.close()
 		self._stdout_thread.join()  # _stdout_thread will automatically terminate once process.stderr is no longer readable
 
-		if self.status!=EngineStatus.error:
-			self.status=EngineStatus.exited
+		if self.status!=self._EngineStatus.error:
+			self.status=self._EngineStatus.exited
 
 		self._process=None
 
