@@ -57,8 +57,8 @@ To create the documentation:
 ```
 # sphinx-quickstart docs --sep -p pythonimmediate-tex -a user202729 -r '' -l en
 
-rm docs/pythonimmediate.rst
-SPHINX_APIDOC_OPTIONS='members,show-inheritance' sphinx-apidoc --full -o docs pythonimmediate
+rm docs/pythonimmediate*.rst
+SPHINX_APIDOC_OPTIONS='members,show-inheritance' sphinx-apidoc --separate --full --no-toc -o docs pythonimmediate
 cd docs
 make html
 ```
