@@ -104,7 +104,8 @@ import inspect
 import contextlib
 import io
 import functools
-from typing import Optional, Union, Callable, Any, Iterator, Protocol, Iterable, Sequence, Type, Tuple, List, Dict, IO, Set
+from fractions import Fraction
+from typing import Optional, Union, Callable, Any, Iterator, Protocol, Iterable, Sequence, Type, Tuple, List, Dict, IO, Set, Literal
 import typing
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -118,6 +119,9 @@ from collections import defaultdict
 import enum
 from weakref import WeakKeyDictionary
 import weakref
+import itertools
+import string
+import numbers
 
 T1 = typing.TypeVar("T1")
 
@@ -129,8 +133,6 @@ is_sphinx_build = "SPHINX_BUILD" in os.environ
 debug=functools.partial(print, file=sys.stderr, flush=True)
 debug=lambda *args, **kwargs: None  # type: ignore
 
-
-
 expansion_only_can_call_Python=False  # normally. May be different in LuaTeX etc.
 from .engine import Engine, default_engine, default_engine as engine, ParentProcessEngine, EngineStatus, TeXProcessError, TeXProcessExited, ChildProcessEngine
 
@@ -140,6 +142,22 @@ if os.environ.get("pythonimmediatenodebug", "").lower() in ["true", "1"]:
 	debugging=False
 
 FunctionType = typing.TypeVar("FunctionType", bound=Callable)
+
+DimensionUnit = Literal["pt", "in", "pc", "cm", "mm", "bp", "dd", "cc", "sp"]
+# ex and em are font-dependent
+
+unit_per_pt: Dict[DimensionUnit, Fraction]={
+		"pt": Fraction(1, 1),
+		"in": Fraction(7227, 100),
+		"pc": Fraction(12, 1),
+		"cm": Fraction(7227, 254),
+		"mm": Fraction(7227, 2540),
+		"bp": Fraction(7227, 7200),
+		"dd": Fraction(1238, 1157),
+		"cc": Fraction(14856, 1157),
+		"sp": Fraction(1, 65536),
+		}
+assert {*unit_per_pt.keys()}=={*DimensionUnit.__args__}  # type: ignore
 
 import random
 def surround_delimiter(block: str)->str:
@@ -924,6 +942,74 @@ class Token(NToken):
 		BalancedTokenList([self]).put_next()
 		return get_arg_estr()
 
+	@typing.overload
+	def dim(self, unit: DimensionUnit, val: int)->int: ...
+	@typing.overload
+	def dim(self, unit: DimensionUnit, val: float)->float: ...
+	@typing.overload
+	def dim(self, unit: DimensionUnit, val: Fraction)->Fraction: ...
+	@typing.overload
+	def dim(self, unit: DimensionUnit)->Fraction: ...
+	@typing.overload
+	def dim(self, unit: str)->Any: ...
+	@typing.overload
+	def dim(self, val: float|Fraction, unit: DimensionUnit)->Fraction: ...
+	@typing.overload
+	def dim(self)->str: ...
+
+	def dim(self, *args: Any, **kwargs: Any)->Any:
+		r"""
+		Manipulate an expl3 dimension variable.
+
+		>>> T.l_tmpa_dim.dim("100.5pt")
+		>>> T.l_tmpa_dim.dim()
+		'100.5pt'
+		>>> T.l_tmpa_dim.dim(100.5, "pt")
+		100.5
+		>>> T.l_tmpa_dim.dim("pt")
+		Fraction(201, 2)
+		>>> T.l_tmpa_dim.dim("em")
+		Traceback (most recent call last):
+			...
+		ValueError: Unknown unit "em"
+		>>> T.l_tmpa_dim.dim(100.5)
+		Traceback (most recent call last):
+			...
+		ValueError: Explicit unit is required (e.g. "cm")
+		>>> T.l_tmpa_dim.dim("6586368sp")
+		>>> T.l_tmpa_dim.dim("sp")
+		Fraction(6586368, 1)
+		"""
+		assert {*kwargs.keys()}<={"val", "unit"}
+		val, unit=[*args, *kwargs.values(), None, None][:2]
+		if val is None and unit is None:
+			return BalancedTokenList([T.the, self]).expand_estr()  # dim() -> "100.5pt"
+		if unit is None and val is not None:
+			val, unit=unit, val
+		if val is None and unit is not None:
+			if isinstance(unit, numbers.Number):
+				raise ValueError('Explicit unit is required (e.g. "cm")')
+			assert isinstance(unit, str), unit
+			if {*string.digits}&{*unit}:
+				# dim("1pt") -> None
+				(BalancedTokenList([self])+BalancedTokenList.fstr(f"={unit}")).execute()
+				return None
+			else:
+				# dim("pt") -> 201/2
+				result_sp=BalancedTokenList([T.number, self]).expand_o().int()
+				result_pt=result_sp*unit_per_pt["sp"]
+				if unit not in unit_per_pt:
+					raise ValueError(f'Unknown unit "{unit}"')
+				return result_pt/unit_per_pt[typing.cast(DimensionUnit, unit)]
+		# dim(1.3, "pt") -> 1.3
+		assert unit is not None
+		assert val is not None
+		if isinstance(val, str): val, unit=unit, val
+		assert unit in unit_per_pt, (val, unit)
+		(BalancedTokenList([self])+BalancedTokenList.fstr(f"={float(val):.6f}{unit}")).execute()
+		# let TeX do the conversion (this will allow em and ex etc.)
+		return val
+
 	def str(self, val: Optional[str]=None)->str:
 		r"""
 		Manipulate an expl3 str variable.
@@ -986,6 +1072,7 @@ class Token(NToken):
 			(BalancedTokenList([self])+BalancedTokenList.fstr('=' + str(val))).execute()
 			return val
 		return BalancedTokenList([T.the, self]).expand_o().int()
+
 
 	def bool(self)->bool:
 		r"""
@@ -2669,9 +2756,6 @@ class PTTBalancedTokenList(PyToTeXData):
 
 # ======== define TeX functions that execute Python code ========
 # ======== implementation of ``\py`` etc. Doesn't support verbatim argument yet. ========
-
-import itertools
-import string
 
 def random_TeX_identifiers()->Iterator[str]:  # do this to avoid TeX hash collision while keeping the length short
 	for len_ in itertools.count(0):
