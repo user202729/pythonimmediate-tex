@@ -579,6 +579,28 @@ class ChildProcessEngine(Engine):
 	:param env: See documentation of *env* argument in ``subprocess.Popen``.
 		Note that it's usually recommended to append environment variables that should be set to
 		``os.environ`` instead of replacing it entirely.
+	:param from_dump: Slightly undocumented feature at the moment.
+
+		Refer to https://tex.stackexchange.com/a/687427 for explanation. Decompressing the format file
+		is optional, explained in that link.
+
+		Example:
+
+		>>> from pythonimmediate import BalancedTokenList
+		>>> from pathlib import Path
+		>>> import tempfile
+		>>> import gzip
+		>>> with ChildProcessEngine("pdftex", args=["--ini", "&pdflatex"]) as engine, default_engine.set_engine(engine):
+		... 	try: execute(r"\documentclass{article} \usepackage{tikz} \pythonimmediatechildprocessdump")
+		... 	except TeXProcessExited: pass
+		... 	else: assert False
+		... 	f=Path(tempfile.mktemp(suffix=".fmt"))
+		... 	_size=f.write_bytes(gzip.decompress(engine.read_output_file("fmt")))
+		>>> with ChildProcessEngine("pdftex", from_dump=True, args=["&"+str(f.with_suffix(""))]) as engine, default_engine.set_engine(engine):
+		... 	BalancedTokenList(r"\the\numexpr 12+34\relax").expand_o()
+		<BalancedTokenList: 4₁₂ 6₁₂>
+		>>> f.unlink()
+
 	:param autorestart: Mostly for testing purpose -- whenever an error happen, the engine will be killed and automatically restarted.
 		
 		For example:

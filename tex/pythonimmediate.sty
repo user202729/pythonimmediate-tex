@@ -95,15 +95,30 @@
 	\cs_gset_protected:Npn \_pythonimmediate_send_content:e ##1 {}
 }
 
-\bool_if:NTF \_pythonimmediate_child_process {
-	\newwrite \_pythonimmediate_write_file
-	\sys_if_engine_luatex:TF {
-		% use Lua to write to stderr
+\sys_if_engine_luatex:TF {
+	% use Lua to write to stderr
+	\cs_new_protected:Npn \_pythonimmediate_open_write_child_process: {
 		\directlua{ (require "pythonimmediate_helper")() }
-	} {
+	}
+} {
+	\cs_new_protected:Npn \_pythonimmediate_open_write_child_process: {
 		%\immediate\openout \_pythonimmediate_write_file=symlink-to-stderr.txt~
 		% tried this method, it seems to work except that it's buffered when stderr is redirected to a file...
 		\immediate\openout \_pythonimmediate_write_file=|"\_pythonimmediate_python_executable \space \_pythonimmediate_python_flags \space -m ~ pythonimmediate.copy_to_stderr"~
+	}
+}
+
+\bool_if:NTF \_pythonimmediate_child_process {
+	\newwrite \_pythonimmediate_write_file
+	\_pythonimmediate_open_write_child_process:
+	\cs_new_protected:Npn \pythonimmediatechildprocessdump {
+		\everyjob\expandafter{
+			\the\everyjob
+			\_pythonimmediate_open_write_child_process:
+			\pythonimmediatelisten
+			\stop
+		}
+		\dump
 	}
 } {
 
