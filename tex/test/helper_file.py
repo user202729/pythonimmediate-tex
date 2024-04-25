@@ -1,6 +1,6 @@
 import unittest
 import pythonimmediate
-from typing import Any
+from typing import Any, Generator
 from pythonimmediate import Token, TokenList, BalancedTokenList, Catcode, ControlSequenceToken, frozen_relax_token, BlueToken, NTokenList, catcode, remove_handler, group, get_env_body_verb_approximate
 from pythonimmediate import Catcode as C
 from pythonimmediate import default_engine, simple
@@ -557,7 +557,7 @@ class Test(unittest.TestCase):
 		import random
 		l=[]
 		@simple.newenvironment("myenv")
-		def	myenv()->None:
+		def	myenv()->Generator[None]:
 			x=random.randint(1, 10**18)
 			l.append(f"begin {x}")
 			yield
@@ -600,7 +600,7 @@ class Test(unittest.TestCase):
 	def test_get_env_body_verb_approximate(self)->None:
 		a=0
 		@simple.newenvironment("myenv**")
-		def myenv()->None:
+		def myenv()->Generator[None]:
 			s, _, _=get_env_body_verb_approximate()
 			nonlocal a
 			a=1

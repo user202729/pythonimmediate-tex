@@ -1,6 +1,6 @@
 import subprocess
 import tempfile
-from typing import List
+from typing import List, Any
 import re
 
 import psutil
@@ -175,18 +175,19 @@ class Test:
 
 		def i()->None:
 			g, l = pythonimmediate.simple.set_globals_locals(None, None)
+			assert l is not None
 			assert "f_var" not in l
 			assert "g_var" not in l
 			assert l["h_var"] == 3
 
 		f()
 
-		def h()->None:
+		def h()->None:  # type: ignore
 			h_var = 4
 			x = 5
-			[list(i() for x in range(1)) for y in range(1, 2)]
+			[list(i() for x in range(1)) for y in range(1, 2)]  # type: ignore
 
-		def i()->None:
+		def i()->None:  # type: ignore
 			g, l = pythonimmediate.simple.set_globals_locals(None, None)
 			assert l is not None
 			assert "f_var" not in l
@@ -199,12 +200,12 @@ class Test:
 
 	def test_f1(self)->None:
 		from pythonimmediate.simple import f1
-		def f()->None:
+		def f()->list:
 		    k = 1
 		    return [f"j={j}, k={k}" for j in range(5)]
 		assert f() == ['j=0, k=1', 'j=1, k=1', 'j=2, k=1', 'j=3, k=1', 'j=4, k=1']
 
-		def f()->None:
+		def f()->list:
 		    k = 1
 		    return [f1("j=`j`, k=`k`") for j in range(5)]
 		assert f() == ['j=0, k=1', 'j=1, k=1', 'j=2, k=1', 'j=3, k=1', 'j=4, k=1']
@@ -268,25 +269,25 @@ def test_process_garbage_collection(explicitly_collect: bool)->None:
 @pytest.mark.parametrize("engine_name", engine_names)
 @pytest.mark.parametrize("cat", [C.other, C.letter, C.param, C.alignment, C.space])
 class TestBenchmarkTl:
-	def test_bench_send_simple_tl(self, engine_name: EngineName, benchmark, cat: Catcode)->None:
+	def test_bench_send_simple_tl(self, engine_name: EngineName, benchmark: Any, cat: Catcode)->None:
 		with ChildProcessEngine(engine_name) as e, default_engine.set_engine(e):
 			t=BalancedTokenList([r"\toks0=", [cat("?")]*500])
 			@benchmark
 			def _()->None:
 				t.execute()
 
-	def test_bench_recv_simple_tl(self, engine_name: EngineName, benchmark, cat: Catcode)->None:
+	def test_bench_recv_simple_tl(self, engine_name: EngineName, benchmark: Any, cat: Catcode)->None:
 		with ChildProcessEngine(engine_name) as e, default_engine.set_engine(e):
 			toks[1]=BalancedTokenList([cat("?")])*500
 			@benchmark
 			def _()->None:
 				toks[1]
 
-def test_bench_import(benchmark)->None:
+def test_bench_import(benchmark: Any)->None:
 	benchmark(subprocess.run, ["python", "-c", "from pythonimmediate import*"], check=True)
 
 @pytest.mark.parametrize("engine_name", engine_names)
-def test_bench_start_child_process(benchmark, engine_name: EngineName)->None:
+def test_bench_start_child_process(benchmark: Any, engine_name: EngineName)->None:
 	@benchmark
 	def _()->None:
 		with ChildProcessEngine(engine_name) as e, default_engine.set_engine(e):

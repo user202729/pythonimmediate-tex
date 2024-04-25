@@ -758,7 +758,7 @@ def put_next_tokenized(line: str, engine: Engine=default_engine)->None:
 		"""))(PTTTeXLine(line))
 
 @_export
-def print_TeX(*args, **kwargs)->None:
+def print_TeX(*args: Any, **kwargs: Any)->None:
 	r"""
 	Unlike other packages, the normal ``print()`` function prints to the console.
 
@@ -997,7 +997,7 @@ def newenvironment_verb(name: str, f: Callable[[str], None])->None:
 		}
 		""", recursive=False))(PTTVerbatimLine(name), PTTVerbatimLine(identifier))
 
-	def f1():
+	def f1()->None:
 		body=typing.cast(Callable[[], TTPBlock], Python_call_TeX_local(
 			r"""
 			\cs_new_protected:Npn %name% {
