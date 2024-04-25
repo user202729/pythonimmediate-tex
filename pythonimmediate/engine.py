@@ -464,6 +464,9 @@ class DefaultEngine(Engine, threading.local):
 	def _write(self, s: bytes)->None:
 		self.get_engine()._write(s)
 
+	def _log_communication(self, s: bytes)->None:
+		self.get_engine()._log_communication(s)
+
 	def add_on_close(self, f: Callable[[], None])->None:
 		assert False
 
@@ -606,11 +609,12 @@ class ChildProcessEngine(Engine):
 
 	"""
 
-	def __init__(self, engine_name: EngineName, args: Iterable[str]=(), env=None, autorestart: bool=False, debug_log_communication: Optional[str|Path]=None)->None:
+	def __init__(self, engine_name: EngineName, args: Iterable[str]=(), env=None, autorestart: bool=False, debug_log_communication: Optional[str|Path]=None, from_dump: bool=False)->None:
 		super().__init__()
 		if debug_log_communication is not None:
 			self.set_log_communication_file(debug_log_communication)
 		self._name=engine_name
+		self._from_dump=from_dump
 		assert not isinstance(args, str), "Pass a list/tuple of strings as args"
 		self._args=args
 		self._env=env
@@ -646,7 +650,9 @@ class ChildProcessEngine(Engine):
 		self._process=subprocess.Popen(
 				[
 					engine_name_to_latex_executable[self._name], "--shell-escape",
-						*self._args, r"\RequirePackage[child-process]{pythonimmediate}\pythonimmediatelisten\stop"],
+						*self._args,
+						*([] if self._from_dump else [r"\RequirePackage[child-process]{pythonimmediate}\pythonimmediatelisten\stop"])
+						],
 				stdin=subprocess.PIPE,
 				stdout=subprocess.PIPE,
 				stderr=subprocess.PIPE,
@@ -660,10 +666,11 @@ class ChildProcessEngine(Engine):
 		self._stdout_thread=threading.Thread(target=ChildProcessEngine._stdout_thread_func, args=(weakref.ref(self),), daemon=True)
 		self._stdout_thread.start()
 
-		from . import surround_delimiter, substitute_private, get_bootstrap_code
-		self.write(surround_delimiter(substitute_private(
-			get_bootstrap_code(self)
-			)).encode('u8'))
+		if not self._from_dump:
+			from . import surround_delimiter, substitute_private, get_bootstrap_code
+			self.write(surround_delimiter(substitute_private(
+				get_bootstrap_code(self)
+				)).encode('u8'))
 
 	def __repr__(self)->str:
 		r"""
