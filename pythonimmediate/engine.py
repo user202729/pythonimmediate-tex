@@ -213,9 +213,9 @@ class ParentProcessEngine(Engine):
 
 	This should not be instantiated directly. Only :func:`pythonimmediate.textopy.main` should instantiate this.
 	"""
-	_logged_communication: bytearray
 	def _log_communication(self, s: bytes)->None:
-		self._logged_communication += s
+		self._log_communication_file.write(s)
+		self._log_communication_file.flush()
 
 	def __init__(self, pseudo_config: GlobalConfiguration)->None:
 		super().__init__()
@@ -280,10 +280,9 @@ class ParentProcessEngine(Engine):
 			from string import Template
 			debug_log_communication = Path(Template(self.config.debug_log_communication).safe_substitute(pid=os.getpid()))
 			print(f"[All communications will be logged to {debug_log_communication}]", flush=True)
-			self._logged_communication = bytearray()
-			def write_communication_log()->None:
-				debug_log_communication.write_bytes(b"Communication log ['>': TeX to Python - include i/r distinction, '<': Python to TeX]:\n" + self._logged_communication)
-			atexit.register(write_communication_log)
+			self._log_communication_file=open(debug_log_communication, "wb")
+			self._log_communication_file.write(b"Communication log ['>': TeX to Python - include i/r distinction, '<': Python to TeX]:\n")
+			atexit.register(lambda: self._log_communication_file.close())
 
 		from . import surround_delimiter, substitute_private, get_bootstrap_code
 		self.write(surround_delimiter(substitute_private(get_bootstrap_code(self))).encode('u8'))

@@ -27,9 +27,9 @@ def main()->None:
 
 			if engine.config.sanity_check_extra_line:
 				assert not engine._read(), "Internal error: TeX sends extra line"
-	atexit.register(atexit_callback)
 
 	engine=ParentProcessEngine(pseudo_config)
+	atexit.register(atexit_callback)
 	default_engine.set_engine(engine)
 	try:
 		run_main_loop()  # if this returns cleanly TeX has no error. Otherwise some readline() will reach eof and print out a stack trace
