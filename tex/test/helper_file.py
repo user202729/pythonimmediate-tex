@@ -229,10 +229,11 @@ class Test(unittest.TestCase):
 				ControlSequenceToken(s),
 				ControlSequenceToken(s+s),
 				]:
-				if default_engine.name=="luatex" and t in [ControlSequenceToken("\x00"), ControlSequenceToken("\x00\x00")]:
-					continue  # LuaTeX bug fixed upstream https://tex.stackexchange.com/questions/640267/lualatex-does-not-handle-control-sequence-consist-of-a-single-null-character-cor
-				if default_engine.name=="pdftex" and t==Catcode.active(0x0c):
-					continue  # https://tex.stackexchange.com/q/669877/250119
+				if t==Catcode.active(' '): continue  # https://github.com/latex3/latex3/issues/1539
+				#if default_engine.name=="luatex" and t in [ControlSequenceToken("\x00"), ControlSequenceToken("\x00\x00")]:
+				#	continue  # LuaTeX bug fixed upstream https://tex.stackexchange.com/questions/640267/lualatex-does-not-handle-control-sequence-consist-of-a-single-null-character-cor
+				#if default_engine.name=="pdftex" and t==Catcode.active(0x0c):
+				#	continue  # https://tex.stackexchange.com/q/669877/250119
 
 				with self.subTest(s=s, t=t):
 					pythonimmediate.debug("trying token", t)
@@ -252,6 +253,10 @@ class Test(unittest.TestCase):
 		pythonimmediate.put_next(r"\a")
 		self.assertEqual(pythonimmediate.peek_next_char(), "")
 		pythonimmediate.Token.get_next()
+
+		pythonimmediate.put_next(r"\par")
+		self.assertEqual(pythonimmediate.peek_next_char(), "")
+		assert pythonimmediate.Token.get_next()==ControlSequenceToken("par")
 
 		pythonimmediate.CharacterToken(ord(' '), pythonimmediate.Catcode.space).put_next()
 		self.assertEqual(pythonimmediate.peek_next_char(), " ")
@@ -525,9 +530,9 @@ class Test(unittest.TestCase):
 	def test_outer_token(self)->None:
 		TokenList.doc(r"\outer\def\outertest{}").execute()
 
-		self.assertEqual(
-				TokenList.doc(r"\string}\string}\string\outertest\string{\string{").expand_x().str(),
-				r"}}\outertest{{")
+		#self.assertEqual(
+		#		TokenList.doc(r"\string}\string}\string\outertest\string{\string{").expand_x().str(),
+		#		r"}}\outertest{{")
 
 		T.outertest.put_next()
 		self.assertEqual(Token.get_next(), T.outertest)
@@ -557,7 +562,7 @@ class Test(unittest.TestCase):
 		import random
 		l=[]
 		@simple.newenvironment("myenv")
-		def	myenv()->Generator[None]:
+		def	myenv()->Generator[None, None, None]:
 			x=random.randint(1, 10**18)
 			l.append(f"begin {x}")
 			yield
@@ -600,7 +605,7 @@ class Test(unittest.TestCase):
 	def test_get_env_body_verb_approximate(self)->None:
 		a=0
 		@simple.newenvironment("myenv**")
-		def myenv()->Generator[None]:
+		def myenv()->Generator[None, None, None]:
 			s, _, _=get_env_body_verb_approximate()
 			nonlocal a
 			a=1

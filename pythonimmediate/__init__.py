@@ -1028,6 +1028,7 @@ r"""
 \def \__tldeserialize_R #1            { \cFrozenRelax                                                                  \csname #1 \endcsname }
 
 % here #1 is the target token list to store the result to, #2 is a string with the final '.'.
+% normally LaTeX3 token list cannot hold outer tokens, so we use \xdef.
 \cs_new_protected:Npn \__tldeserialize_dot:Nn #1 #2 {
 	\begingroup
 		%\tl_gset:Nn \__gtmp {#2}
@@ -1052,7 +1053,7 @@ r"""
 		\let \R \__tldeserialize_R 
 
 		\let \. \empty
-		\tl_gset:Nx \__gtmp {\expandafter \__tldeserialize_start \__gtmp}
+		\xdef \__gtmp {\expandafter \__tldeserialize_start \__gtmp}
 	\endgroup
 	\tl_set_eq:NN #1 \__gtmp
 }
