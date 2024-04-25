@@ -703,6 +703,7 @@ class ChildProcessEngine(Engine):
 
 			# debug logging
 			#sys.stderr.write(f" | {_stdout_lines=} | {_stdout_buffer=} | {_error_marker_line_seen=} | {self.status=}\n")
+		process.stdout.close()
 
 	def get_process(self)->subprocess.Popen:
 		if self._process is None:
