@@ -10,6 +10,9 @@ will be appended to the command-line arguments. For example you could invoke [Te
 to enable debugging facilities.
 
 Side note ``--debug-log-communication`` also accept a ``$pid`` placeholder.
+That is, if you pass ``--debug-log-communication=/tmp/a-$pid.diff``, then the ``$pid`` will be replaced
+with the process ID.
+This is useful if you want to run multiple [TeX] processes at the same time and want to log them separately.
 
 Supported command-line arguments:
 
