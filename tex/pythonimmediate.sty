@@ -104,7 +104,7 @@
 	\cs_new_protected:Npn \_pythonimmediate_open_write_child_process: {
 		%\immediate\openout \_pythonimmediate_write_file=symlink-to-stderr.txt~
 		% tried this method, it seems to work except that it's buffered when stderr is redirected to a file...
-		\immediate\openout \_pythonimmediate_write_file=|"\_pythonimmediate_python_executable \space \_pythonimmediate_python_flags \space -m ~ pythonimmediate.copy_to_stderr"~
+		\immediate\openout \_pythonimmediate_write_file=|"\_pythonimmediate_python_executable \space \_pythonimmediate_python_flags \space -m ~ pythonimmediatehelper.copy_to_stderr"~
 	}
 }
 

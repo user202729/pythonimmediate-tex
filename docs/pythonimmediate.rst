@@ -8,7 +8,6 @@ Submodules
    :maxdepth: 4
 
    pythonimmediate.communicate
-   pythonimmediate.copy_to_stderr
    pythonimmediate.engine
    pythonimmediate.pytotex
    pythonimmediate.simple
