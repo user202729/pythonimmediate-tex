@@ -67,7 +67,7 @@ from dataclasses import dataclass
 
 import pythonimmediate
 from . import scan_Python_call_TeX_module, PTTTeXLine, PTTVerbatimLine, PTTTeXLine, Python_call_TeX_local, check_line, Token, TTPEBlock, TTPEmbeddedLine, get_random_Python_identifier, CharacterToken, define_TeX_call_Python, parse_meaning_str, peek_next_meaning, run_block_local, run_code_redirect_print_TeX, TTPBlock, TTPLine, BalancedTokenList, TokenList, ControlSequenceToken, doc_catcode_table, Catcode, T, ControlSequenceToken, group
-from .engine import Engine, default_engine, default_engine as engine
+from .engine import Engine, default_engine, default_engine as engine, TeXProcessExited
 
 if not typing.TYPE_CHECKING:
 	__all__ = []
@@ -693,7 +693,7 @@ def undefine_char(char: str)->None:
 			""", recursive=False))(PTTVerbatimLine(char))
 
 @_export
-def execute(block: str, engine: Engine=default_engine)->None:
+def execute(block: str, engine: Engine=default_engine, expecting_exit: bool=False)->None:
 	r"""
 	Run a block of [TeX]-code (might consist of multiple lines).
 
@@ -724,7 +724,12 @@ def execute(block: str, engine: Engine=default_engine)->None:
 
 		For advanced users: it's implemented with ``\scantokens``, so catcode-changing commands are allowed inside.
 	"""
-	run_block_local(block)
+	if expecting_exit:
+		try: execute(block)
+		except TeXProcessExited: pass
+		else: assert False, "Process did not exit even though expecting_exit is True"
+	else:
+		run_block_local(block)
 
 @_export
 def execute_tokenized(line: str, engine: Engine=default_engine)->None:

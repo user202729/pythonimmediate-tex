@@ -9,10 +9,12 @@ Submodules
 
    pythonimmediate.communicate
    pythonimmediate.engine
+   pythonimmediate.multiengine
    pythonimmediate.pytotex
    pythonimmediate.simple
    pythonimmediate.texcmds
    pythonimmediate.textopy
+   pythonimmediate.util
 
 Module contents
 ---------------

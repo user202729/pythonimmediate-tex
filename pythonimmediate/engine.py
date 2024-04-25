@@ -781,6 +781,7 @@ class ChildProcessEngine(Engine):
 		This is only reliable when the process has already been terminated. Refer to :meth:`terminate`.
 
 		See :class:`ChildProcessEngine` for an usage example.
+		See :class:`~pythonimmediate.multiengine.MultiChildProcessEngine` for another example.
 		"""
 		return (self.directory/("texput."+extension)).read_bytes()
 
