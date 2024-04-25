@@ -593,6 +593,7 @@ class ChildProcessEngine(Engine):
 	def __init__(self, engine_name: EngineName, args: Iterable[str]=(), env=None, autorestart: bool=False)->None:
 		super().__init__()
 		self._name=engine_name
+		assert not isinstance(args, str), "Pass a list/tuple of strings as args"
 		self._args=args
 		self._env=env
 		self._autorestart=autorestart
