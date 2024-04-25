@@ -874,13 +874,27 @@ class ChildProcessEngine(Engine):
 	_EngineStatus=EngineStatus
 
 	def terminate(self)->None:
-		"""
+		r"""
 		Terminate the current process.
 
 		This must be used in place of :meth:`~Engine.close` in order to stop the process but still keep the generated files.
 
 		See :class:`ChildProcessEngine` for an usage example.
+
+		Similar to ``file.close``, ``subprocess.Popen.wait`` or ``subprocess.Popen.kill``,
+		this method does nothing if the process is already terminated.
+
+		>>> from pythonimmediate import execute
+		>>> with ChildProcessEngine("pdftex") as engine, default_engine.set_engine(engine):
+		...		execute(r'\typeout{123}')
+		...		engine.terminate()
+		...		engine.terminate()
+		...		engine.close()
+		>>> engine.terminate()
+		>>> engine.close()
+		>>> engine.close()
 		"""
+		if self._process is None: return
 		process=self.get_process()
 		assert process.stdin is not None
 		assert process.stderr is not None
@@ -911,14 +925,11 @@ class ChildProcessEngine(Engine):
 		self._process=None
 
 	def __del__(self)->None:
-		if self._process is not None:
-			self.close()
+		self.close()
 
 	def __enter__(self)->ChildProcessEngine:
 		return self
 
 	def __exit__(self, exc_type, exc_val, exc_tb)->None:
-		if self._process is not None:
-			self.close()
-
+		self.close()
 
