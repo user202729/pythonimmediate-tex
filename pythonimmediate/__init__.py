@@ -1415,6 +1415,7 @@ class ControlSequenceTokenMaker:
 	<Token: \__mymodule_a>
 	"""
 	def __init__(self, prefix: str)->None:
+		assert all(ord(c) <= 0x7f for c in prefix), "Prefix containing non-ASCII characters is not supported because of complexities with is_unicode (see documentation of ControlSequenceToken)"
 		self.prefix=prefix
 	if enable_get_attribute:
 		def __getattribute__(self, a: str)->"ControlSequenceToken":
@@ -1424,7 +1425,7 @@ class ControlSequenceTokenMaker:
 			return ControlSequenceToken(object.__getattribute__(self, "prefix")+a)
 	def __getitem__(self, a: str|bytes)->"ControlSequenceToken":
 		if isinstance(a, bytes):
-			a="".join(map(chr, a))
+			return ControlSequenceToken(object.__getattribute__(self, "prefix").encode('u8')+a)
 		return ControlSequenceToken(object.__getattribute__(self, "prefix")+a)
 
 
@@ -1465,6 +1466,20 @@ class ControlSequenceToken(Token):
 		False
 		>>> a == ControlSequenceToken("u8:\xc3\x97", is_unicode=True)
 		True
+
+	Generally, the default way to construct the control sequence will give you what you want.
+
+		>>> with ChildProcessEngine("pdftex") as engine, default_engine.set_engine(engine):
+		... 	print(T["u8:×"].meaning_str())
+		... 	print(T["u8:×".encode('u8')].meaning_str())
+		macro:->\IeC {\texttimes }
+		macro:->\IeC {\texttimes }
+		>>> with ChildProcessEngine("luatex") as engine, default_engine.set_engine(engine):
+		... 	print(C.active("\xAD").meaning_str())  # discretionary hyphen
+		... 	BalancedTokenList([r"\expandafter\def\csname\string", C.active("\xAD"), r"\endcsname{123}"]).execute()
+		... 	print(T["\xAD"].meaning_str())  # just a convoluted test since no control sequence with non-ASCII name is defined by default in LuaTeX (that I know of)
+		macro:->\-
+		macro:->123
 
 	*is_unicode* will be fetched from :const:`~pythonimmediate.engine.default_engine`
 	if not explicitly specified.
@@ -1543,9 +1558,9 @@ class ControlSequenceToken(Token):
 
 	def serialize(self)->str:
 		return (
-				"*"*sum(1 for x in self.csname if ord(x)<33) +
+				"*"*sum(1 for x in self._codes if x<33) +
 				"\\" +
-				"".join(' '+chr(ord(x)+64) if ord(x)<33 else x   for x in self.csname)
+				"".join(' '+chr(x+64) if x<33 else chr(x)   for x in self._codes)
 				+ " ")
 
 	def repr1(self)->str:
