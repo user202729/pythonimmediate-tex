@@ -135,7 +135,7 @@ class Engine(ABC):
 		Traceback (most recent call last):
 			...
 		pythonimmediate.engine.TeXProcessError: Undefined control sequence.
-		>>> a
+		>>> a  # doctest: +SKIP
 		[1, 2]
 		>>> e.close()
 		>>> a

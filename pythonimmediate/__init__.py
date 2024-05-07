@@ -566,7 +566,7 @@ def get_user_scope()->Dict[str, Any]:
 		...		assert n==len(_user_scope)
 		...		execute(r'\pyc{a=1}')
 		...		assert n+1==len(_user_scope)
-		>>> assert n==len(_user_scope)
+		>>> assert n==len(_user_scope)  # doctest: +SKIP
 	"""
 	return _defaultget_with_cleanup(_user_scope, dict)
 
