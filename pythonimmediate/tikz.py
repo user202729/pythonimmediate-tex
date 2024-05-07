@@ -29,8 +29,9 @@ def clear():
 	''')
 	execute(r'\draw [help lines] (-5, -5) grid (5, 5);')
 
-clear()
+#clear()
 
+r'''
 ipython=get_ipython()
 
 try: ipython.input_transformer_manager.line_transforms.remove(_ipython_hook)
@@ -92,19 +93,17 @@ with ChildProcessEngine("pdftex", args=["--ini", "&pdflatex"]) as engine, defaul
 
 
 
-r"""
 example::
 
 	! \typeout{123}
 	! \typeout{456}
 
-"""
 
 with ChildProcessEngine("pdftex", from_dump=True, args=["&"+str(format_file.with_suffix(""))]) as engine, default_engine.set_engine(engine):
-	execute(r'''
+	execute(r"""
 	\begin{document}
 	\begin{tikzpicture}
-	''')
+	""")
 	execute(r'\draw (-5, -5) grid (5, 5);')
 	execute(r'\draw (0,0) -- (1,1);')
 	execute(r'\end{tikzpicture}')
@@ -192,3 +191,4 @@ with engine.extract_one() as child:
 	child.terminate()
 	Path("/tmp/a.pdf").write_bytes(child.read_output_file())
 
+'''

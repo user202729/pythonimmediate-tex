@@ -101,11 +101,12 @@ from __future__ import annotations
 import sys
 import os
 import inspect
+import threading
 import contextlib
 import io
 import functools
 from fractions import Fraction
-from typing import Optional, Union, Callable, Any, Iterator, Protocol, Iterable, Sequence, Type, Tuple, List, Dict, IO, Set, Literal
+from typing import Optional, Union, Callable, Any, Iterator, Protocol, Iterable, Sequence, Type, Tuple, List, Dict, IO, Set, Literal, Generator
 import typing
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -1089,7 +1090,7 @@ class Token(NToken):
 		>>> BalancedTokenList(r'\int_set:Nn \l_tmpa_int {5+6}').execute()
 		>>> T.l_tmpa_int.int()
 		11
-		
+
 		.. seealso:: :data:`count`.
 		"""
 		if val is not None:
@@ -1608,6 +1609,32 @@ class Catcode(enum.Enum):
 
 	Both of the above forms are equivalent to ``CharacterToken(index=97, catcode=Catcode.letter)``.
 
+	Another shorthand is available to check if a token has a particular catcode.
+	Note that it is not safe to access :attr:`CharacterToken.catcode` directly, as it is
+	not available for all tokens.
+
+		>>> C.letter("a") in C.letter
+		True
+		>>> C.letter("a") in C.space
+		False
+		>>> T.a in C.letter
+		False
+		>>> C.letter("a").catcode==C.letter
+		True
+		>>> T.a.catcode==C.letter
+		Traceback (most recent call last):
+			...
+		AttributeError: 'ControlSequenceToken' object has no attribute 'catcode'
+
+	The behavior with blue tokens might be unexpected, be careful::
+
+		>>> C.active("a").blue in C.active
+		True
+		>>> T.a.blue in C.letter
+		False
+		>>> T.a.blue in C.active
+		False
+
 	See also :ref:`token-list-construction` for more ways of constructing token lists.
 	"""
 
@@ -1645,6 +1672,10 @@ class Catcode(enum.Enum):
 		if isinstance(ch, str): ch=ord(ch)
 		return CharacterToken(ch, self)
 
+	def __contains__(self, t: NToken)->bool:
+		t=t.no_blue
+		return isinstance(t, CharacterToken) and t.catcode==self
+
 	@staticmethod
 	def lookup(x: int)->Catcode:
 		"""
@@ -1677,6 +1708,12 @@ class CharacterToken(Token):
 	"""
 	>>> C.letter("a").catcode
 	<Catcode.letter: 11>
+
+	Note that it is recommended to use the shorthand documented in :class:`Catcode` to
+	check the catcode of a token instead::
+
+	>>> C.letter("a") in C.letter
+	True
 	"""
 
 	@property
@@ -1825,6 +1862,11 @@ else:  # Python 3.8 compatibility
 
 def TokenList_e3(s: str)->TokenList: return TokenList.e3(s)
 
+class UnbalancedTokenListError(ValueError):
+	"""
+	Exception raised when a token list is unbalanced.
+	"""
+
 class TokenList(TokenListBaseClass):
 	r"""
 	Represent a [TeX] token list, none of which can contain a blue token.
@@ -1918,10 +1960,10 @@ class TokenList(TokenListBaseClass):
 		"""
 		ensure that this is balanced.
 
-		:raises ValueError: if this is not balanced.
+		:raises UnbalancedTokenListError: if this is not balanced.
 		"""
 		if not self.is_balanced():
-			raise ValueError(f"Token list {self} is not balanced")
+			raise UnbalancedTokenListError(f"Token list {self} is not balanced")
 
 	def balanced_parts(self)->"List[Union[BalancedTokenList, Token]]":
 		"""
@@ -2000,7 +2042,8 @@ class TokenList(TokenListBaseClass):
 					while i<len(s) and s[i]==' ':
 						i+=1
 			elif cat.for_token:
-				yield cat(ch)
+				yield cat(ch)  # type: ignore
+				# temporary, see https://github.com/python/mypy/issues/17222
 			elif cat==Catcode.ignored:
 				continue
 			else:
@@ -2129,7 +2172,7 @@ class TokenList(TokenListBaseClass):
 		Refer to :class:`TokenList` on how to use this function.
 		"""
 		super().__init__(TokenList.force_token_list(a, string_tokenizer))
-		
+
 	def serialize(self)->str:
 		return "".join(t.serialize() for t in self)
 
@@ -2289,6 +2332,59 @@ class TokenList(TokenListBaseClass):
 		return int(self.str_if_unicode())
 
 
+class ImmutableBalancedTokenList(collections.abc.Sequence, collections.abc.Hashable):
+	r"""
+	Represents an immutable balanced token list.
+
+	Note that this class is not a subclass of :class:`TokenList`, and is not mutable.
+
+	Not many operations are supported. Convert to :class:`BalancedTokenList` to perform more operations.
+
+	Its main use is to be used as a key in a dictionary.
+
+	>>> a=ImmutableBalancedTokenList(BalancedTokenList.e3(r'\def\a{b}'))
+	>>> b=ImmutableBalancedTokenList(BalancedTokenList.e3(r'\def\a{b}'))
+	>>> c=ImmutableBalancedTokenList(BalancedTokenList.e3(r'\def\a{c}'))
+	>>> hash(a)==hash(b)
+	True
+	>>> a==b
+	True
+	>>> a!=b
+	False
+	>>> a==c
+	False
+	>>> a!=c
+	True
+	"""
+	def __init__(self, a: BalancedTokenList)->None:
+		self._data: Tuple[Token, ...]=tuple(a)
+
+	@typing.overload
+	def __getitem__(self, i: int)->Token: ...
+	@typing.overload
+	def __getitem__(self, i: slice)->ImmutableBalancedTokenList: ...
+
+	def __getitem__(self, i: int|slice)->Token|ImmutableBalancedTokenList:
+		if isinstance(i, slice): return ImmutableBalancedTokenList(BalancedTokenList(self._data[i]))
+		return self._data[i]
+
+	def __len__(self)->int:
+		return len(self._data)
+
+	def __repr__(self)->str:
+		return TokenList.__repr__(self)  # type: ignore
+
+	def __str__(self)->str:
+		return repr(self)
+
+	def __hash__(self)->int:
+		return hash(self._data)
+
+	def __eq__(self, other: object)->bool:
+		if not isinstance(other, ImmutableBalancedTokenList): return NotImplemented
+		return self._data==other._data
+
+
 class BalancedTokenList(TokenList):
 	"""
 	Represents a balanced token list.
@@ -2308,7 +2404,12 @@ class BalancedTokenList(TokenList):
 		"""
 		Constructor.
 
-		:raises ValueError: if the token list is not balanced.
+		:raises UnbalancedTokenListError: if the token list is not balanced.
+
+		>>> BalancedTokenList("{")
+		Traceback (most recent call last):
+			...
+		UnbalancedTokenListError: Token list <BalancedTokenList: {₁> is not balanced
 		"""
 		super().__init__(a, string_tokenizer)
 		self.check_balanced()
@@ -2466,6 +2567,174 @@ class BalancedTokenList(TokenList):
 		"""
 		return BalancedTokenList([T.detokenize, self]).expand_x().str()
 
+	def strip_optional_braces(self)->"BalancedTokenList":
+		"""
+		Strip the optional braces from the given token list, if the whole token list is wrapped in braces.
+
+		For example::
+
+			>>> BalancedTokenList("{a}").strip_optional_braces()
+			<BalancedTokenList: a₁₁>
+			>>> BalancedTokenList("a").strip_optional_braces()
+			<BalancedTokenList: a₁₁>
+			>>> BalancedTokenList("{a},{b}").strip_optional_braces()
+			<BalancedTokenList: {₁ a₁₁ }₂ ,₁₂ {₁ b₁₁ }₂>
+			>>> BalancedTokenList([C.begin_group("X"), C.other("a"), C.end_group("Y")]).strip_optional_braces()
+			<BalancedTokenList: a₁₂>
+
+		Note that :class:`BalancedTokenList` is mutable. A copy is returned in any case::
+
+			>>> x=BalancedTokenList("a")
+			>>> y=x.strip_optional_braces()
+			>>> x is y
+			False
+			>>> x.append(C.letter("b"))
+			>>> x
+			<BalancedTokenList: a₁₁ b₁₁>
+			>>> y
+			<BalancedTokenList: a₁₁>
+		"""
+		if self and self[0] in C.begin_group and self[-1] in C.end_group and TokenList(self)[1:-1].is_balanced():
+			return self[1:-1]
+		return self[:]
+
+	def split_balanced(self, /, sep: "BalancedTokenList", maxsplit: int=-1, do_strip_braces_in_result: bool=True)->List["BalancedTokenList"]:
+		r"""
+		Split the given token list at the given delimiter, but only if the parts are balanced.
+
+		:param sep: the delimiter.
+		:param maxsplit: the maximum number of splits.
+		:param do_strip_braces_in_result: if ``True``, each element of the result will have the braces stripped, if any.
+
+			It is recommended to set this to ``True`` (the default),
+			otherwise the user will not have any way to "quote" the separator in each entry.
+		:raises ValueError: if ``self`` or ``sep`` is not balanced.
+
+		For example::
+
+			>>> BalancedTokenList("a{b,c},c{d}").split_balanced(BalancedTokenList(","))
+			[<BalancedTokenList: a₁₁ {₁ b₁₁ ,₁₂ c₁₁ }₂>, <BalancedTokenList: c₁₁ {₁ d₁₁ }₂>]
+			>>> BalancedTokenList("a{b,c},{d,d},e").split_balanced(BalancedTokenList(","), do_strip_braces_in_result=False)
+			[<BalancedTokenList: a₁₁ {₁ b₁₁ ,₁₂ c₁₁ }₂>, <BalancedTokenList: {₁ d₁₁ ,₁₂ d₁₁ }₂>, <BalancedTokenList: e₁₁>]
+			>>> BalancedTokenList("a{b,c},{d,d},e").split_balanced(BalancedTokenList(","))
+			[<BalancedTokenList: a₁₁ {₁ b₁₁ ,₁₂ c₁₁ }₂>, <BalancedTokenList: d₁₁ ,₁₂ d₁₁>, <BalancedTokenList: e₁₁>]
+			>>> BalancedTokenList.doc(" a = b = c ").split_balanced(BalancedTokenList("="), maxsplit=1)
+			[<BalancedTokenList:  ₁₀ a₁₁  ₁₀>, <BalancedTokenList:  ₁₀ b₁₁  ₁₀ =₁₂  ₁₀ c₁₁  ₁₀>]
+			>>> BalancedTokenList(r"\{,\}").split_balanced(BalancedTokenList(","))
+			[<BalancedTokenList: \{>, <BalancedTokenList: \}>]
+		"""
+		assert maxsplit>=-1, "maxsplit should be either -1 (unbounded) or the maximum number of splits"
+		assert self.is_balanced(), "Content is not balanced!"
+		assert sep.is_balanced(), "Separator is not balanced!"
+		if not sep:
+			raise ValueError("Empty separator")
+		result: List[BalancedTokenList]=[]
+		result_degree=0
+		remaining=TokenList()
+		i=0
+		self_=TokenList(self)
+		while i<len(self):
+			if len(result)!=maxsplit and i+len(sep)<=len(self) and self_[i:i+len(sep)]==sep and result_degree==0:
+				result.append(BalancedTokenList(remaining))
+				remaining=TokenList()
+				i+=len(sep)
+			else:
+				remaining.append(self[i])
+				result_degree+=self[i].degree()
+				assert result_degree>=0, "This cannot happen, the input is balanced"
+				i+=1
+		result.append(BalancedTokenList(remaining))
+		if do_strip_braces_in_result:
+			return [x.strip_optional_braces() for x in result]
+		return result
+
+	def strip_spaces(self)->"BalancedTokenList":
+		r"""
+		Strip spaces from the beginning and end of the token list.
+
+		For example::
+
+			>>> BalancedTokenList.doc(" a ").strip_spaces()
+			<BalancedTokenList: a₁₁>
+			>>> BalancedTokenList([C.space(' '), C.space(' '), " a b "], BalancedTokenList.doc).strip_spaces()
+			<BalancedTokenList: a₁₁  ₁₀ b₁₁>
+			>>> BalancedTokenList().strip_spaces()
+			<BalancedTokenList: >
+
+		Note that only spaces with charcode 32 are stripped::
+
+			>>> BalancedTokenList([C.space('X'), C.space(' '), "a", C.space(' ')]).strip_spaces()
+			<BalancedTokenList: X₁₀  ₁₀ a₁₁>
+
+		Similar to :meth:`strip_optional_braces`, a copy is returned in any case::
+
+			>>> x=BalancedTokenList("a")
+			>>> y=x.strip_spaces()
+			>>> x is y
+			False
+		"""
+		i=0
+		while i<len(self) and self[i]==C.space(' '):
+			i+=1
+		j=len(self)
+		while j>i and self[j-1]==C.space(' '):
+			j-=1
+		return self[i:j]
+
+	def parse_keyval_items(self)->list[tuple[BalancedTokenList, Optional[BalancedTokenList]]]:
+		r"""
+		Parse a key-value token list into a list of pairs.
+
+		>>> BalancedTokenList("a=b,c=d").parse_keyval_items()
+		[(<BalancedTokenList: a₁₁>, <BalancedTokenList: b₁₁>), (<BalancedTokenList: c₁₁>, <BalancedTokenList: d₁₁>)]
+		>>> BalancedTokenList("a,c=d").parse_keyval_items()
+		[(<BalancedTokenList: a₁₁>, None), (<BalancedTokenList: c₁₁>, <BalancedTokenList: d₁₁>)]
+		>>> BalancedTokenList.doc("a = b , c = d").parse_keyval_items()
+		[(<BalancedTokenList: a₁₁>, <BalancedTokenList: b₁₁>), (<BalancedTokenList: c₁₁>, <BalancedTokenList: d₁₁>)]
+		>>> BalancedTokenList.doc("a ={ b,c }, c = { d}").parse_keyval_items()
+		[(<BalancedTokenList: a₁₁>, <BalancedTokenList:  ₁₀ b₁₁ ,₁₂ c₁₁  ₁₀>), (<BalancedTokenList: c₁₁>, <BalancedTokenList:  ₁₀ d₁₁>)]
+		>>> BalancedTokenList.doc("{a=b},c=d").parse_keyval_items()
+		[(<BalancedTokenList: {₁ a₁₁ =₁₂ b₁₁ }₂>, None), (<BalancedTokenList: c₁₁>, <BalancedTokenList: d₁₁>)]
+		"""
+		parts=self.split_balanced(BalancedTokenList(","), do_strip_braces_in_result=False)
+		result: list[tuple[BalancedTokenList, Optional[BalancedTokenList]]]=[]
+		for part in parts:
+			kv=part.split_balanced(BalancedTokenList("="), maxsplit=1, do_strip_braces_in_result=False)
+			if len(kv)==1:
+				result.append((kv[0].strip_spaces(), None))
+			else:
+				assert len(kv)==2
+				result.append((kv[0].strip_spaces(), kv[1].strip_spaces().strip_optional_braces()))
+		return result
+
+	def parse_keyval(self, allow_duplicate: bool=False)->dict[ImmutableBalancedTokenList, Optional[BalancedTokenList]]:
+		r"""
+		Parse a key-value token list into a dictionary.
+
+		>>> BalancedTokenList("a=b,c=d").parse_keyval()
+		{<ImmutableBalancedTokenList: a₁₁>: <BalancedTokenList: b₁₁>, <ImmutableBalancedTokenList: c₁₁>: <BalancedTokenList: d₁₁>}
+		>>> BalancedTokenList("a,c=d").parse_keyval()
+		{<ImmutableBalancedTokenList: a₁₁>: None, <ImmutableBalancedTokenList: c₁₁>: <BalancedTokenList: d₁₁>}
+		>>> BalancedTokenList.doc("a = b , c = d").parse_keyval()
+		{<ImmutableBalancedTokenList: a₁₁>: <BalancedTokenList: b₁₁>, <ImmutableBalancedTokenList: c₁₁>: <BalancedTokenList: d₁₁>}
+		>>> BalancedTokenList.doc("a ={ b,c }, c = { d}").parse_keyval()
+		{<ImmutableBalancedTokenList: a₁₁>: <BalancedTokenList:  ₁₀ b₁₁ ,₁₂ c₁₁  ₁₀>, <ImmutableBalancedTokenList: c₁₁>: <BalancedTokenList:  ₁₀ d₁₁>}
+		>>> BalancedTokenList("a=b,a=c").parse_keyval()
+		Traceback (most recent call last):
+			...
+		ValueError: Duplicate key: <ImmutableBalancedTokenList: a₁₁>
+		>>> BalancedTokenList("a=b,a=c").parse_keyval(allow_duplicate=True)
+		{<ImmutableBalancedTokenList: a₁₁>: <BalancedTokenList: c₁₁>}
+		"""
+		items=[(ImmutableBalancedTokenList(k), v) for k, v in self.parse_keyval_items()]
+		if allow_duplicate: return dict(items)
+		result={}
+		for k, v in items:
+			if k in result:
+				raise ValueError(f"Duplicate key: {k!r}")
+			result[k]=v
+		return result
+
 
 if typing.TYPE_CHECKING:
 	NTokenListBaseClass = collections.UserList[NToken]
@@ -2539,7 +2808,7 @@ class NTokenList(NTokenListBaseClass):
 		See :meth:`BalancedTokenList.put_next`.
 		"""
 		for part in reversed(self.simple_parts()): part.put_next()
-		
+
 	def execute(self)->None:
 		"""
 		See :meth:`BalancedTokenList.execute`.
@@ -2637,10 +2906,10 @@ class TTPELine(TeXToPyData, str):
 
 class TTPEmbeddedLine(TeXToPyData, str):
 	@staticmethod
-	def send_code(self)->str:
+	def send_code(arg: str)->str:
 		raise RuntimeError("Must be manually handled")
 	@staticmethod
-	def send_code_var(self)->str:
+	def send_code_var(arg: str)->str:
 		raise RuntimeError("Must be manually handled")
 	@staticmethod
 	def read()->"TTPEmbeddedLine":
@@ -2941,7 +3210,7 @@ class RedirectPrintTeX:
 
 	Then all :meth:`print_TeX` function calls will be redirected to ``t``.
 	"""
-	def __init__(self, t)->None:
+	def __init__(self, t: IO)->None:
 		self.t=t
 
 	def __enter__(self)->None:
@@ -2949,7 +3218,7 @@ class RedirectPrintTeX:
 		self.old=file
 		file=self.t
 
-	def __exit__(self, exc_type, exc_value, tb)->None:
+	def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any)->None:
 		global file
 		file=self.old
 
@@ -3120,7 +3389,7 @@ def build_Python_call_TeX(T: Type, TeX_code: str, *, recursive: bool=True, sync:
 			code, result1=define_Python_call_TeX(TeX_code=TeX_code, ptt_argtypes=[*extra.ptt_argtypes], ttp_argtypes=[ttp_argtypes],
 																  recursive=recursive, sync=sync, finish=finish,
 																  )
-			def result(*args)->Any:
+			def result(*args: Any)->Any:
 				tmp=result1(*args)
 				assert tmp is not None
 				assert len(tmp)==1
@@ -3212,7 +3481,7 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 	* call ``\pythonimmediatelisten`` iff not ``finish``.
 
 	This is allowed to contain the following:
-	
+
 	* %name%: the name of the function to be defined as explained above.
 	* %read_arg0(\var_name)%, %read_arg1(...)%: will be expanded to code that reads the input.
 	* %send_arg0(...)%, %send_arg1(...)%: will be expanded to code that sends the content.
@@ -3295,7 +3564,7 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 							   lambda match: postprocess_send_code(argtype.send_code_var(match[1]), i==len(ttp_argtypes)-1),
 							   optional=True)
 
-	def f(*args)->Optional[Tuple[TeXToPyData, ...]]:
+	def f(*args: Any)->Optional[Tuple[TeXToPyData, ...]]:
 		assert len(args)==len(ptt_argtypes), f"passed in {len(args)} = {args}, expect {len(ptt_argtypes)}"
 
 		if engine.status==EngineStatus.error:
@@ -3697,8 +3966,7 @@ https://github.com/pytest-dev/pytest/issues/6996
 so we use :meta public: to force include docstring of private member in documentation
 """
 
-
-class _GroupManager:
+class _GroupManager(threading.local):
 	"""
 	Create a semi-simple group.
 
@@ -3712,16 +3980,59 @@ class _GroupManager:
 		>>> count[0]
 		5
 
+	Note that the user must not manually change the group level in a context::
+
+		>>> with group:
+		...     group.begin()
+		Traceback (most recent call last):
+			...
+		ValueError: Group level changed during group
+
+	They must not change the engine either::
+
+		>>> tmp_engine=ChildProcessEngine("pdftex")
+		>>> with group:
+		...     c=default_engine.set_engine(tmp_engine)
+		Traceback (most recent call last):
+			...
+		ValueError: Engine changed during group
+		>>> tmp_engine.close()
+		>>> c.restore()
+		>>> group.end()
+
 	:meta public:
 	"""
+
+	def __init__(self)->None:
+		self._running_instances: list=[]
+
+	@contextlib.contextmanager
+	def _run(self)->Generator[None, None, None]:
+		engine=default_engine.engine
+		self.begin()
+		level=T.currentgrouplevel.int()
+		try: yield
+		finally:
+			if engine is not default_engine.engine:
+				raise ValueError("Engine changed during group")
+			if T.currentgrouplevel.int()!=level:
+				raise ValueError("Group level changed during group")
+			self.end()
+
 	def begin(self)->None:
 		TokenList(r"\begingroup").execute()
+
 	def __enter__(self)->None:
-		self.begin()
+		instance: Any=self._run()
+		instance.__enter__()
+		self._running_instances.append(instance)
+
 	def end(self)->None:
 		TokenList(r"\endgroup").execute()
-	def __exit__(self, _exc_type, _exc_value, _traceback)->None:
-		self.end()
+
+	def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any)->None:
+		instance=self._running_instances.pop()
+		instance.__exit__(exc_type, exc_value, traceback)
 
 group=_GroupManager()
 r"""
@@ -4012,7 +4323,7 @@ def lua_try_eval(s: str)->Optional[str]:
 def peek_next_meaning()->str:
 	r"""
 	Get the meaning of the following token, as a string, using the current ``\escapechar``.
-	
+
 	This is recommended over :func:`peek_next_token` as it will not tokenize an extra token.
 
 	It's undefined behavior if there's a newline (``\newlinechar`` or ``^^J``, the latter is OS-specific)
@@ -4066,7 +4377,7 @@ def get_bootstrap_code(engine: Engine)->str:
 	Return the bootstrap code for an engine.
 
 	This is before the call to :meth:`substitute_private`.
-	
+
 	:meta private:
 	"""
 	return "\n".join(

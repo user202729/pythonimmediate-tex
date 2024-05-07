@@ -1093,18 +1093,27 @@ def is_balanced(content: str)->bool:
 	return TokenList.doc(content).is_balanced()
 
 @_export
-def split_balanced(content: str, separator: str)->List[str]:
+def split_balanced(content: str, /, sep: str, maxsplit: int=-1, do_strip_braces_in_result: bool=True)->List[str]:
 	r"""
 	Split the given string at the given substring, but only if the parts are balanced.
 
 	This is a bit tricky to implement, it's recommended to use the library function.
 
-	If either *content* or *separator* is unbalanced, the function will raise ValueError.
+	If either *content* or *sep* is unbalanced, the function will raise ValueError.
+
+	It is recommended to set *do_strip_braces_in_result* to ``True`` (the default),
+	otherwise the user will not have any way to "quote" the separator in each entry.
 
 	For example::
 
 		>>> split_balanced("a{b,c},c{d}", ",")
 		['a{b,c}', 'c{d}']
+		>>> split_balanced("a{b,c},{d,d},e", ",", do_strip_braces_in_result=False)
+		['a{b,c}', '{d,d}', 'e']
+		>>> split_balanced("a{b,c},{d,d},e", ",")
+		['a{b,c}', 'd,d', 'e']
+		>>> split_balanced(" a = b = c ", "=", maxsplit=1)
+		[' a ', ' b = c ']
 		>>> split_balanced(r"\{,\}", ",")
 		['\\{', '\\}']
 		>>> split_balanced("{", "{")
@@ -1112,17 +1121,20 @@ def split_balanced(content: str, separator: str)->List[str]:
 			...
 		ValueError: Content is not balanced!
 	"""
+	assert maxsplit>=-1, "maxsplit should be either -1 (unbounded) or the maximum number of splits"
 	content1=TokenList.doc(content)
 	if not content1.is_balanced():
 		raise ValueError("Content is not balanced!")
-	separator1=BalancedTokenList.doc(separator)
-	result: List[str]=[]
+	separator1=BalancedTokenList.doc(sep)
+	if not separator1:
+		raise ValueError("Empty separator")
+	result: List[BalancedTokenList]=[]
 	result_degree=0
 	remaining=TokenList()
 	i=0
 	while i<len(content1):
-		if i+len(separator1)<=len(content1) and content1[i:i+len(separator1)]==separator1 and result_degree==0:
-			result.append(remaining.simple_detokenize(default_get_catcode))
+		if len(result)!=maxsplit and i+len(separator1)<=len(content1) and content1[i:i+len(separator1)]==separator1 and result_degree==0:
+			result.append(remaining)
 			remaining=TokenList()
 			i+=len(separator1)
 		else:
@@ -1130,8 +1142,11 @@ def split_balanced(content: str, separator: str)->List[str]:
 			result_degree+=content1[i].degree()
 			assert result_degree>=0, "This cannot happen, the input is balanced"
 			i+=1
-	result.append(remaining.simple_detokenize(default_get_catcode))
-	return result
+	result.append(remaining)
+	result1=[x.simple_detokenize(default_get_catcode) for x in result]
+	if do_strip_braces_in_result:
+		result1=[strip_optional_braces(x) for x in result1]
+	return result1
 
 @_export
 def strip_optional_braces(content: str)->str:
@@ -1153,6 +1168,59 @@ def strip_optional_braces(content: str)->str:
 		return content[1:-1]
 	return content
 
+@_export
+def parse_keyval_items(content: str)->list[tuple[str, Optional[str]]]:
+	"""
+	>>> parse_keyval_items("a=b,c=d")
+	[('a', 'b'), ('c', 'd')]
+	>>> parse_keyval_items("a,c=d")
+	[('a', None), ('c', 'd')]
+	>>> parse_keyval_items("a = b , c = d")
+	[('a', ' b '), ('c', ' d')]
+	>>> parse_keyval_items("a={b,c}, c=d")
+	[('a', 'b,c'), ('c', 'd')]
+	>>> parse_keyval_items("{a=b},c=d")
+	[('{a=b}', None), ('c', 'd')]
+	"""
+	parts=split_balanced(content, ",", do_strip_braces_in_result=False)
+	result=[]
+	for part in parts:
+		kv=split_balanced(part, "=", maxsplit=1, do_strip_braces_in_result=False)
+		if len(kv)==1:
+			result.append((kv[0].strip(), None))
+		else:
+			assert len(kv)==2
+			result.append((kv[0].strip(), strip_optional_braces(kv[1])))
+	return result
+
+@_export
+def parse_keyval(content: str, allow_duplicate: bool=False)->dict[str, Optional[str]]:
+	"""
+	Parse a key-value string into a dictionary.
+
+	>>> parse_keyval("a=b,c=d")
+	{'a': 'b', 'c': 'd'}
+	>>> parse_keyval("a,c=d")
+	{'a': None, 'c': 'd'}
+	>>> parse_keyval("a = b , c = d")
+	{'a': ' b ', 'c': ' d'}
+	>>> parse_keyval("a={b,c}, c=d")
+	{'a': 'b,c', 'c': 'd'}
+	>>> parse_keyval("a=b,a=c")
+	Traceback (most recent call last):
+		...
+	ValueError: Duplicate key: 'a'
+	>>> parse_keyval("a=b,a=c", allow_duplicate=True)
+	{'a': 'c'}
+	"""
+	items=parse_keyval_items(content)
+	if allow_duplicate: return dict(items)
+	result={}
+	for k, v in items:
+		if k in result:
+			raise ValueError(f"Duplicate key: {k!r}")
+		result[k]=v
+	return result
 
 def set_globals_locals(globals, locals)->Tuple[Optional[dict], Optional[dict]]:
 	"""
