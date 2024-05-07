@@ -2155,7 +2155,7 @@ class TokenList(TokenListBaseClass):
 			>>> BalancedTokenList.doc('}')
 			Traceback (most recent call last):
 				...
-			ValueError: Token list <BalancedTokenList: }₂> is not balanced
+			pythonimmediate.UnbalancedTokenListError: Token list <BalancedTokenList: }₂> is not balanced
 			>>> BalancedTokenList.doc('\n\n')
 			Traceback (most recent call last):
 				...
@@ -2409,7 +2409,7 @@ class BalancedTokenList(TokenList):
 		>>> BalancedTokenList("{")
 		Traceback (most recent call last):
 			...
-		UnbalancedTokenListError: Token list <BalancedTokenList: {₁> is not balanced
+		pythonimmediate.UnbalancedTokenListError: Token list <BalancedTokenList: {₁> is not balanced
 		"""
 		super().__init__(a, string_tokenizer)
 		self.check_balanced()

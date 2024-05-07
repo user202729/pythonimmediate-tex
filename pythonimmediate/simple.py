@@ -66,13 +66,14 @@ import re
 from dataclasses import dataclass
 
 import pythonimmediate
-from . import scan_Python_call_TeX_module, PTTTeXLine, PTTVerbatimLine, PTTTeXLine, Python_call_TeX_local, check_line, Token, TTPEBlock, TTPEmbeddedLine, get_random_Python_identifier, CharacterToken, define_TeX_call_Python, parse_meaning_str, peek_next_meaning, run_block_local, run_code_redirect_print_TeX, TTPBlock, TTPLine, BalancedTokenList, TokenList, ControlSequenceToken, doc_catcode_table, Catcode, T, ControlSequenceToken, group
+from . import scan_Python_call_TeX_module, PTTTeXLine, PTTVerbatimLine, PTTTeXLine, Python_call_TeX_local, check_line, Token, TTPEBlock, TTPEmbeddedLine, get_random_Python_identifier, CharacterToken, define_TeX_call_Python, parse_meaning_str, peek_next_meaning, run_block_local, run_code_redirect_print_TeX, TTPBlock, TTPLine, BalancedTokenList, TokenList, ControlSequenceToken, doc_catcode_table, Catcode, T, ControlSequenceToken, group, UnbalancedTokenListError
 from .engine import Engine, default_engine, default_engine as engine, TeXProcessExited
 
 if not typing.TYPE_CHECKING:
 	__all__ = []
 
-default_get_catcode = lambda x: doc_catcode_table.get(x, Catcode.other)
+def default_get_catcode(x: int)->Catcode:
+	return doc_catcode_table.get(x, Catcode.other)
 
 def _export(f: T2)->T2:
 	__all__.append(f.__name__)  # type: ignore
@@ -1092,6 +1093,9 @@ def is_balanced(content: str)->bool:
 	"""
 	return TokenList.doc(content).is_balanced()
 
+def _detokenize(t: BalancedTokenList)->str:
+	return t.simple_detokenize(default_get_catcode)
+
 @_export
 def split_balanced(content: str, /, sep: str, maxsplit: int=-1, do_strip_braces_in_result: bool=True)->List[str]:
 	r"""
@@ -1122,30 +1126,12 @@ def split_balanced(content: str, /, sep: str, maxsplit: int=-1, do_strip_braces_
 		ValueError: Content is not balanced!
 	"""
 	assert maxsplit>=-1, "maxsplit should be either -1 (unbounded) or the maximum number of splits"
-	content1=TokenList.doc(content)
-	if not content1.is_balanced():
-		raise ValueError("Content is not balanced!")
-	separator1=BalancedTokenList.doc(sep)
-	if not separator1:
-		raise ValueError("Empty separator")
-	result: List[BalancedTokenList]=[]
-	result_degree=0
-	remaining=TokenList()
-	i=0
-	while i<len(content1):
-		if len(result)!=maxsplit and i+len(separator1)<=len(content1) and content1[i:i+len(separator1)]==separator1 and result_degree==0:
-			result.append(remaining)
-			remaining=TokenList()
-			i+=len(separator1)
-		else:
-			remaining.append(content1[i])
-			result_degree+=content1[i].degree()
-			assert result_degree>=0, "This cannot happen, the input is balanced"
-			i+=1
-	result.append(remaining)
-	result1=[x.simple_detokenize(default_get_catcode) for x in result]
-	if do_strip_braces_in_result:
-		result1=[strip_optional_braces(x) for x in result1]
+	try: content1=BalancedTokenList.doc(content)
+	except UnbalancedTokenListError: raise ValueError("Content is not balanced!")
+	try: separator1=BalancedTokenList.doc(sep)
+	except UnbalancedTokenListError: raise ValueError("Separator is not balanced!")
+	result=content1.split_balanced(separator1, maxsplit, do_strip_braces_in_result=do_strip_braces_in_result)
+	result1=[_detokenize(x) for x in result]
 	return result1
 
 @_export
@@ -1162,11 +1148,8 @@ def strip_optional_braces(content: str)->str:
 		>>> strip_optional_braces("{a},{b}")
 		'{a},{b}'
 	"""
-	t=TokenList.doc(content)
-	assert t.is_balanced(), "The string must be balanced!"
-	if content.startswith("{") and content.endswith("}") and t[1:-1].is_balanced():
-		return content[1:-1]
-	return content
+	t=BalancedTokenList.doc(content)
+	return _detokenize(t.strip_optional_braces())
 
 @_export
 def parse_keyval_items(content: str)->list[tuple[str, Optional[str]]]:
@@ -1176,22 +1159,18 @@ def parse_keyval_items(content: str)->list[tuple[str, Optional[str]]]:
 	>>> parse_keyval_items("a,c=d")
 	[('a', None), ('c', 'd')]
 	>>> parse_keyval_items("a = b , c = d")
+	[('a', 'b'), ('c', 'd')]
+	>>> parse_keyval_items("a ={ b }, c ={ d}")
 	[('a', ' b '), ('c', ' d')]
 	>>> parse_keyval_items("a={b,c}, c=d")
 	[('a', 'b,c'), ('c', 'd')]
 	>>> parse_keyval_items("{a=b},c=d")
 	[('{a=b}', None), ('c', 'd')]
 	"""
-	parts=split_balanced(content, ",", do_strip_braces_in_result=False)
-	result=[]
-	for part in parts:
-		kv=split_balanced(part, "=", maxsplit=1, do_strip_braces_in_result=False)
-		if len(kv)==1:
-			result.append((kv[0].strip(), None))
-		else:
-			assert len(kv)==2
-			result.append((kv[0].strip(), strip_optional_braces(kv[1])))
-	return result
+	content1=BalancedTokenList.doc(content)
+	result=content1.parse_keyval_items()
+	return [(_detokenize(k), _detokenize(v) if v is not None else None)
+		 for k, v in result]
 
 @_export
 def parse_keyval(content: str, allow_duplicate: bool=False)->dict[str, Optional[str]]:
@@ -1203,6 +1182,8 @@ def parse_keyval(content: str, allow_duplicate: bool=False)->dict[str, Optional[
 	>>> parse_keyval("a,c=d")
 	{'a': None, 'c': 'd'}
 	>>> parse_keyval("a = b , c = d")
+	{'a': 'b', 'c': 'd'}
+	>>> parse_keyval("a ={ b }, c ={ d}")
 	{'a': ' b ', 'c': ' d'}
 	>>> parse_keyval("a={b,c}, c=d")
 	{'a': 'b,c', 'c': 'd'}
@@ -1222,7 +1203,7 @@ def parse_keyval(content: str, allow_duplicate: bool=False)->dict[str, Optional[
 		result[k]=v
 	return result
 
-def set_globals_locals(globals, locals)->Tuple[Optional[dict], Optional[dict]]:
+def set_globals_locals(globals: Any, locals: Any)->Tuple[Optional[dict], Optional[dict]]:
 	"""
 	Helper function, compute the globals and locals dict of the caller's parent frame.
 	"""
