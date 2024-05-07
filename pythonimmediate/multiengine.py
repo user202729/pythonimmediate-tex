@@ -74,7 +74,7 @@ class MultiChildProcessEngine(Engine):
 		self._init_count=count
 
 	def __enter__(self)->"MultiChildProcessEngine":
-		self._in_transient_context=False
+		self._layers_in_transient_context=0
 		self._action_log: list[EngineAction]=[]
 		self._child_processes: list[ChildProcessEngine]=[]
 		for __ in range(self._init_count):
@@ -91,7 +91,7 @@ class MultiChildProcessEngine(Engine):
 			for child_process in child_processes:
 				stack.push(child_process.__exit__)
 		del self._action_log
-		del self._in_transient_context
+		del self._layers_in_transient_context
 
 	@contextlib.contextmanager
 	def transient_context(self)->Generator[None, None, None]:
@@ -110,19 +110,21 @@ class MultiChildProcessEngine(Engine):
 		>>> with MultiChildProcessEngine("pdftex", 2) as engine, default_engine.set_engine(engine):
 		... 	T.l_tmpa_tl.str("Hello world") # mutates the state, cannot be put in transient context
 		... 	with engine.transient_context():
-		...			T.l_tmpa_tl.str() # does not mutate the state, can be put in transient context
+		...			with engine.transient_context():
+		...				T.l_tmpa_tl.str() # does not mutate the state, can be put in transient context
 		'Hello world'
 		'Hello world'
+
+		As seen above, this context manager can be nested as well.
 		"""
-		assert not self._in_transient_context
-		self._in_transient_context=True
+		self._layers_in_transient_context+=1
 		try: yield
-		finally: self._in_transient_context=False
+		finally: self._layers_in_transient_context-=1
 
 	def _read(self)->bytes:
 		line=self._child_processes[0]._read()
 		action=ReadAction(line)
-		if not self._in_transient_context:
+		if not self._layers_in_transient_context:
 			self._action_log.append(action)
 			for child_process in self._child_processes[1:]:
 				action(child_process)
@@ -130,7 +132,7 @@ class MultiChildProcessEngine(Engine):
 
 	def _write(self, data: bytes)->None:
 		action=WriteAction(data)
-		if self._in_transient_context:
+		if self._layers_in_transient_context:
 			action(self._child_processes[0])
 		else:
 			self._action_log.append(action)
@@ -145,7 +147,7 @@ class MultiChildProcessEngine(Engine):
 
 		:param do_replace: whether to replace the extracted child process with a new one.
 		"""
-		assert not self._in_transient_context, "Cannot extract child process in transient context"
+		assert not self._layers_in_transient_context, "Cannot extract child process in transient context"
 		child_process=self._child_processes.pop()
 		if do_replace:
 			self.start_child_process()

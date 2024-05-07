@@ -159,6 +159,31 @@ unit_per_pt: Dict[DimensionUnit, Fraction]={
 		}
 assert {*unit_per_pt.keys()}=={*DimensionUnit.__args__}  # type: ignore
 
+@typing.overload
+def convert_unit(val: Fraction, from_: DimensionUnit, *, to: DimensionUnit)->Fraction: ...
+@typing.overload
+def convert_unit(val: float, from_: DimensionUnit, *, to: DimensionUnit)->float: ...
+
+def convert_unit(val: Fraction|float, from_: DimensionUnit, *, to: DimensionUnit)->Fraction|float:
+	"""
+	Convert between units.
+
+	>>> convert_unit(1, "in", to="cm")
+	Fraction(127, 50)
+	>>> convert_unit(1., "in", to="cm")
+	2.54
+
+	Note that in ``inkex``, then the argument order is reversed,
+	i.e. ``convert_unit(1, "cm", "in")`` returns ``2.54``.
+	That's why ``to`` is made into a keyword argument.
+	"""
+	if isinstance(val, float):
+		return float(convert_unit(Fraction(val), from_, to=to))
+	for unit in from_, to:
+		if unit not in unit_per_pt:
+			raise ValueError(f'Unknown unit "{unit}"')
+	return val*unit_per_pt[from_]/unit_per_pt[to]
+
 import random
 def surround_delimiter(block: str)->str:
 	while True:
@@ -968,6 +993,9 @@ class Token(NToken):
 		100.5
 		>>> T.l_tmpa_dim.dim("pt")
 		Fraction(201, 2)
+		>>> T.l_tmpa_dim.dim("1em")
+		>>> T.l_tmpa_dim.dim(1, "em")
+		1
 		>>> T.l_tmpa_dim.dim("em")
 		Traceback (most recent call last):
 			...
@@ -997,15 +1025,11 @@ class Token(NToken):
 			else:
 				# dim("pt") -> 201/2
 				result_sp=BalancedTokenList([T.number, self]).expand_o().int()
-				result_pt=result_sp*unit_per_pt["sp"]
-				if unit not in unit_per_pt:
-					raise ValueError(f'Unknown unit "{unit}"')
-				return result_pt/unit_per_pt[typing.cast(DimensionUnit, unit)]
+				return convert_unit(result_sp, "sp", to=typing.cast(DimensionUnit, unit))
 		# dim(1.3, "pt") -> 1.3
 		assert unit is not None
 		assert val is not None
 		if isinstance(val, str): val, unit=unit, val
-		assert unit in unit_per_pt, (val, unit)
 		(BalancedTokenList([self])+BalancedTokenList.fstr(f"={float(val):.6f}{unit}")).execute()
 		# let TeX do the conversion (this will allow em and ex etc.)
 		return val
