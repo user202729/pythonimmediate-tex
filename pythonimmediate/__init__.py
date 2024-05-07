@@ -688,6 +688,23 @@ class NToken(ABC):
 		return 0
 
 
+@bootstrap_code_functions.append
+def _helper_put_next_brace(engine: Engine)->str:
+	if engine.name=="luatex":  # TODO https://github.com/latex3/latex3/issues/1540
+		return r"""
+			\cs_new_protected:Npn \__put_next_unbalanced:n #1 {
+				\expandafter \expandafter \expandafter \expandafter \expandafter \expandafter \expandafter \pythonimmediatecontinuenoarg
+					\expandafter \expandafter \expandafter \expandafter \char_generate:nn {\__index} {#1} \empty
+			}
+			"""
+	else:
+		return r"""
+			\cs_new_protected:Npn \__put_next_unbalanced:n #1 {
+				\expandafter \expandafter \expandafter \pythonimmediatecontinuenoarg
+					\char_generate:nn {\__index} {#1}
+			}
+			"""
+
 class Token(NToken):
 	"""
 	Represent a [TeX] token, excluding the notexpanded possibility.
@@ -916,8 +933,7 @@ class Token(NToken):
 					r"""
 					\cs_new_protected:Npn %name% {
 						%read_arg0(\__index)%
-						\expandafter \expandafter \expandafter \pythonimmediatecontinuenoarg
-							\char_generate:nn {\__index} {1}
+						\__put_next_unbalanced:n 1
 					}
 					""", recursive=False, sync=True))(PTTInt(self.index))
 			else:
@@ -926,8 +942,7 @@ class Token(NToken):
 					r"""
 					\cs_new_protected:Npn %name% {
 						%read_arg0(\__index)%
-						\expandafter \expandafter \expandafter \pythonimmediatecontinuenoarg
-							\char_generate:nn {\__index} {2}
+						\__put_next_unbalanced:n 2
 					}
 					""", recursive=False, sync=True))(PTTInt(self.index))
 
