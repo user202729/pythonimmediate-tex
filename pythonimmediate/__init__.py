@@ -822,6 +822,21 @@ class Token(NToken):
 			}
 			""" , sync=True))(PTTBalancedTokenList(BalancedTokenList([self])))
 
+	def is_defined(self)->bool:
+		"""
+		Return whether this token is defined.
+
+		>>> T.relax.is_defined()
+		True
+		>>> T.undefined.is_defined()
+		False
+		>>> C.active("~").is_defined()
+		True
+		>>> C.other("a").is_defined()
+		True
+		"""
+		# use \ifdefined
+		return TokenList([T.ifdefined, self, C.other("1"), T.fi]).expand_x().str() == "1"
 
 	def set_func(self, f: Callable[[], None], global_: bool=False)->str:
 		"""
@@ -1112,7 +1127,6 @@ class Token(NToken):
 			(BalancedTokenList([self])+BalancedTokenList.fstr('=' + str(val))).execute()
 			return val
 		return BalancedTokenList([T.the, self]).expand_o().int()
-
 
 	def bool(self)->bool:
 		r"""

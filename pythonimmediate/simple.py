@@ -439,7 +439,7 @@ def newcommand(name: str, f: Callable)->None:
 	r"""
 	Define a new [TeX]-command.
 
-	The corresponding advanced API is :meth:`.Token.assign_func`.
+	The corresponding advanced API is :meth:`.Token.set_func`.
 
 	Example::
 
