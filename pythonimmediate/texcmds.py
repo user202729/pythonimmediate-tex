@@ -118,7 +118,7 @@ def pycode(code: TTPBlock, lineno_: TTPLine, filename: TTPLine, fileabspath: TTP
 		The ``code`` is not executed immediately, instead we search for the source [TeX] file that contains the code
 		(it must be found, otherwise an error is thrown), then read the source from that file.
 
-		[TeX] might mangle the code a bit before passing it to Python, as such we use :func:`.can_be_mangled_to`
+		[TeX] might mangle the code a bit before passing it to Python, as such we use :func:`~.lowlevel.can_be_mangled_to`
 		(might return some false positive)
 		to compare it with the code read from the sourcecode.
 	"""
@@ -164,7 +164,7 @@ mark_bootstrap(define_TeX_call_Python(pycode, name="__pycodex"))
 
 def pycodefuzzy(code: TTPBlock, lineno_: TTPLine)->None:
 	r"""
-	Same as :func:`pycode`, but may mangle the code (strip trailing spaces, etc. Refer to :func:`can_be_mangled_to` for technical details).
+	Same as :func:`pycode`, but may mangle the code (strip trailing spaces, etc. Refer to :func:`~.lowlevel.can_be_mangled_to` for technical details).
 	Not recommended unless you don't have ``[abspath]currfile`` package loaded.
 	"""
 	if not code: return
@@ -204,7 +204,7 @@ def pyc(code: TTPEBlock)->None:
 @define_internal_handler
 def pycq(code: TTPEBlock)->None:
 	"""
-	Similar to :meth:`pyc`, however any output by :meth:`print_TeX` is suppressed.
+	Similar to :meth:`pyc`, however any output by :func:`.print_TeX` is suppressed.
 	"""
 	with RedirectPrintTeX(None):
 		exec_with_linecache(code, get_user_scope())

@@ -2,7 +2,7 @@
 r"""
 The main module. Contains Pythonic wrappers for much of [TeX]'s API.
 
-Refer to :mod:`~pythonimmediate.simple` for the "simple" API -- which allows users to avoid the need to
+Refer to :mod:`~.simple` for the "simple" API -- which allows users to avoid the need to
 know [TeX] internals such as category codes.
 
 The fundamental data of [TeX] is a token, this is represented by Python's :class:`Token` object.
@@ -49,7 +49,7 @@ This is a table of [TeX] primitives, and their Python wrapper:
 	* - ``\let``
 	  - :meth:`Token.set_eq`
 	* - ``\ifx``
-	  - :meth:`Token.meaning_eq`
+	  - :meth:`NToken.meaning_eq`
 	* - ``\meaning``
 	  - :meth:`NToken.meaning_str`
 	* - ``\futurelet``
@@ -93,7 +93,7 @@ A token list can be:
 * expanded with :meth:`BalancedTokenList.expand_x` or :meth:`BalancedTokenList.expand_o`,
 * etc.
 
-Some debug functionalities are provided and can be specified on the command-line, refer to :mod:`~pythonimmediate.pytotex` documentation.
+Some debug functionalities are provided and can be specified on the command-line, refer to :mod:`~.pytotex` documentation.
 
 """
 
@@ -251,7 +251,7 @@ def add_handler(f: Callable[[], None], *, all_engines: bool=False)->str:
 	which should be used to pass into ``\pythonimmediatecallhandler`` [TeX] command
 	and :func:`remove_handler`.
 
-	The handlers must take a single argument of type :class:`Engine` as input, and returns nothing.
+	The handlers must take a single argument of type :class:`~engine.Engine` as input, and returns nothing.
 
 	.. seealso::
 		:func:`add_handler_async`, :func:`remove_handler`.
@@ -404,7 +404,7 @@ class NToken(ABC):
 		:return: the character code.
 
 		.. note::
-			See :meth:`NTokenList.str_codes`.
+			See :meth:`TokenList.str_codes`.
 		"""
 		# default implementation, might not be correct. Subclass overrides as needed.
 		raise ValueError("Token does not represent a string!")
@@ -1235,7 +1235,7 @@ class ControlSequenceToken(Token):
 		macro:->\-
 		macro:->123
 
-	*is_unicode* will be fetched from :const:`~pythonimmediate.engine.default_engine`
+	*is_unicode* will be fetched from :const:`~engine.default_engine`
 	if not explicitly specified.
 	"""
 	_codes: Tuple[int, ...]  # this is the only thing that is guaranteed to be defined.
@@ -1606,9 +1606,6 @@ TokenListType = typing.TypeVar("TokenListType", bound="TokenList")
 
 if typing.TYPE_CHECKING:
 	TokenListBaseClass = collections.UserList[Token]
-	# these are just for type-checking purposes...
-	_Bool = bool
-	_Str = str
 else:  # Python 3.8 compatibility
 	TokenListBaseClass = collections.UserList
 
@@ -1634,7 +1631,7 @@ class TokenList(TokenListBaseClass):
 	Token list construction
 	-----------------------
 
-	:meth:`__init__` is the constructor of the class, and it accepts parameters in various different forms to allow convenient
+	The constructor of this class accepts parameters in various different forms to allow convenient
 	construction of token lists.
 
 	Most generally, you can construct a token list from any iterable consist of (recursively) iterables,
@@ -1821,7 +1818,7 @@ class TokenList(TokenListBaseClass):
 		"""
 		Approximate tokenizer implemented in Python.
 
-		Convert a string to a :class:`TokenList` (or some subclass of it such as :class:`BalancedTokenList` approximately.
+		Convert a string to a :class:`TokenList` (or some subclass of it such as :class:`BalancedTokenList`) approximately.
 
 		This is an internal function and should not be used directly. Use one of :meth:`e3` or :meth:`doc` instead.
 
@@ -1945,6 +1942,9 @@ class TokenList(TokenListBaseClass):
 
 	@classmethod
 	def deserialize(cls: Type[TokenListType], data: str|bytes)->TokenListType:
+		"""
+		Internal function?
+		"""
 		result: List[Token]=[]
 		i=0
 
@@ -2050,6 +2050,17 @@ class TokenList(TokenListBaseClass):
 		"""
 		return [t.str_code() for t in self]
 
+	def str_if_unicode(self, unicode: bool=True)->str:
+		"""
+		Assume this token list represents a string in a (Unicode/non-Unicode) engine, return the string content.
+
+		If the engine is not Unicode, assume the string is encoded in UTF-8.
+		"""
+		if unicode:
+			return "".join(map(chr, self.str_codes()))
+		else:
+			return bytes(self.str_codes()).decode('u8')
+
 	def str(self)->str:
 		"""
 		``self`` must represent a [TeX] string. (i.e. equal to itself when detokenized)
@@ -2062,17 +2073,6 @@ class TokenList(TokenListBaseClass):
 		'α'
 		"""
 		return self.str_if_unicode(engine.is_unicode)
-
-	def str_if_unicode(self, unicode: bool=True)->_Str:
-		"""
-		Assume this token list represents a string in a (Unicode/non-Unicode) engine, return the string content.
-
-		If the engine is not Unicode, assume the string is encoded in UTF-8.
-		"""
-		if unicode:
-			return "".join(map(chr, self.str_codes()))
-		else:
-			return bytes(self.str_codes()).decode('u8')
 
 	def int(self)->int:
 		r"""
@@ -2605,7 +2605,7 @@ class RedirectPrintTeX:
 		with RedirectPrintTeX(t):
 			pass  # some code
 
-	Then all :meth:`print_TeX` function calls will be redirected to ``t``.
+	Then all :func:`.print_TeX` function calls will be redirected to ``t``.
 	"""
 	def __init__(self, t: Optional[IO])->None:
 		self.t=t
@@ -3109,6 +3109,8 @@ Umathcode.active = Umathcode(family=1, cls=MathClass.ord, position=0)
 
 class _UmathcodeManager:
 	"""
+	Interface is similar to :const:`catcode`.
+
 	For example::
 
 		>>> umathcode[0]
@@ -3138,15 +3140,13 @@ class _UmathcodeManager:
 
 umathcode=_UmathcodeManager()
 r"""
-Similar to :const:`~pythonimmediate.catcode`.
-
 See :class:`_UmathcodeManager`.
 """
 
 
 class _CountManager:
 	r"""
-	Manipulate count registers. Interface is similar to :const:`~pythonimmediate.catcode`.
+	Manipulate count registers. Interface is similar to :const:`catcode`.
 
 	For example::
 
@@ -3185,13 +3185,15 @@ See :class:`_CountManager`.
 
 class _ToksManager:
 	r"""
-	Manipulate tok registers. Interface is similar to :const:`~pythonimmediate.catcode`.
+	Manipulate tok registers. Interface is similar to :const:`catcode`.
 
 	For example::
 
 		>>> toks[0]=BalancedTokenList('abc')
 		>>> toks[0]
 		<BalancedTokenList: a₁₁ b₁₁ c₁₁>
+
+	:meta public:
 	"""
 	def __getitem__(self, x: int)->BalancedTokenList:
 		return BalancedTokenList([r"\the\toks" + str(x)]).expand_o()
@@ -3295,7 +3297,7 @@ def peek_next_meaning()->str:
 	r"""
 	Get the meaning of the following token, as a string, using the current ``\escapechar``.
 
-	This is recommended over :func:`peek_next_token` as it will not tokenize an extra token.
+	This is recommended over :meth:`Token.peek_next` as it will not tokenize an extra token.
 
 	It's undefined behavior if there's a newline (``\newlinechar`` or ``^^J``, the latter is OS-specific)
 	in the meaning string.

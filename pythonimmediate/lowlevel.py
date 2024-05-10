@@ -55,7 +55,6 @@ Internal constant.
 Contains functions that takes an engine object and returns some code before :meth:`substitute_private` is applied on it.
 
 :meta hide-value:
-:meta private:
 """
 def mark_bootstrap(code: str|EngineDependentCode)->None:
 	if isinstance(code, str):
@@ -140,8 +139,6 @@ def mark_bootstrap_naive_replace(code: str)->None:
 		if :attr:`Engine.config.naive_flush` is ``True``, else become empty
 	- ``%naive_flush%``: replaced with ``\__send_content:e {\__naive_flush_data:}``
 		if :attr:`Engine.config.naive_flush` is ``True``
-
-	:meta private:
 	"""
 	mark_bootstrap(wrap_naive_replace(code))
 
@@ -260,8 +257,6 @@ def _run_block_finish(block: str)->None:
 def check_line(line: str, *, braces: bool, newline: bool, continue_: Optional[bool])->None:
 	"""
 	check user-provided line before sending to TeX for execution
-
-	:meta private:
 	"""
 	if braces:
 		assert line.count("{") == line.count("}")
@@ -548,8 +543,6 @@ def define_TeX_call_Python(f: Callable[..., None], name: Optional[str]=None, arg
 	:param argtypes: list of argument types. If it's None it will be automatically deduced from the function ``f``'s signature.
 	:param identifier: should be obtained by :func:`get_random_Python_identifier`.
 	:returns: some code (to be executed in ``expl3`` catcode regime) as explained above.
-
-	:meta private:
 	"""
 	if argtypes is None:
 		argtypes=[p.annotation for p in inspect.signature(f).parameters.values()]
@@ -615,8 +608,6 @@ def define_internal_handler(f: FunctionType)->FunctionType:
 	Define a TeX function with TeX name = ``f.__name__`` that calls f().
 
 	This does not define the specified function in any particular engine, just add them to the :const:`bootstrap_code`.
-
-	:meta private:
 	"""
 	mark_bootstrap(define_TeX_call_Python(f))
 	return f
@@ -694,8 +685,6 @@ def can_be_mangled_to(original: str, mangled: str)->bool:
 		True
 		>>> can_be_mangled_to("a\n", "b\n")
 		False
-
-	:meta private:
 	"""
 	return normalize_line(original)==normalize_line(mangled)
 
@@ -750,8 +739,6 @@ def build_Python_call_TeX(T: Type, TeX_code: str, *, recursive: bool=True, sync:
 
 	The Tuple[...] can optionally be a single type, then it is almost equivalent to a tuple of one element
 	It can also be None
-
-	:meta private:
 	"""
 
 	assert T.__origin__ == typing.Callable[[], None].__origin__  # type: ignore
@@ -823,8 +810,6 @@ def scan_Python_call_TeX(sourcecode: str, filename: Optional[str]=None)->None:
 	temporary variables.
 
 	Don't use this function on untrusted code.
-
-	:meta private:
 	"""
 	import ast
 	from copy import deepcopy
@@ -856,8 +841,6 @@ def scan_Python_call_TeX_module(name: str)->None:
 	"""
 	Internal function.
 	Can be used as ``scan_Python_call_TeX_module(__name__)`` to scan the current module.
-
-	:meta private:
 	"""
 	assert name != "__main__"  # https://github.com/python/cpython/issues/86291
 	scan_Python_call_TeX(inspect.getsource(sys.modules[name]), name)
@@ -918,8 +901,6 @@ def define_Python_call_TeX(TeX_code: str, ptt_argtypes: List[Type[PyToTeXData]],
 	* the ``r`` is not needed if not recursive and ``ttp_argtypes`` is nonempty
 	  (the output itself tells Python when the [TeX]-code finished)
 	* the first line of the output may be on the same line as the ``r`` itself (done, use :class:`TTPEmbeddedLine` type, although a bit hacky)
-
-	:meta private:
 	"""
 	if ttp_argtypes!=[]:
 		assert sync!=False
@@ -1071,8 +1052,6 @@ def get_bootstrap_code(engine: Engine)->str:
 	Return the bootstrap code for an engine.
 
 	This is before the call to :meth:`substitute_private`.
-
-	:meta private:
 	"""
 	return "\n".join(
 			f(engine)

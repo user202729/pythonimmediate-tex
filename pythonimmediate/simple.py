@@ -128,7 +128,7 @@ def peek_next_char()->str:
 	.. note::
 		For advanced users:
 
-		This function uses :func:`~pythonimmediate.textopy.peek_next_meaning` under the hood to get the meaning of the following token.
+		This function uses :func:`~pythonimmediate.peek_next_meaning` under the hood to get the meaning of the following token.
 		See that function documentation for a warning on undefined behavior.
 
 		Will also return nonempty if the next token is an implicit character token. This case is not supported and
@@ -244,7 +244,7 @@ def get_arg_str()->str:
 		It gets the argument, detokenize it, pass it through :func:`_replace_double_hash`, and return the result.
 
 		This is the simple API, as such it assumes normal category code values.
-		Refer to :meth:`BalancedTokenList.get_next()` for a more advanced API.
+		Refer to :meth:`~pythonimmediate.BalancedTokenList.get_next()` for a more advanced API.
 
 	"""
 	return _replace_par_to_crcr(_replace_double_hash(typing.cast(Callable[[], TTPEmbeddedLine], Python_call_TeX_local(
