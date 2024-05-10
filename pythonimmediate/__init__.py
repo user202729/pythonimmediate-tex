@@ -1739,7 +1739,7 @@ class CharacterToken(Token):
 	<Catcode.letter: 11>
 
 	Note that it is recommended to use the shorthand documented in :class:`Catcode` to
-	check the catcode of a token instead::
+	check the catcode of a token instead:
 
 	>>> C.letter("a") in C.letter
 	True
