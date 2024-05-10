@@ -694,7 +694,7 @@ def undefine_char(char: str)->None:
 			""", recursive=False))(PTTVerbatimLine(char))
 
 @_export
-def execute(block: str, engine: Engine=default_engine, expecting_exit: bool=False)->None:
+def execute(block: str, expecting_exit: bool=False)->None:
 	r"""
 	Run a block of [TeX]-code (might consist of multiple lines).
 
@@ -733,7 +733,7 @@ def execute(block: str, engine: Engine=default_engine, expecting_exit: bool=Fals
 		run_block_local(block)
 
 @_export
-def execute_tokenized(line: str, engine: Engine=default_engine)->None:
+def execute_tokenized(line: str)->None:
 	"""
 	Temporary.
 	"""
@@ -749,7 +749,7 @@ def execute_tokenized(line: str, engine: Engine=default_engine)->None:
 		"""))(PTTTeXLine(line))
 
 @_export
-def put_next_tokenized(line: str, engine: Engine=default_engine)->None:
+def put_next_tokenized(line: str)->None:
 	"""
 	Temporary.
 	"""
@@ -891,7 +891,7 @@ def newenvironment(name: str, f: Callable)->None:
 	# ignore _code, already executed something equivalent in the TeX command
 
 @_export
-def get_env_body_verb_approximate(envname: Optional[str]=None, engine: Engine=default_engine)->tuple[str, str, int]:
+def get_env_body_verb_approximate(envname: Optional[str]=None)->tuple[str, str, int]:
 	r"""
 	This function is to be used inside :func:`newenvironment`'s registered function in order to get the environment body.
 
