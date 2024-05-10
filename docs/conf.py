@@ -68,9 +68,48 @@ def process_line(line: str) -> str:
 def process_docstring(app, what, name, obj, options, lines):
 	lines[:] = [process_line(line) for line in lines]
 
+from contextlib import suppress
+from docutils import nodes
+from sphinx import addnodes
+from sphinx.errors import NoUri
+from sphinx.transforms.post_transforms import SphinxPostTransform
+from sphinx.util import logging
+
+logger = logging.getLogger(__name__)
+
+# https://stackoverflow.com/a/62782264/5267751
+class MyLinkWarner(SphinxPostTransform):
+	default_priority = 5
+
+	def run(self):
+		for node in self.document.traverse(addnodes.pending_xref):
+			target = node["reftarget"]
+
+			if target.startswith("pythonimmediate."):
+				found_ref = False
+
+				with suppress(NoUri, KeyError):
+					# let the domain try to resolve the reference
+					found_ref = self.env.domains[node["refdomain"]].resolve_xref(
+							self.env,
+							node.get("refdoc", self.env.docname),
+							self.app.builder,
+							node["reftype"],
+							target,
+							node,
+							nodes.TextElement("", ""),
+							)
+
+				# warn if resolve_xref did not return or raised
+				if not found_ref:
+					logger.warning(
+							f"API link {target} is broken.", location=node, type="ref"
+							)
+
 def setup(app):
 	app.connect('autodoc-process-docstring', process_docstring)
 	app.connect('env-before-read-docs', env_before_read_docs)
+	app.add_post_transform(MyLinkWarner)
 
 def env_before_read_docs(app, env, docnames):
 	env.settings["tab_width"] = 4  # https://stackoverflow.com/a/75037587/5267751
