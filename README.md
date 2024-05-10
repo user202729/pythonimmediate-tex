@@ -67,7 +67,7 @@ To autobuild the documentation
 
 ```
 cd docs
-sphinx-autobuild . /tmp/_build/ --watch ..
+./run-sphinx-autobuild
 ```
 
 To create a tag
