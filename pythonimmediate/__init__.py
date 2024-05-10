@@ -123,20 +123,16 @@ import weakref
 import itertools
 import string
 import numbers
+import random
+import linecache
+
+from .engine import Engine, default_engine, default_engine as engine, ParentProcessEngine, EngineStatus, TeXProcessError, TeXProcessExited, ChildProcessEngine
 
 T1 = typing.TypeVar("T1")
 
 is_sphinx_build = "SPHINX_BUILD" in os.environ
 
-
-#debug_file=open(Path(tempfile.gettempdir())/"pythonimmediate_debug_textopy.txt", "w", encoding='u8', buffering=2)
-#debug=functools.partial(print, file=debug_file, flush=True)
-debug=functools.partial(print, file=sys.stderr, flush=True)
-debug=lambda *args, **kwargs: None  # type: ignore
-
 expansion_only_can_call_Python=False  # normally. May be different in LuaTeX etc.
-from .engine import Engine, default_engine, default_engine as engine, ParentProcessEngine, EngineStatus, TeXProcessError, TeXProcessExited, ChildProcessEngine
-
 
 debugging: bool=True
 if os.environ.get("pythonimmediatenodebug", "").lower() in ["true", "1"]:
@@ -185,7 +181,6 @@ def convert_unit(val: Fraction|float, from_: DimensionUnit, *, to: DimensionUnit
 			raise ValueError(f'Unknown unit "{unit}"')
 	return val*unit_per_pt[from_]/unit_per_pt[to]
 
-import random
 def surround_delimiter(block: str)->str:
 	while True:
 		delimiter=str(random.randint(0, 10**12))
@@ -3199,7 +3194,6 @@ def define_internal_handler(f: FunctionType)->FunctionType:
 	return f
 
 
-import linecache
 
 # https://stackoverflow.com/questions/47183305/file-string-traceback-with-line-preview
 def exec_or_eval_with_linecache(code: str, globals: dict, mode: str)->Any:
@@ -4259,8 +4253,6 @@ toks=_ToksManager()
 """
 See :class:`_ToksManager`.
 """
-
-# ========
 
 def wlog(s: str)->None:
 	r"""

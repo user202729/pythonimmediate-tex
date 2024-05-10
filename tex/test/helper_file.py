@@ -236,8 +236,6 @@ class Test(unittest.TestCase):
 				#	continue  # https://tex.stackexchange.com/q/669877/250119
 
 				with self.subTest(s=s, t=t):
-					pythonimmediate.debug("trying token", t)
-
 					if is_unicode or ord(s)<256:
 						t.put_next()
 						self.assertEqual(Token.get_next(), t)
