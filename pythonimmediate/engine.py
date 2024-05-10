@@ -23,6 +23,10 @@ from .communicate import GlobalConfiguration
 
 
 EngineName=Literal["pdftex", "xetex", "luatex"]
+"""
+The ``EngineName`` type is a string that specifies the name of the engine.
+"""
+
 engine_names: Tuple[EngineName, ...]=EngineName.__args__  # type: ignore
 
 _DEFAULT_TIMEOUT=5

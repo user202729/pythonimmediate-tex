@@ -29,6 +29,13 @@ extensions = [
 	'sphinxarg.ext',
 ]
 
+autodoc_type_aliases = {
+		'DimensionUnit': 'DimensionUnit',
+		'EngineName': 'EngineName',
+		}
+autodoc_typehints_format = 'short'
+python_use_unqualified_type_names = True
+
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 

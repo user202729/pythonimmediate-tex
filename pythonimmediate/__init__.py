@@ -132,7 +132,9 @@ from .lowlevel import debugging, is_sphinx_build, _handlers, _per_engine_handler
 T1 = typing.TypeVar("T1")
 
 DimensionUnit = Literal["pt", "in", "pc", "cm", "mm", "bp", "dd", "cc", "sp"]
-# ex and em are font-dependent
+"""
+[TeX] dimension units. ``ex`` and ``em`` are font-dependent, so excluded.
+"""
 
 unit_per_pt: Dict[DimensionUnit, Fraction]={
 		"pt": Fraction(1, 1),
