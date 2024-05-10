@@ -66,7 +66,8 @@ import re
 from dataclasses import dataclass
 
 import pythonimmediate
-from . import scan_Python_call_TeX_module, PTTTeXLine, PTTVerbatimLine, PTTTeXLine, Python_call_TeX_local, check_line, Token, TTPEBlock, TTPEmbeddedLine, get_random_Python_identifier, CharacterToken, define_TeX_call_Python, parse_meaning_str, peek_next_meaning, run_block_local, run_code_redirect_print_TeX, TTPBlock, TTPLine, BalancedTokenList, TokenList, ControlSequenceToken, doc_catcode_table, Catcode, T, ControlSequenceToken, group, UnbalancedTokenListError
+from . import Token, parse_meaning_str, peek_next_meaning, run_code_redirect_print_TeX, BalancedTokenList, TokenList, ControlSequenceToken, doc_catcode_table, Catcode, T, ControlSequenceToken, group, UnbalancedTokenListError, CharacterToken
+from .lowlevel import scan_Python_call_TeX_module, PTTVerbatimLine, PTTTeXLine, Python_call_TeX_local, check_line, get_random_Python_identifier, TTPEBlock, TTPEmbeddedLine, define_TeX_call_Python, run_block_local, TTPBlock, TTPLine
 from .engine import Engine, default_engine, default_engine as engine, TeXProcessExited
 
 if not typing.TYPE_CHECKING:

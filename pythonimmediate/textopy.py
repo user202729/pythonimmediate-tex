@@ -13,7 +13,8 @@ def main()->None:
 	The arguments are re-parsed here anyway to provide a "temporary" configuration for the engine to work with before getting the real configuration.
 	"""
 	from .engine import ParentProcessEngine, EngineStatus
-	from . import PTTBlock, PTTVerbatimLine, run_error_finish, default_engine, surround_delimiter, substitute_private, get_bootstrap_code, run_main_loop, run_none_finish
+	from .lowlevel import PTTBlock, PTTVerbatimLine, run_error_finish, surround_delimiter, substitute_private, get_bootstrap_code, run_main_loop, run_none_finish
+	from .engine import default_engine
 	from .pytotex import parse_args
 	from .communicate import GlobalConfiguration, Communicator
 

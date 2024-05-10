@@ -24,7 +24,14 @@ Some command are not documented here, refer to:
 
 """
 
-from . import*
+from __future__ import annotations
+
+import os
+from typing import Optional
+from pathlib import Path
+
+from . import RedirectPrintTeX, get_user_scope, run_code_redirect_print_TeX
+from .lowlevel import define_TeX_call_Python, run_none_finish, scan_Python_call_TeX_module, TTPLine, define_internal_handler, eval_with_linecache, exec_with_linecache, TTPEBlock, TTPBlock, TTPELine, can_be_mangled_to, mark_bootstrap
 
 @define_internal_handler
 def py(code: TTPEBlock)->None:
@@ -136,10 +143,10 @@ def pycode(code: TTPBlock, lineno_: TTPLine, filename: TTPLine, fileabspath: TTP
 			break
 
 	if not target_filename:
-		if len(file_lines)==len(code_lines):
-			for file_line, code_line in zip(file_lines, code_lines):
-				if not can_be_mangled_to(file_line, code_line):
-					debug(f"different {file_line!r} {code_line!r}")
+		#if len(file_lines)==len(code_lines):
+		#	for file_line, code_line in zip(file_lines, code_lines):
+		#		if not can_be_mangled_to(file_line, code_line):
+		#			debug(f"different {file_line!r} {code_line!r}")
 		raise RuntimeError(f"Source file not found! (cwd={os.getcwd()}, attempted {(fileabspath, filename)})")
 
 	def tmp()->None:
@@ -153,7 +160,7 @@ def pycode(code: TTPBlock, lineno_: TTPLine, filename: TTPLine, fileabspath: TTP
 			exec(code_, get_user_scope())
 	run_code_redirect_print_TeX(tmp)
 	
-bootstrap_code_functions.append(define_TeX_call_Python(pycode, name="__pycodex"))
+mark_bootstrap(define_TeX_call_Python(pycode, name="__pycodex"))
 
 def pycodefuzzy(code: TTPBlock, lineno_: TTPLine)->None:
 	r"""
@@ -168,7 +175,7 @@ def pycodefuzzy(code: TTPBlock, lineno_: TTPLine)->None:
 		exec(code_, get_user_scope())
 	run_code_redirect_print_TeX(tmp)
 
-bootstrap_code_functions.append(define_TeX_call_Python(pycodefuzzy, name="__pycodefuzzyx"))
+mark_bootstrap(define_TeX_call_Python(pycodefuzzy, name="__pycodefuzzyx"))
 mark_bootstrap(
 r"""
 \NewDocumentEnvironment{pycodefuzzy}{}{

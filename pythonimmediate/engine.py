@@ -4,7 +4,7 @@ Abstract engine class.
 
 from __future__ import annotations
 
-from typing import Optional, Literal, Iterable, List, Dict, Tuple, Callable
+from typing import Optional, Literal, Iterable, List, Dict, Tuple, Callable, Any
 from abc import ABC, abstractmethod
 import sys
 import os
@@ -79,7 +79,7 @@ class EngineStatus(enum.Enum):
 	exited =enum.auto()
 
 
-def _try_close_log_communication_file(o: Any)->None:
+def _try_close_log_communication_file(o: Any)->Callable[[], None]:
 	def f()->None:
 		p=o()
 		if p:
@@ -97,7 +97,7 @@ class Engine(ABC):
 			self._log_communication_file.write(s)
 			self._log_communication_file.flush()
 
-	def set_log_communication_file(self, path: Path)->None:
+	def set_log_communication_file(self, path: str|Path)->None:
 		print(f"[All communications will be logged to {path}]", flush=True)
 		self._log_communication_file=open(path, "wb")
 		self._log_communication(b"Communication log ['>': TeX to Python - include i/r distinction, '<': Python to TeX]:\n")
@@ -308,7 +308,7 @@ class ParentProcessEngine(Engine):
 			debug_log_communication = Path(Template(self.config.debug_log_communication).safe_substitute(pid=os.getpid()))
 			self.set_log_communication_file(debug_log_communication)
 
-		from . import surround_delimiter, substitute_private, get_bootstrap_code
+		from .lowlevel import surround_delimiter, substitute_private, get_bootstrap_code
 		self.write(surround_delimiter(substitute_private(get_bootstrap_code(self))).encode('u8'))
 		self.status=EngineStatus.running
 
@@ -347,7 +347,7 @@ class _SetDefaultEngineContextManager:
 		self._new_engine=None
 		return result
 
-	def __exit__(self, exc_type, exc_val, exc_tb)->None:
+	def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any)->None:
 		assert self.entered, "__exit__ called manually without __enter__ called"
 		if not self.restored: self.restore()
 
@@ -631,7 +631,7 @@ class ChildProcessEngine(Engine):
 
 	"""
 
-	def __init__(self, engine_name: EngineName, args: Iterable[str]=(), env=None, autorestart: bool=False, debug_log_communication: Optional[str|Path]=None, from_dump: bool=False)->None:
+	def __init__(self, engine_name: EngineName, args: Iterable[str]=(), env: Optional[dict[str, str]]=None, autorestart: bool=False, debug_log_communication: Optional[str|Path]=None, from_dump: bool=False)->None:
 		super().__init__()
 		if debug_log_communication is not None:
 			self.set_log_communication_file(debug_log_communication)
@@ -651,7 +651,7 @@ class ChildProcessEngine(Engine):
 		self._start_process()
 
 	def _create_directory(self)->None:
-		self._directory: tempfile.TemporaryDirectory=tempfile.TemporaryDirectory(prefix="pyimm-", ignore_cleanup_errors=True)
+		self._directory: tempfile.TemporaryDirectory=tempfile.TemporaryDirectory(prefix="pyimm-", ignore_cleanup_errors=True)  # type: ignore
 		self.directory: Path=Path(self._directory.name)
 
 	def _start_process(self)->None:
@@ -689,7 +689,7 @@ class ChildProcessEngine(Engine):
 		self._stdout_thread.start()
 
 		if not self._from_dump:
-			from . import surround_delimiter, substitute_private, get_bootstrap_code
+			from .lowlevel import surround_delimiter, substitute_private, get_bootstrap_code
 			self.write(surround_delimiter(substitute_private(
 				get_bootstrap_code(self)
 				)).encode('u8'))
@@ -767,6 +767,7 @@ class ChildProcessEngine(Engine):
 
 			# debug logging
 			#sys.stderr.write(f" | {_stdout_lines=} | {_stdout_buffer=} | {_error_marker_line_seen=} | {self.status=}\n")
+		process.stdin.close()
 		process.stdout.close()
 
 	def get_process(self)->subprocess.Popen:
@@ -901,8 +902,9 @@ class ChildProcessEngine(Engine):
 		assert process.stdin is not None
 		assert process.stderr is not None
 
-		if self.status==self._EngineStatus.error:  # we need to do this because when :meth:`__del__` is called the objects might already be torn down
-			# only _stdout_thread can possibly set status to error, so we just need to wait for _stdout_thread
+		# we need to use self._EngineStatus instead of EngineStatusbecause when :meth:`__del__` is called the objects might already be torn down
+		# only _stdout_thread can possibly set status to error, so we just need to wait for _stdout_thread
+		if self.status==self._EngineStatus.error:
 			self._stdout_thread.join()
 
 		if not process.poll():
@@ -917,7 +919,8 @@ class ChildProcessEngine(Engine):
 				process.kill()
 			process.wait(timeout=_DEFAULT_TIMEOUT)
 
-		process.stdin.close()
+		# we must not close stdin here, let _stdout_thread do it
+		# because otherwise the "? " may overrun (rare race condition) (I guess)
 		process.stderr.close()
 		self._stdout_thread.join()  # _stdout_thread will automatically terminate once process.stderr is no longer readable
 
@@ -932,6 +935,6 @@ class ChildProcessEngine(Engine):
 	def __enter__(self)->ChildProcessEngine:
 		return self
 
-	def __exit__(self, exc_type, exc_val, exc_tb)->None:
+	def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any)->None:
 		self.close()
 

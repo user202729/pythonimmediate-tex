@@ -1,9 +1,11 @@
 import unittest
 import pythonimmediate
 from typing import Any, Generator
-from pythonimmediate import Token, TokenList, BalancedTokenList, Catcode, ControlSequenceToken, frozen_relax_token, BlueToken, NTokenList, catcode, remove_handler, group, get_env_body_verb_approximate
+from pythonimmediate import Token, TokenList, BalancedTokenList, Catcode, ControlSequenceToken, frozen_relax_token, BlueToken, NTokenList, catcode, remove_handler, group, expand_once
 from pythonimmediate import Catcode as C
-from pythonimmediate import default_engine, simple
+from pythonimmediate import CharacterToken, print_TeX
+from pythonimmediate.engine import default_engine
+from pythonimmediate.simple import execute, get_arg_estr, get_arg_str, get_env_body_verb_approximate, get_multiline_verb_arg, get_optional_arg_estr, get_optional_arg_str, get_verb_arg, newcommand, peek_next_char, peek_next_meaning, put_next, renewcommand, define_char, undefine_char, newenvironment, newenvironment_verb, var
 T=ControlSequenceToken.make
 
 assert default_engine.name in ["pdftex", "xetex", "luatex"]
@@ -18,7 +20,7 @@ need_speed_up=default_engine.config.naive_flush
 
 class Test(unittest.TestCase):
 	def test_simple_run_tokenized_line_local(self)->None:
-		pythonimmediate.execute(r'\testa {123} {456}')
+		execute(r'\testa {123} {456}')
 		self.assertEqual(x, "123")
 		self.assertEqual(y, "456")
 
@@ -31,22 +33,22 @@ class Test(unittest.TestCase):
 				assert BalancedTokenList.get_next() ==s
 
 	def test_renewcommand_non_Python_defined(self)->None:
-		pythonimmediate.execute(r'\def \testb {}')
+		execute(r'\def \testb {}')
 
-		@pythonimmediate.renewcommand
+		@renewcommand
 		def testb()->None: pass
 
 	def test_newcommand(self)->None:
 		global x
 		x=1
 
-		@pythonimmediate.newcommand
+		@newcommand
 		def testa()->None:
 			global x
 			x=2
 
 		self.assertEqual(x, 1)
-		pythonimmediate.execute(r'\testa')
+		execute(r'\testa')
 		self.assertEqual(x, 2)
 
 	def test_meaning_eq(self)->None:
@@ -57,20 +59,20 @@ class Test(unittest.TestCase):
 
 	def test_unicode_str(self)->None:
 		s='Æ²×⁴ℝ𝕏'
-		pythonimmediate.put_next('{' + s + '}')
-		self.assertEqual(pythonimmediate.get_arg_str(), s)
+		put_next('{' + s + '}')
+		self.assertEqual(get_arg_str(), s)
 
-		pythonimmediate.put_next('{' + s + '}')
-		self.assertEqual(pythonimmediate.get_arg_estr(), s)
+		put_next('{' + s + '}')
+		self.assertEqual(get_arg_estr(), s)
 
-		pythonimmediate.put_next(r'\expandafter{\detokenize{' + s + '}}')
-		pythonimmediate.expand_once()
+		put_next(r'\expandafter{\detokenize{' + s + '}}')
+		expand_once()
 		t=BalancedTokenList.get_next()
 		assert t.str()==s
 
 	def test_csname_unicode(self)->None:
 		s='Æ²×⁴ℝ𝕏'
-		pythonimmediate.execute(r'\edef\testb{\expandafter \noexpand \csname \detokenize{' + s + r'}\endcsname}')
+		execute(r'\edef\testb{\expandafter \noexpand \csname \detokenize{' + s + r'}\endcsname}')
 		
 		def byte_to_char_hack(s: str)->str:
 			return "".join(chr(c) for c in s.encode('u8'))
@@ -81,10 +83,10 @@ class Test(unittest.TestCase):
 			self.assertEqual(BalancedTokenList([T.testb]).expand_o(), BalancedTokenList([ControlSequenceToken(byte_to_char_hack(s))]))
 
 		if default_engine.is_unicode:
-			pythonimmediate.execute(r'\edef\testb{\expandafter \noexpand \csname \detokenize{' + f"^^^^{ord('ℝ'):04x}" + r'}\endcsname}')
+			execute(r'\edef\testb{\expandafter \noexpand \csname \detokenize{' + f"^^^^{ord('ℝ'):04x}" + r'}\endcsname}')
 			self.assertEqual(BalancedTokenList([T.testb]).expand_o(), BalancedTokenList([ControlSequenceToken("ℝ")]))
 		else:
-			pythonimmediate.execute(r'\edef\testb{\expandafter \noexpand \csname \detokenize{' + 
+			execute(r'\edef\testb{\expandafter \noexpand \csname \detokenize{' + 
 						   "".join(f"^^{a:02x}" for a in 'ℝ'.encode('u8')) +
 						   r'}\endcsname}')
 			self.assertEqual(BalancedTokenList([T.testb]).expand_o(), BalancedTokenList([ControlSequenceToken(byte_to_char_hack("ℝ"))]))
@@ -97,61 +99,61 @@ class Test(unittest.TestCase):
 				(r"\##", None),
 				(r"#\#", None),
 				]:
-			pythonimmediate.put_next('{' + put + '}')
-			self.assertEqual(pythonimmediate.get_arg_str(), (put if get is None else get))
+			put_next('{' + put + '}')
+			self.assertEqual(get_arg_str(), (put if get is None else get))
 
 
 	def test_newcommand_with_name(self)->None:
-		@pythonimmediate.newcommand("testd")
+		@newcommand("testd")
 		def testa()->None:
 			global x
 			x=3
 
 		self.assertEqual(x, 2)
-		pythonimmediate.execute(r'\testd')
+		execute(r'\testd')
 		self.assertEqual(x, 3)
 
-		@pythonimmediate.renewcommand  # type: ignore
+		@renewcommand  # type: ignore
 		def testa()->None:
 			global x, y
-			x=pythonimmediate.get_arg_str()
-			y=pythonimmediate.get_arg_str()
+			x=get_arg_str()
+			y=get_arg_str()
 
-		@pythonimmediate.newcommand
+		@newcommand
 		def testc()->str:
-			self.assertEqual(pythonimmediate.get_arg_str(), "ab")
-			self.assertEqual(pythonimmediate.get_optional_arg_str(), "cd")
-			self.assertEqual(pythonimmediate.get_optional_arg_str(), None)
-			self.assertEqual(pythonimmediate.get_verb_arg(), "ef")
-			self.assertEqual(pythonimmediate.get_optional_arg_str(), None)
-			self.assertEqual(pythonimmediate.get_verb_arg(), "gh")
-			self.assertEqual(pythonimmediate.get_multiline_verb_arg(), "ijk\nlm")
-			pythonimmediate.print_TeX("123", end="")
+			self.assertEqual(get_arg_str(), "ab")
+			self.assertEqual(get_optional_arg_str(), "cd")
+			self.assertEqual(get_optional_arg_str(), None)
+			self.assertEqual(get_verb_arg(), "ef")
+			self.assertEqual(get_optional_arg_str(), None)
+			self.assertEqual(get_verb_arg(), "gh")
+			self.assertEqual(get_multiline_verb_arg(), "ijk\nlm")
+			print_TeX("123", end="")
 			return "456"
 
-		pythonimmediate.execute("789%")
-		pythonimmediate.execute("789%")
+		execute("789%")
+		execute("789%")
 
-		pythonimmediate.execute(r"""\testc {ab} [cd]|ef|{gh}|ijk""" + "\n" + r"""lm|%""")
+		execute(r"""\testc {ab} [cd]|ef|{gh}|ijk""" + "\n" + r"""lm|%""")
 
-		pythonimmediate.execute("789%")
+		execute("789%")
 
 
 	def test_tokens(self)->None:
 		global x
 		x=0
 
-		@pythonimmediate.renewcommand
+		@renewcommand
 		def testd()->None:
 			global x
 			x=1
 
 			a=BalancedTokenList.get_next()
 
-			pythonimmediate.put_next(r'{123}')
+			put_next(r'{123}')
 			b=BalancedTokenList.get_next()
 
-			pythonimmediate.put_next(r'{1 a\relax}')
+			put_next(r'{1 a\relax}')
 			for t, meaning in [
 					(Catcode.bgroup('{'), "begin-group character {"),
 					(Catcode.other ('1'), "the character 1"),
@@ -160,9 +162,9 @@ class Test(unittest.TestCase):
 					(ControlSequenceToken('relax'), r"\relax"),
 					(Catcode.egroup('}'), "end-group character }"),
 					]:
-				self.assertEqual(pythonimmediate.peek_next_meaning(), meaning)
-				self.assertEqual(pythonimmediate.Token.peek_next(), t)
-				self.assertEqual(pythonimmediate.Token.get_next(), t)
+				self.assertEqual(peek_next_meaning(), meaning)
+				self.assertEqual(Token.peek_next(), t)
+				self.assertEqual(Token.get_next(), t)
 
 
 			a.put_next()
@@ -172,7 +174,7 @@ class Test(unittest.TestCase):
 
 
 		self.assertEqual(x, 0)
-		pythonimmediate.execute(
+		execute(
 		r'''
 		\precattlExec{ \testd {{ab\cC {}\cC{123}\relax\cFrozenRelax {}\cP*$^_ \cS\a}} }
 		''')
@@ -200,7 +202,7 @@ class Test(unittest.TestCase):
 				frozen_relax_token,
 				ControlSequenceToken(">>"),
 				ControlSequenceToken(""),
-				ControlSequenceToken("  "),
+				ControlSequenceToken("	"),
 				ControlSequenceToken(" > a b>\\> "),
 				Catcode.space(' '),
 				Catcode.other(' '),
@@ -245,28 +247,28 @@ class Test(unittest.TestCase):
 
 
 	def test_put_get_next(self)->None:
-		pythonimmediate.put_next("a")
-		self.assertEqual(pythonimmediate.peek_next_char(), "a")
+		put_next("a")
+		self.assertEqual(peek_next_char(), "a")
 
-		pythonimmediate.put_next(r"\a")
-		self.assertEqual(pythonimmediate.peek_next_char(), "")
-		pythonimmediate.Token.get_next()
+		put_next(r"\a")
+		self.assertEqual(peek_next_char(), "")
+		Token.get_next()
 
-		pythonimmediate.put_next(r"\par")
-		self.assertEqual(pythonimmediate.peek_next_char(), "")
-		assert pythonimmediate.Token.get_next()==ControlSequenceToken("par")
+		put_next(r"\par")
+		self.assertEqual(peek_next_char(), "")
+		assert Token.get_next()==ControlSequenceToken("par")
 
-		pythonimmediate.CharacterToken(ord(' '), pythonimmediate.Catcode.space).put_next()
-		self.assertEqual(pythonimmediate.peek_next_char(), " ")
+		CharacterToken(ord(' '), Catcode.space).put_next()
+		self.assertEqual(peek_next_char(), " ")
 
-		pythonimmediate.put_next(r"\relax")
-		self.assertEqual(pythonimmediate.peek_next_char(), "")
+		put_next(r"\relax")
+		self.assertEqual(peek_next_char(), "")
 
-		pythonimmediate.put_next(r"\begingroup\endgroup")
-		self.assertEqual(pythonimmediate.peek_next_char(), "")
+		put_next(r"\begingroup\endgroup")
+		self.assertEqual(peek_next_char(), "")
 
-		pythonimmediate.put_next(r"\bgroup\egroup")
-		self.assertEqual(pythonimmediate.peek_next_char(), "{")
+		put_next(r"\bgroup\egroup")
+		self.assertEqual(peek_next_char(), "{")
 
 	def test_balanced(self)->None:
 		a=TokenList.doc(r'}{')
@@ -378,43 +380,43 @@ class Test(unittest.TestCase):
 
 	def test_get_arg_estr(self)->None:
 		BalancedTokenList.doc(r'{123}').put_next()
-		self.assertEqual(pythonimmediate.get_arg_estr(), "123")
+		self.assertEqual(get_arg_estr(), "123")
 
 		BalancedTokenList.doc(r'{\empty}').put_next()
-		self.assertEqual(pythonimmediate.get_arg_estr(), "")
+		self.assertEqual(get_arg_estr(), "")
 
 		BalancedTokenList.doc(r'{a\ \\\{\}\$\&\#\^\_\%\~~b}').put_next()
-		self.assertEqual(pythonimmediate.get_arg_estr(), r"a \{}$&#^_%~~b")
+		self.assertEqual(get_arg_estr(), r"a \{}$&#^_%~~b")
 
 		
 	def test_get_optional_arg_estr(self)->None:
 		BalancedTokenList.doc(r'[123]').put_next()
-		self.assertEqual(pythonimmediate.get_optional_arg_estr(), "123")
+		self.assertEqual(get_optional_arg_estr(), "123")
 
 		# outermost only {} get stripped
 		BalancedTokenList.doc(r'[{123}]').put_next()
-		self.assertEqual(pythonimmediate.get_optional_arg_estr(), "123")
+		self.assertEqual(get_optional_arg_estr(), "123")
 
 		# can also be used to hide the ]
 		BalancedTokenList.doc(r'[{]}]').put_next()
-		self.assertEqual(pythonimmediate.get_optional_arg_estr(), "]")
+		self.assertEqual(get_optional_arg_estr(), "]")
 
 		# can also hide this way
 		BalancedTokenList.doc(r'[\]]').put_next()
-		self.assertEqual(pythonimmediate.get_optional_arg_estr(), "]")
+		self.assertEqual(get_optional_arg_estr(), "]")
 
 		# test expansion
 		BalancedTokenList.doc(r'[\empty]').put_next()
-		self.assertEqual(pythonimmediate.get_optional_arg_estr(), "")
+		self.assertEqual(get_optional_arg_estr(), "")
 
 		# test balancedness & keep braces (supported by xparse)
 		BalancedTokenList.doc(r'[{a}\ \\\{\}\$\&\#\^\_\%\~~b[]]').put_next()
-		self.assertEqual(pythonimmediate.get_optional_arg_estr(), r"{a} \{}$&#^_%~~b[]")
+		self.assertEqual(get_optional_arg_estr(), r"{a} \{}$&#^_%~~b[]")
 
 		# test nonexistent optional argument
 		BalancedTokenList.doc(r'{ab}').put_next()
-		self.assertEqual(pythonimmediate.get_optional_arg_estr(), None)
-		self.assertEqual(pythonimmediate.get_arg_str(), "ab")
+		self.assertEqual(get_optional_arg_estr(), None)
+		self.assertEqual(get_arg_str(), "ab")
 
 	def test_control_sequence_token_maker(self)->None:
 		self.assertEqual(ControlSequenceToken("ab_c"), ControlSequenceToken.make.ab_c)
@@ -423,7 +425,7 @@ class Test(unittest.TestCase):
 	def test_expand_once(self)->None:
 		BalancedTokenList.doc(r'\def\aaa{\bbb}').execute()
 		T.aaa.put_next()
-		pythonimmediate.expand_once()
+		expand_once()
 		self.assertEqual(Token.get_next(), T.bbb)
 
 	def test_blue_tokens(self)->None:
@@ -545,21 +547,21 @@ class Test(unittest.TestCase):
 			with self.subTest(c=c):
 				a = 1
 
-				@simple.define_char(c)
+				@define_char(c)
 				def f()->None:
 					nonlocal a
 					a = 2
 
 				self.assertEqual(a, 1)
-				simple.execute(c)
+				execute(c)
 				self.assertEqual(a, 2)
 
-				simple.undefine_char(c)
+				undefine_char(c)
 
 	def test_new_environment(self)->None:
 		import random
 		l=[]
-		@simple.newenvironment("myenv")
+		@newenvironment("myenv")
 		def	myenv()->Generator[None, None, None]:
 			x=random.randint(1, 10**18)
 			l.append(f"begin {x}")
@@ -567,7 +569,7 @@ class Test(unittest.TestCase):
 			l.append(f"end {x}")
 
 
-		simple.execute(r"""
+		execute(r"""
 		\begin{myenv}
 		\begin{myenv}
 		\end{myenv}
@@ -584,7 +586,7 @@ class Test(unittest.TestCase):
 
 	def test_new_verbatim_environment(self)->None:
 		a=0
-		@simple.newenvironment_verb("myenv*")
+		@newenvironment_verb("myenv*")
 		def myenv(s: str)->None:
 			nonlocal a
 			a=1
@@ -592,7 +594,7 @@ class Test(unittest.TestCase):
 
 		self.assertEqual(a, 0)
 		import textwrap
-		simple.execute(textwrap.dedent(r"""
+		execute(textwrap.dedent(r"""
 		\begin{myenv*}
 		hello world
 		 \#^&%$
@@ -602,7 +604,7 @@ class Test(unittest.TestCase):
 		
 	def test_get_env_body_verb_approximate(self)->None:
 		a=0
-		@simple.newenvironment("myenv**")
+		@newenvironment("myenv**")
 		def myenv()->Generator[None, None, None]:
 			s, _, _=get_env_body_verb_approximate()
 			nonlocal a
@@ -612,7 +614,7 @@ class Test(unittest.TestCase):
 
 		self.assertEqual(a, 0)
 		import textwrap
-		simple.execute(textwrap.dedent(r"""
+		execute(textwrap.dedent(r"""
 		\begin{myenv**}
 		hello world
 		 \#^&%$
@@ -621,8 +623,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(a, 1)
 
 	def test_var(self)->None:
-		simple.var["abc"]=r"\test  \###\a\b{}#&?"
-		self.assertEqual(simple.var["abc"], r"\test \###\a \b {}#&?")
+		var["abc"]=r"\test  \###\a\b{}#&?"
+		self.assertEqual(var["abc"], r"\test \###\a \b {}#&?")
 
 
 suite = unittest.defaultTestLoader.loadTestsFromTestCase(Test)
