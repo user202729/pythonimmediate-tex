@@ -851,10 +851,11 @@ class ChildProcessEngine(Engine):
 		assert process.stderr is not None
 		self._check_no_error()
 		line=process.stderr.readline()
-		self._check_no_error()
 		if not line:
 			process.wait(timeout=_DEFAULT_TIMEOUT)
 			self.terminate()
+			self._check_no_error()  # it is important that this is done after terminate(),
+			# because _stdout_thread is the one responsible for setting error status
 			if self._autorestart:
 				self._start_process()
 			raise TeXProcessExited
