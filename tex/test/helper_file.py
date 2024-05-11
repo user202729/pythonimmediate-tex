@@ -537,9 +537,9 @@ class Test(unittest.TestCase):
 	def test_outer_token(self)->None:
 		TokenList.doc(r"\outer\def\outertest{}").execute()
 
-		#self.assertEqual(
-		#		TokenList.doc(r"\string}\string}\string\outertest\string{\string{").expand_x().str(),
-		#		r"}}\outertest{{")
+		self.assertEqual(
+				TokenList.doc(r"\string}\string}\string\outertest\string{\string{").expand_x().str(),
+				r"}}\outertest{{")
 
 		T.outertest.put_next()
 		self.assertEqual(Token.get_next(), T.outertest)
