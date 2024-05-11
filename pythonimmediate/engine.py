@@ -114,16 +114,20 @@ class Engine(ABC):
 	def __init__(self)->None:
 		self._config=GlobalConfiguration()  # dummy value
 		self.status=EngineStatus.waiting
-		self._on_close_list: List[Callable[[], None]]=[]
+		self._on_close_list: List[Callable[[Engine], None]]=[]
 		self._log: Optional[bytes]=None
 
-	def add_on_close(self, f: Callable[[], None])->None:
+	def add_on_close(self, f: Callable[[Engine], None])->None:
 		r"""
 		Add a function that will be executed when the engine is closed.
 
+		This function takes the engine object itself as the only argument
+		to avoid a circular reference issue which would prevent the engine
+		from being garbage-collected.
+
 		>>> e=ChildProcessEngine("pdftex")
-		>>> e.add_on_close(lambda: print(1))
-		>>> e.add_on_close(lambda: print(2))
+		>>> e.add_on_close(lambda _: print(1))
+		>>> e.add_on_close(lambda _: print(2))
 		>>> e.close()
 		1
 		2
@@ -133,14 +137,14 @@ class Engine(ABC):
 
 		>>> e=ChildProcessEngine("pdftex", autorestart=True)
 		>>> a=[1, 2, 3]
-		>>> e.add_on_close(a.pop)
+		>>> e.add_on_close(lambda e: a.pop())
 		>>> from pythonimmediate import execute
 		>>> with default_engine.set_engine(e): execute(r"\error")
 		Traceback (most recent call last):
 			...
 		pythonimmediate.engine.TeXProcessError: Undefined control sequence.
-		>>> a  # doctest: +SKIP
-		[1, 2]
+		>>> a
+		[1, 2, 3]
 		>>> e.close()
 		>>> a
 		[1, 2]
@@ -237,7 +241,7 @@ class Engine(ABC):
 		self.close_log_communication_file()
 		l=self._on_close_list
 		self._on_close_list=[]
-		for f in l: f()
+		for f in l: f(self)
 
 	@abstractmethod
 	def _close(self)->None:
@@ -492,7 +496,7 @@ class DefaultEngine:
 	def _log_communication(self, s: bytes)->None:
 		self.get_engine()._log_communication(s)
 
-	def add_on_close(self, f: Callable[[], None])->None:
+	def add_on_close(self, f: Callable[[Engine], None])->None:
 		assert False
 
 	def _close(self)->None:

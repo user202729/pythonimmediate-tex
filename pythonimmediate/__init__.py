@@ -289,10 +289,10 @@ def _defaultget_with_cleanup(d: WeakKeyDictionary[Engine, T1], default: Callable
 	e=default_engine.get_engine()
 	if e not in d:
 		d[e]=default()
-		#def cleanup()->None:
-		#	try: del d[e]
-		#	except KeyError: pass
-		#e.add_on_close(cleanup)
+		def cleanup(e: Engine)->None:
+			try: del d[e]
+			except KeyError: pass
+		e.add_on_close(cleanup)
 	return d[e]
 
 def get_user_scope()->Dict[str, Any]:
@@ -317,7 +317,7 @@ def get_user_scope()->Dict[str, Any]:
 		...		assert n==len(_user_scope)
 		...		execute(r'\pyc{a=1}')
 		...		assert n+1==len(_user_scope)
-		>>> assert n==len(_user_scope)  # doctest: +SKIP
+		>>> assert n==len(_user_scope), (n, len(_user_scope))
 	"""
 	return _defaultget_with_cleanup(_user_scope, dict)
 
