@@ -162,14 +162,14 @@ def put_next(arg: str)->None:
 		Refer to :func:`print_TeX` or :func:`execute` for workarounds,
 		or use the advanced interface such as :meth:`pythonimmediate.BalancedTokenList.put_next`.
 
-	For example, if the following content in the input stream are ``{abc}{def}``::
+	For example::
 
-		s = get_arg_str()  # s = "abc"
-		t = get_arg_str()  # t = "def"
-		put_next("{" + t + "}")
-		put_next("{" + s + "}")
-	
-	After the above code, the content in the input stream is "mostly unchanged".
+		>>> put_next("{abc}")
+		>>> put_next("{def}")
+		>>> get_arg_str()
+		'def'
+		>>> get_arg_str()
+		'abc'
 
 	.. note::
 		For advanced users: the argument is tokenized in the current category regime.
@@ -1229,7 +1229,7 @@ def riffle(s: Iterable[T3], sep: T3)->Iterator[T3]:
 	"""
 	Helper function, yield the given strings, separated by the given separator.
 
-	?>> [*riffle(["a", "b", "c"], ",")]
+	>>> [*riffle(["a", "b", "c"], ",")]
 	['a', ',', 'b', ',', 'c']
 	"""
 	for i, x in enumerate(s):

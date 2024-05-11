@@ -64,7 +64,7 @@
 
 \bool_if:NTF \_pythonimmediate_child_process {
 	% make read file read from stdin
-	% note that \ior_str_get:NN cannot be used here as it checks for \ifeof which breaks with terminal for some reason
+	% note that \ior_str_get:NN or \ior_get:NN cannot be used here as it checks for \ifeof which breaks with terminal for some reason
 	\int_const:Nn \_pythonimmediate_read_file {-1}
 } {
 	\newread \_pythonimmediate_read_file
@@ -81,7 +81,14 @@
 	}
 }
 
-
+% ======== copy of ior_get but does not check for file end ========
+\cs_new_protected:Npn \_pythonimmediate_get:N #1 {
+	\use_ii_i:on {\the\endlinechar\relax} {
+		\endlinechar=-1~
+		\read \_pythonimmediate_read_file to #1
+		\endlinechar=
+	}
+}
 
 % ======== setup write file ========
 \cs_new_protected:Npn \_pythonimmediate_send_content:e #1 {

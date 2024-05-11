@@ -672,6 +672,8 @@ class ChildProcessEngine(Engine):
 		A temporary working directory for the engine.
 		"""
 
+		self._stdout_lines: List[bytes]=[]  # for debugging purpose only
+
 		self._process: Optional[subprocess.Popen]=None  # guard like this so that __del__ does not blow up if Popen() fails
 		self._start_process()
 
@@ -763,6 +765,8 @@ class ChildProcessEngine(Engine):
 		_stdout_lines: List[bytes]=[]  # Note that this is asynchronously populated so values may not be always correct
 		_stdout_buffer=bytearray()  # remaining part that does not fit in any line
 
+		get_engine()._stdout_lines=_stdout_lines  # for debugging purpose only
+
 		while True:
 			line: bytes=process.stdout.read1()  # type: ignore
 			if not line:
@@ -776,7 +780,7 @@ class ChildProcessEngine(Engine):
 				parts = _stdout_buffer.split(b"\n")
 				_stdout_lines+=map(bytes, parts[:-1])
 				_error_marker_line_seen=_error_marker_line_seen or any(line.startswith(b"<*> ") for line in parts[:-1])
-				_stdout_buffer=parts[-1]
+				_stdout_buffer[:]=parts[-1]
 				if b'!  ==> Fatal error occurred, no output PDF file produced!' in parts[:-1]:
 					get_engine().status=EngineStatus.error
 					process.wait(timeout=_DEFAULT_TIMEOUT)
@@ -789,11 +793,14 @@ class ChildProcessEngine(Engine):
 				process.wait(timeout=_DEFAULT_TIMEOUT)
 				break
 				# this is a simple way to break out _read() but it will not allow error recovery
-
-			# debug logging
-			#sys.stderr.write(f" | {_stdout_lines=} | {_stdout_buffer=} | {_error_marker_line_seen=} | {self.status=}\n")
 		process.stdin.close()
 		process.stdout.close()
+
+	def _print_stdout(self)->None:
+		"""
+		For debug purpose only. If the engine is still running there's a chance the log is not flushed when this function is called.
+		"""
+		print(b"\n".join(self._stdout_lines).decode('u8', "replace"))
 
 	def get_process(self)->subprocess.Popen:
 		if self._process is None:
