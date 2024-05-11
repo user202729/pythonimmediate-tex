@@ -664,7 +664,6 @@ class Token(NToken):
 		assert self.assignable
 		return not BalancedTokenList([T.ifx, self, T["@undefined"], Catcode.other("1"), T.fi]).expand_x()
 
-
 	def put_next(self)->None:
 		d=self.degree()
 		if d==0:
@@ -1191,6 +1190,8 @@ class ControlSequenceToken(Token):
 
 		>>> ControlSequenceToken("abc")
 		<Token: \abc>
+		>>> ControlSequenceToken([97, 98, 99])
+		<Token: \abc>
 
 	The preferred way to construct a control sequence is :data:`T`.
 
@@ -1244,9 +1245,14 @@ class ControlSequenceToken(Token):
 	_csname: Optional[str]  # defined if csname is representable as a str. The same control sequence may be represented differently depends on is_unicode.
 	_csname_bytes: Optional[bytes]  # defined if csname is representable as a bytes.
 
-	def __init__(self, csname: Union[str, bytes], is_unicode: Optional[bool]=None)->None:
+	def __init__(self, csname: Union[str, bytes, list[int], tuple[int, ...]], is_unicode: Optional[bool]=None)->None:
 		if is_unicode is None and default_engine.engine is not None:
 			is_unicode = default_engine.is_unicode
+
+		if isinstance(csname, (list, tuple)):
+			self._codes = tuple(csname)
+			self._csname = "".join(chr(c) for c in csname)
+			return
 
 		if is_unicode is None:
 			# check csname can only be interpreted as one way (i.e. all codes ≤ 0x7f)
@@ -1309,8 +1315,10 @@ class ControlSequenceToken(Token):
 	def assignable(self)->bool:
 		return True
 	def __str__(self)->str:
-		if self.csname=="": return r"\csname\endcsname"
-		return "\\"+self.csname
+		if not self._codes: return r"\csname\endcsname"
+		if self._csname is not None:
+			return "\\"+self._csname
+		return "\\"+repr(self._csname_bytes)
 
 	def serialize(self)->str:
 		return (
@@ -1320,7 +1328,9 @@ class ControlSequenceToken(Token):
 				+ " ")
 
 	def repr1(self)->str:
-		return f"\\" + repr(self.csname.replace(' ', "␣"))[1:-1]
+		if self._csname is not None:
+			return f"\\" + repr(self._csname.replace(' ', "␣"))[1:-1]
+		return f"\\" + repr(self._csname_bytes).replace(' ', "␣")
 
 	def simple_detokenize(self, get_catcode: Callable[[int], Catcode])->str:
 		if not self.csname:
@@ -1423,8 +1433,11 @@ class Catcode(enum.Enum):
 		"""
 		return self not in (Catcode.escape, Catcode.line, Catcode.ignored, Catcode.comment, Catcode.invalid)
 
-	def __call__(self, ch: Union[str, int])->"CharacterToken":
+	def __call__(self, ch: Union[str, bytes, int])->"CharacterToken":
 		if isinstance(ch, str): ch=ord(ch)
+		elif isinstance(ch, bytes):
+			if len(ch)!=1: raise ValueError("bytes must have length 1, received "+repr(ch))
+			ch=ch[0]
 		return CharacterToken(ch, self)
 
 	def __contains__(self, t: NToken)->bool:
@@ -1951,6 +1964,7 @@ class TokenList(TokenListBaseClass):
 		i=0
 
 		# hack
+		data_was_bytes=isinstance(data, bytes)
 		if isinstance(data, bytes):
 			data="".join(chr(i) for i in data)
 
@@ -1962,7 +1976,6 @@ class TokenList(TokenListBaseClass):
 				])
 
 		while i<len(data):
-
 			if data[i] in "\\>*":
 				start=data.find("\\", i)
 				pos=start+1
@@ -1979,7 +1992,9 @@ class TokenList(TokenListBaseClass):
 
 				i=data.find(' ', pos)+1
 				csname+=data[pos:i-1]
-				result.append(ControlSequenceToken(csname))
+				result.append(ControlSequenceToken(
+					bytes(map(ord, csname)) if data_was_bytes else csname,
+					is_unicode=not data_was_bytes))
 
 			elif data[i]=="R":
 				result.append(frozen_relax_token)

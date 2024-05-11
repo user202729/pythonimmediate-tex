@@ -1,6 +1,6 @@
 import unittest
 import pythonimmediate
-from typing import Any, Generator
+from typing import Any, Generator, Union
 from pythonimmediate import Token, TokenList, BalancedTokenList, Catcode, ControlSequenceToken, frozen_relax_token, BlueToken, NTokenList, catcode, remove_handler, group, expand_once
 from pythonimmediate import Catcode as C
 from pythonimmediate import CharacterToken, print_TeX
@@ -74,22 +74,15 @@ class Test(unittest.TestCase):
 		s='Æ²×⁴ℝ𝕏'
 		execute(r'\edef\testb{\expandafter \noexpand \csname \detokenize{' + s + r'}\endcsname}')
 		
-		def byte_to_char_hack(s: str)->str:
-			return "".join(chr(c) for c in s.encode('u8'))
-
-		if default_engine.is_unicode:
-			self.assertEqual(BalancedTokenList([T.testb]).expand_o(), BalancedTokenList([ControlSequenceToken(s)]))
-		else:
-			self.assertEqual(BalancedTokenList([T.testb]).expand_o(), BalancedTokenList([ControlSequenceToken(byte_to_char_hack(s))]))
-
+		self.assertEqual(BalancedTokenList([T.testb]).expand_o(), BalancedTokenList([ControlSequenceToken(s)]))
 		if default_engine.is_unicode:
 			execute(r'\edef\testb{\expandafter \noexpand \csname \detokenize{' + f"^^^^{ord('ℝ'):04x}" + r'}\endcsname}')
-			self.assertEqual(BalancedTokenList([T.testb]).expand_o(), BalancedTokenList([ControlSequenceToken("ℝ")]))
+			self.assertEqual(BalancedTokenList([T.testb]).expand_o(), BalancedTokenList([ControlSequenceToken("ℝ", is_unicode=True)]))
 		else:
-			execute(r'\edef\testb{\expandafter \noexpand \csname \detokenize{' + 
+			execute(r'\edef\testb{\expandafter \noexpand \csname \detokenize{' +
 						   "".join(f"^^{a:02x}" for a in 'ℝ'.encode('u8')) +
 						   r'}\endcsname}')
-			self.assertEqual(BalancedTokenList([T.testb]).expand_o(), BalancedTokenList([ControlSequenceToken(byte_to_char_hack("ℝ"))]))
+			self.assertEqual(BalancedTokenList([T.testb]).expand_o(), BalancedTokenList([ControlSequenceToken("ℝ".encode('u8'))]))
 
 	def test_hash(self)->None:
 		for put, get in [
@@ -219,17 +212,19 @@ class Test(unittest.TestCase):
 				self.assertEqual(Token.get_next(), t)
 
 	def test_tokens_control_chars(self)->None:
-		for s in [
-				chr(i)
-				for i in range(0, 700, (50 if need_speed_up else 1))
-				]:
+		for i in range(0, 700, (50 if need_speed_up else 1)):
+			s: Union[str, bytes]=chr(i) if is_unicode or i>=256 else bytes([i])
 			for t in [
 				Catcode.active(s),
 				Catcode.bgroup(s),
 				Catcode.egroup(s),
 				Catcode.other (s),
-				ControlSequenceToken(s),
-				ControlSequenceToken(s+s),
+				ControlSequenceToken([i]),
+				ControlSequenceToken([i, i]),
+				*(
+					[] if is_unicode else
+					[ ControlSequenceToken(chr(i).encode('u8')), ControlSequenceToken(chr(i).encode('u8')*2) ]
+					),
 				]:
 				if t==Catcode.active(' '): continue  # https://github.com/latex3/latex3/issues/1539
 				#if default_engine.name=="luatex" and t in [ControlSequenceToken("\x00"), ControlSequenceToken("\x00\x00")]:
@@ -237,14 +232,26 @@ class Test(unittest.TestCase):
 				#if default_engine.name=="pdftex" and t==Catcode.active(0x0c):
 				#	continue  # https://tex.stackexchange.com/q/669877/250119
 
-				with self.subTest(s=s, t=t):
-					if is_unicode or ord(s)<256:
-						t.put_next()
-						self.assertEqual(Token.get_next(), t)
-					else:
-						with self.assertRaises(ValueError):
+				try:
+					t1=t
+					with self.subTest(s=s, t=t):
+						if is_unicode:
+							should_give_error=False
+						else:
+							if isinstance(t, CharacterToken):
+								should_give_error=t.index>=256
+							else:
+								assert isinstance(t, ControlSequenceToken)
+								should_give_error=max(t.codes)>=256
+						if should_give_error:
+							with self.assertRaises(ValueError):
+								t.put_next()
+						else:
 							t.put_next()
-
+							t1=Token.get_next()
+							self.assertEqual(t1, t)
+				except:
+					raise ValueError(f"{s=!r} {ord(s)=} {t=!r} {t1=!r}")
 
 	def test_put_get_next(self)->None:
 		put_next("a")
