@@ -1375,7 +1375,7 @@ def f1(s: str, *, globals: Optional[dict]=None, locals: Optional[dict]=None, esc
 		assert not partial_code
 		return "".join(result)
 
-f1.default_escape="`"  # type: ignore
+f1.default_escape="`"
 
 @dataclass
 class VarManager:

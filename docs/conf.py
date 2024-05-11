@@ -6,8 +6,10 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
+from typing import Any
+
 project = 'pythonimmediate'
-copyright = '2023, user202729'
+copyright = '2024, user202729'
 author = 'user202729'
 
 # -- set sys.path to allow Sphinx-apidoc to find the package
@@ -65,7 +67,7 @@ def process_line(line: str) -> str:
 		line = line.replace(macro, replacement)
 	return line
 
-def process_docstring(app, what, name, obj, options, lines):
+def process_docstring(app: Any, what: str, name: str, obj: Any, options: Any, lines: list[str]) -> None:
 	lines[:] = [process_line(line) for line in lines]
 
 from contextlib import suppress
@@ -81,7 +83,7 @@ logger = logging.getLogger(__name__)
 class MyLinkWarner(SphinxPostTransform):
 	default_priority = 5
 
-	def run(self):
+	def run(self, **kwargs: Any)->None:
 		for node in self.document.traverse(addnodes.pending_xref):
 			target = node["reftarget"]
 
@@ -106,10 +108,10 @@ class MyLinkWarner(SphinxPostTransform):
 							f"API link {target} is broken.", location=node, type="ref"
 							)
 
-def setup(app):
+def setup(app: Any)->None:
 	app.connect('autodoc-process-docstring', process_docstring)
 	app.connect('env-before-read-docs', env_before_read_docs)
 	app.add_post_transform(MyLinkWarner)
 
-def env_before_read_docs(app, env, docnames):
+def env_before_read_docs(app: Any, env: Any, docnames: Any)->None:
 	env.settings["tab_width"] = 4  # https://stackoverflow.com/a/75037587/5267751

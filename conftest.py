@@ -1,10 +1,11 @@
 import pytest
 import sys
+from typing import Any
 
 engines=None
 
 @pytest.fixture(autouse=True)
-def _setup_default_engine(doctest_namespace):
+def _setup_default_engine(doctest_namespace: Any)->None:
 	# this is for pytest doctest only
 	from pythonimmediate.engine import default_engine, ChildProcessEngine
 

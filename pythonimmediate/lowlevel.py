@@ -761,12 +761,12 @@ def build_Python_call_TeX(T: Type, TeX_code: str, *, recursive: bool=True, sync:
 		# special case, return a single object instead of a tuple of length 1
 		ttp_argtypes = result_type
 	else:
-		ttp_argtypes = result_type.__args__  # type: ignore
+		ttp_argtypes = result_type.__args__
 
 	extra=Python_call_TeX_extra(
 			ptt_argtypes=Tx,
 			ttp_argtypes=ttp_argtypes
-			)  # type: ignore
+			)
 	if data in Python_call_TeX_defined:
 		assert Python_call_TeX_defined[data][0]==extra, "different function with exact same code is not supported for now"
 	else:

@@ -2,20 +2,24 @@
 """
 Some TikZ bindings.
 """
+from __future__ import annotations
+
 from pathlib import Path
 import tempfile
 import gzip
+from typing import Optional
+
+engine: Optional[Engine]=None
 
 from pythonimmediate.multiengine import MultiChildProcessEngine
-from pythonimmediate import*
+from pythonimmediate import*  # type: ignore
 import pythonimmediate
 
 #format_file=Path(tempfile.mktemp(suffix=".fmt"))
 format_file=Path("/tmp/a.fmt")
 
-engine=None
 
-def clear():
+def clear()->None:
 	global engine
 	if engine is not None:
 		engine.__exit__(None, None, None)

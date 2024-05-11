@@ -221,6 +221,14 @@ class Engine(ABC):
 		"""
 		...
 
+	@abstractmethod
+	def __enter__(self)->Engine:
+		...
+
+	@abstractmethod
+	def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any)->None:
+		...
+
 	def close(self)->None:
 		"""
 		Terminates the [TeX] subprocess gracefully.
@@ -331,7 +339,13 @@ class ParentProcessEngine(Engine):
 		self.config.communicator.send(s)
 
 	def _close(self)->None:
-		assert False
+		raise RuntimeError("Cannot close ParentProcessEngine!")
+
+	def __enter__(self)->Engine:
+		raise RuntimeError("ParentProcessEngine should not be used as a context manager!")
+
+	def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any)->None:
+		raise RuntimeError("ParentProcessEngine should not be used as a context manager!")
 
 
 @dataclass
@@ -363,7 +377,18 @@ class _SetDefaultEngineContextManager:
 		self._new_engine=None  # allow the engine to be garbage collected
 
 
-class DefaultEngine(Engine, threading.local):
+class _DefaultEngineStorage(threading.local):
+	def __init__(self)->None:
+		self.engine: Optional[Engine]=None
+		"""
+		Stores the engine being set internally.
+
+		Normally there's no reason to access the internal engine directly, as ``self`` can be used
+		like the engine inside.
+		"""
+
+
+class DefaultEngine:
 	"""
 	A convenience class that can be used to avoid passing explicit ``engine`` argument to functions.
 
@@ -382,20 +407,7 @@ class DefaultEngine(Engine, threading.local):
 	"""
 
 	def __init__(self)->None:
-		#super().__init__()
-		self.engine: Optional[Engine]=None
-		"""
-		Stores the engine being set internally.
-
-		Normally there's no reason to access the internal engine directly, as ``self`` can be used
-		like the engine inside.
-		"""
-
-	def _print_log(self)->None:
-		"""
-		For debug purpose only. If the engine is still running there's a chance the log is not flushed when this function is called.
-		"""
-		print((self._read_log() if self._log is None else self._log).decode('u8', "replace"))
+		self._storage=_DefaultEngineStorage()
 
 	def set_engine(self, engine: Optional[Engine])->_SetDefaultEngineContextManager:
 		r"""
@@ -426,7 +438,7 @@ class DefaultEngine(Engine, threading.local):
 		"""
 		assert engine is not self
 		result=_SetDefaultEngineContextManager(_old_engine=self.engine, _new_engine=engine)
-		self.engine=engine
+		self._storage.engine=engine
 		return result
 
 	def get_engine(self)->Engine:
@@ -436,11 +448,10 @@ class DefaultEngine(Engine, threading.local):
 		All the other functions that use this one (those that make use of the engine) will raise RuntimeError
 		if the engine is None.
 		"""
-		if self.engine is None:
+		if self._storage.engine is None:
 			raise RuntimeError("Default engine not set for this thread!")
-		return self.engine
+		return self._storage.engine
 
-	# temporary hack ><
 	@property
 	def status(self)->EngineStatus:
 		return self.get_engine().status
@@ -448,6 +459,17 @@ class DefaultEngine(Engine, threading.local):
 	@status.setter
 	def status(self, value: EngineStatus)->None:
 		self.get_engine().status=value
+
+	@property
+	def engine(self)->Optional[Engine]:
+		"""
+		Return the engine, or None if the engine is not set.
+		"""
+		return self._storage.engine
+
+	@property
+	def is_unicode(self)->bool:
+		return self.get_engine().is_unicode
 
 	@property
 	def name(self)->EngineName:
@@ -461,12 +483,11 @@ class DefaultEngine(Engine, threading.local):
 	def config(self, value: GlobalConfiguration)->None:
 		raise NotImplementedError
 
-	def _read(self)->bytes:
-		line=self.get_engine()._read()
-		return line
+	def read(self)->bytes:
+		return self.get_engine().read()
 
-	def _write(self, s: bytes)->None:
-		self.get_engine()._write(s)
+	def write(self, s: bytes)->None:
+		self.get_engine().write(s)
 
 	def _log_communication(self, s: bytes)->None:
 		self.get_engine()._log_communication(s)
@@ -792,6 +813,12 @@ class ChildProcessEngine(Engine):
 
 	def _read_log(self)->bytes:
 		return self.read_output_file("log")
+
+	def _print_log(self)->None:
+		"""
+		For debug purpose only. If the engine is still running there's a chance the log is not flushed when this function is called.
+		"""
+		print((self._read_log() if self._log is None else self._log).decode('u8', "replace"))
 
 	def _check_no_error(self)->None:
 		r"""
