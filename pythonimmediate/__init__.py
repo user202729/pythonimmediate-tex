@@ -2941,7 +2941,12 @@ https://github.com/pytest-dev/pytest/issues/6996
 so we use :meta public: to force include docstring of private member in documentation
 """
 
-class _GroupManager(threading.local):
+class _GroupManagerStorage(threading.local):
+	# we separate out the storage so that mypy can type check the parent class _GroupManager
+	def __init__(self)->None:
+		self.running_instances: list=[]
+
+class _GroupManager:
 	"""
 	Create a semi-simple group.
 
@@ -2979,7 +2984,7 @@ class _GroupManager(threading.local):
 	"""
 
 	def __init__(self)->None:
-		self._running_instances: list=[]
+		self._storage=_GroupManagerStorage()
 
 	@contextlib.contextmanager
 	def _run(self)->Generator[None, None, None]:
@@ -3000,13 +3005,13 @@ class _GroupManager(threading.local):
 	def __enter__(self)->None:
 		instance: Any=self._run()
 		instance.__enter__()
-		self._running_instances.append(instance)
+		self._storage.running_instances.append(instance)
 
 	def end(self)->None:
 		TokenList(r"\endgroup").execute()
 
 	def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any)->None:
-		instance=self._running_instances.pop()
+		instance=self._storage.running_instances.pop()
 		instance.__exit__(exc_type, exc_value, traceback)
 
 group=_GroupManager()
