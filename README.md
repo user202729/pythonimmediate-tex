@@ -50,6 +50,8 @@ Description of the TeX package follows.
 
 ### Internal note
 
+To test, run `pytest`. This will also run `mypy` type checking, although not benchmark.
+
 `tex/` folder contains TeX-related files. The source code of the package is in `tex/pythonimmediate.sty`.
 
 To create the documentation:

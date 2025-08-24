@@ -380,13 +380,14 @@ def get_multiline_verb_arg()->str:
 	.. note::
 		in unusual category regime (such as that in ``\ExplSyntaxOn``), it may return wrong result.
 	"""
+	# obeyedline: breaking change from https://tex.stackexchange.com/a/722462/250119
 	return typing.cast(Callable[[], TTPBlock], Python_call_TeX_local(
 		r"""
 		\precattl_exec:n {
 			\NewDocumentCommand %name% {+v} {
 				\__send_content:e { r }
 				\str_set:Nn \l_tmpa_tl { #1 }
-				\str_replace_all:Nnn \l_tmpa_tl { \cO\^^M } { ^^J }
+				\str_replace_all:Nnn \l_tmpa_tl { \obeyedline } { ^^J }
 				\__send_block%naive_send%:e { \l_tmpa_tl }
 				\pythonimmediatelisten
 			}

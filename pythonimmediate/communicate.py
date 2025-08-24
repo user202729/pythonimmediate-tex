@@ -80,6 +80,7 @@ class MultiprocessingNetworkCommunicator(Communicator):
 		def listen_forwarder()->None:
 			with listener:
 				with listener.accept() as connection:
+					assert sys.__stdout__ is not None
 					while True:
 						try:
 							data=connection.recv_bytes()

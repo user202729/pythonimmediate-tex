@@ -834,7 +834,7 @@ def scan_Python_call_TeX(sourcecode: str, filename: Optional[str]=None)->None:
 								f_call.args=[T]+f_call.args
 								eval(compile(ast.Expression(body=f_call), "<string>", "eval"))
 		except:
-			print(f"======== while scanning file for Python_call_TeX_local(...) -- error on line {node.lineno} of file {filename} ========", file=sys.stderr)
+			print(f"======== while scanning file for Python_call_TeX_local(...) -- error on line {getattr(node, 'lineno', '??')} of file {filename} ========", file=sys.stderr)
 			raise
 
 def scan_Python_call_TeX_module(name: str)->None:

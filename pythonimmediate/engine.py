@@ -281,8 +281,9 @@ class ParentProcessEngine(Engine):
 			# create a daemon thread to copy the data from stdin to the pipe, by 4096-byte blocks.
 			def f()->None:
 				buffer=bytearray()
+				assert sys.__stdin__ is not None
 				while True:
-					data=sys.__stdin__.buffer.readline()
+					data=sys.__stdin__.buffer.readline()  # type: ignore
 					if pseudo_config.debug>=5: print("TeX → Python (buffered): " + debug_possibly_shorten(data.decode('u8')))
 					if not data:
 						os.write(w, buffer)
@@ -316,7 +317,7 @@ class ParentProcessEngine(Engine):
 		self._config=pickle.loads(base64.b64decode(line))
 		assert isinstance(self.config, GlobalConfiguration)
 
-		sys.stdin=None  # type: ignore
+		sys.stdin=None
 		# avoid user mistakenly read
 
 		if self.config.debug_log_communication is not None:
@@ -564,6 +565,7 @@ class ChildProcessEngine(Engine):
 
 	>>> with ChildProcessEngine("pdftex") as engine, default_engine.set_engine(engine):
 	... 	execute(r'\documentclass{article}')
+	... 	execute(r'\usepackage[pdfversion=1.5]{hyperref}')
 	... 	execute(r'\begin{document}')
 	... 	execute(r'Hello world')
 	... 	engine.terminate()
@@ -597,6 +599,7 @@ class ChildProcessEngine(Engine):
 
 	>>> with ChildProcessEngine("pdftex") as engine, default_engine.set_engine(engine):
 	... 	execute(r'\documentclass{article}')
+	... 	execute(r'\usepackage[pdfversion=1.5]{hyperref}')
 	... 	execute(r'\begin{document}')
 	... 	execute(r'Hello world')
 	... 	try: execute(r'\end{document}')
@@ -682,7 +685,11 @@ class ChildProcessEngine(Engine):
 		self._start_process()
 
 	def _create_directory(self)->None:
-		self._directory: tempfile.TemporaryDirectory=tempfile.TemporaryDirectory(prefix="pyimm-", ignore_cleanup_errors=True)  # type: ignore
+		self._directory: tempfile.TemporaryDirectory
+		if sys.version_info >= (3, 10):
+			self._directory=tempfile.TemporaryDirectory(prefix="pyimm-", ignore_cleanup_errors=True)
+		else:
+			self._directory=tempfile.TemporaryDirectory(prefix="pyimm-")
 		self.directory: Path=Path(self._directory.name)
 
 	def _start_process(self)->None:
