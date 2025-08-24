@@ -1,4 +1,4 @@
-\ProvidesExplPackage{pythonimmediate}{2024/01/18}{0.5.0}{Library to run Python code}
+\ProvidesExplPackage{pythonimmediate}{2025/08/24}{0.6.0}{Library to run Python code}
 
 \RequirePackage{saveenv}
 \PassOptionsToPackage{abspath}{currfile}  % try to enable abspath if possible (i.e. if package isn't loaded) but otherwise don't give option-clash error
@@ -23,6 +23,7 @@
 		\begingroup
 			\escapechar=-1~
 			\cC{set@display@protect}
+			\let  \cC{]} \relax
 			\let  \cA\~  \relax
 	}
 }
@@ -50,7 +51,9 @@
 
 \msg_new:nnn {pythonimmediate} {shell-fail} {Please~enable~unrestricted~shell~escape!}
 \msg_new:nnn {pythonimmediate} {process-start-error} {Cannot~start~Python~process!~
-	Make~sure~package~options~are~correct~and~the~Python~package~is~installed.}
+	Make~sure~package~options~are~correct~and~the~Python~package~is~installed.~
+	If~PYTHONPATH~is~used~to~specify~a~zip~file,~make~sure~the~name~is~correct,~
+	in~particular~whether~a~dash~or~an~underscore~should~be~used.}
 \msg_new:nnn {pythonimmediate} {internal-error} {Internal~error!}
 
 \sys_if_shell_unrestricted:F {

@@ -52,6 +52,11 @@ Description of the TeX package follows.
 
 To test, run `pytest`. This will also run `mypy` type checking, although not benchmark.
 
+`pytest` also runs, as part of `test_subprocess`, TeX engines (all 3) on the file `tex/test/test_pythonimmediate.tex`.
+One may also run this manually.
+
+To test on Overleaf, follow the instructions in the TeX package documentation and compile `tex/test/test_pythonimmediate.tex`.
+
 `tex/` folder contains TeX-related files. The source code of the package is in `tex/pythonimmediate.sty`.
 
 To create the documentation:

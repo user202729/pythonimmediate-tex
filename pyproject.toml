@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools >= 78.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pythonimmediate-tex"
+version = "0.7.1"
+dependencies = []
+requires-python = ">=3.9"
+authors = [ {name = "user202729"} ]
+maintainers = [ {name = "user202729"} ]
+description = "Python helper for TeX library to run Python code"
+readme = "README.md"
+license = "LPPL-1.3c"
+license-files = ["LICENSE"]
+classifiers = [
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Text Processing :: Markup :: LaTeX"
+]
+
+[tool.setuptools]
+packages = ["pythonimmediate", "pythonimmediatehelper"]
+
+[project.urls]
+Repository = "https://github.com/user202729/pythonimmediate-tex"
+
+[project.optional-dependencies]
+dev = [
+	"pytest",
+	"pytest-mypy",
+	"pytest-benchmark",
+	"pytest-xdist",
+	"psutil",
+	"types-psutil"
+]

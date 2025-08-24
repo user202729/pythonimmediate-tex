@@ -64,7 +64,8 @@ def mark_bootstrap(code: str|EngineDependentCode)->None:
 
 # check TeX package version.
 mark_bootstrap(r"""
-\exp_args:Nx \str_if_in:nnF {\csname ver@pythonimmediate.sty\endcsname} {%} {
+\use:c{@ifpackagelater} {pythonimmediate} {%} {
+} {
 	\msg_new:nnn {pythonimmediate} {incompatible-version} {Incompatible~ TeX~ package~ version~ (#1)~ installed!~ Need~ at~ least~ %.}
 	\msg_error:nnx {pythonimmediate} {incompatible-version} {\csname ver@pythonimmediate.sty\endcsname}
 }
