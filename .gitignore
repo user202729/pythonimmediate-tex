@@ -130,3 +130,6 @@ dmypy.json
 
 # Miscellaneous
 tags
+
+/tex/test/test_pythonimmediate.aux
+/tex/test/test_pythonimmediate.pdf
