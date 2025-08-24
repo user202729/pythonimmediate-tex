@@ -1334,11 +1334,11 @@ class ControlSequenceToken(Token):
 
 	def simple_detokenize(self, get_catcode: Callable[[int], Catcode])->str:
 		if not self.csname:
-			raise NotImplementedError("This isn't simple!")
+			raise NotImplementedError("\\<null control sequence> isn't simple!")
 		if len(self.csname)>1 or get_catcode(ord(self.csname))==Catcode.letter:
 			for ch in self.csname:
 				if get_catcode(ord(ch))!=Catcode.letter:
-					raise NotImplementedError("This isn't simple!")
+					raise NotImplementedError(f"\\{self.csname} isn't simple!")
 			return "\\"+self.csname+" "
 		return "\\"+self.csname
 
