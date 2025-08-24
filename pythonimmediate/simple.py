@@ -386,9 +386,12 @@ def get_multiline_verb_arg()->str:
 		\precattl_exec:n {
 			\NewDocumentCommand %name% {+v} {
 				\__send_content:e { r }
-				\str_set:Nn \l_tmpa_tl { #1 }
-				\str_replace_all:Nnn \l_tmpa_tl { \obeyedline } { ^^J }
-				\__send_block%naive_send%:e { \l_tmpa_tl }
+				{
+					\let \obeyedline \cO\^^M
+					\edef \l_tmpa_tl { #1 }
+					\str_replace_all:Nnn \l_tmpa_tl { \cO\^^M } { ^^J }
+					\__send_block%naive_send%:e { \l_tmpa_tl }
+				}
 				\pythonimmediatelisten
 			}
 		}

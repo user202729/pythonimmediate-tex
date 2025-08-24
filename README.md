@@ -55,6 +55,8 @@ To test, run `pytest`. This will also run `mypy` type checking, although not ben
 `pytest` also runs, as part of `test_subprocess`, TeX engines (all 3) on the file `tex/test/test_pythonimmediate.tex`.
 One may also run this manually.
 
+To create a `zip` file locally (for uploading to Overleaf), run `python setup.py sdist --format=zip`.
+
 To test on Overleaf, follow the instructions in the TeX package documentation and compile `tex/test/test_pythonimmediate.tex`.
 
 `tex/` folder contains TeX-related files. The source code of the package is in `tex/pythonimmediate.sty`.
