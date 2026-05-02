@@ -387,7 +387,7 @@ def get_multiline_verb_arg()->str:
 			\NewDocumentCommand %name% {+v} {
 				\__send_content:e { r }
 				{
-					\let \obeyedline \cO\^^M
+					\def \obeyedline {\cO\^^M}
 					\edef \l_tmpa_tl { #1 }
 					\str_replace_all:Nnn \l_tmpa_tl { \cO\^^M } { ^^J }
 					\__send_block%naive_send%:e { \l_tmpa_tl }
