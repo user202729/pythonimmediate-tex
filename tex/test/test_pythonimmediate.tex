@@ -130,7 +130,7 @@ class Test(unittest.TestCase):
 					   'Æ²×⁴ℝ𝕏',
 					   [198, 178, 215, 8308, 8477, 120143]
 					   ):
-			assert ord(char)==code
+			assert ord(char)==code  # last one expected to fail on Overleaf since Overleaf does not support characters outside BMP
 
 suite = unittest.defaultTestLoader.loadTestsFromTestCase(Test)
 result = unittest.TextTestRunner(failfast=True).run(suite)

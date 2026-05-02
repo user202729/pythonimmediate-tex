@@ -1,4 +1,4 @@
-\ProvidesFile{pythonimmediate.tex}[2025/08/24 0.6.0 Library to run Python code]
+\ProvidesFile{pythonimmediate.tex}[2026/05/02 0.6.1 Library to run Python code]
 \RequirePackage{fvextra}
 \documentclass{l3doc}
 \usepackage{tikz}
@@ -55,7 +55,7 @@ In addition to the \LaTeX\ package, you need the Python \pkg{pythonimmediate-tex
 installation instruction can be found at \url{https://pypi.org/project/pythonimmediate-tex/}.
 
 Note that not all \TeX\ package versions are compatible with all Python package versions.
-This \TeX\ package is compatible with Python package version |0.7.2|.
+This \TeX\ package is compatible with Python package version |0.7.3|.
 
 Remember to enable unrestricted\footnote{
 	There's little point in supporting restricted mode, since it's possible to execute arbitrary shell commands in Python anyway.
@@ -67,7 +67,7 @@ Remember to enable unrestricted\footnote{
 At the point of writing, this package can be used on Overleaf.
 
 Nevertheless, you cannot use |pip| to install Python packages on Overleaf directly, instead it's possible to
-download |.zip| file, include it in your Overleaf project, and specify where the package can be found to Python
+download |.whl| file, include it in your Overleaf project, and specify where the package can be found to Python
 using |PYTHONPATH| environment variable.
 
 Instruction:
@@ -77,18 +77,18 @@ Instruction:
 		\begin{itemize}
 			\item \file{pythonimmediate.sty}
 			\item \file{pythonimmediate_helper.lua}
-			\item \file{pythonimmediate_tex-0.7.2.zip}
+			\item \file{pythonimmediate_tex-0.7.3-py3-none-any.whl}
 		\end{itemize}
-		The |0.7.2| part should be replaced with the desired version
+		The |0.7.3| part should be replaced with the desired version
 		of the Python package.
 
 		The |.sty| files can be downloaded from CTAN at 
 		\url{https://ctan.org/pkg/pythonimmediate}.
 
-		The |.zip| file containing Python source code
+		The |.whl| file containing Python source code
 		can be downloaded from PyPI: \url{https://pypi.org/project/pythonimmediate-tex/\#files}.
 
-		Remark: Currently the \LaTeX\ package version 0.4.0 is included in \TeX\ Live 2023, you would need to download \LaTeX\ version 0.5.0 from CTAN.
+		Remark: Only the |.whl| is always required, the remaining files may have already been included in \TeX\ Live. Currently the \LaTeX\ package version 0.4.0 is included in \TeX\ Live 2023, you would need to download \LaTeX\ version 0.5.0 or newer from CTAN.
 
 	\item In older \TeX\ Live versions (2022 or less), you will in addition need to download the following files:
 		\begin{itemize}
@@ -100,9 +100,9 @@ Instruction:
 	\item Write the following in the preamble (be careful of stray characters if you copy and paste from PDF):
 \begin{verbatim}
 \usepackage[abspath]{currfile}
-\usepackage[python-executable={PYTHONPATH=pythonimmediate_tex-0.7.2.zip/pythonimmediate_tex-0.7.2/ python3},args={--mode=unnamed-pipe}]{pythonimmediate}
+\usepackage[python-executable={PYTHONPATH=pythonimmediate_tex-0.7.3-py3-none-any.whl python3},args={--mode=unnamed-pipe}]{pythonimmediate}
 \end{verbatim}
-As above, replace both occurrences of |0.7.2| with the downloaded version specified in the zip file above.
+As above, replace both occurrences of |0.7.3| with the downloaded version specified in the zip file above.
 
 Refer to \cref{troubleshoot-source-file-not-found} for explanation of the |abspath| option.
 \end{itemize}

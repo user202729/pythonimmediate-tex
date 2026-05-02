@@ -53,11 +53,19 @@ Description of the TeX package follows.
 To test, run `pytest`. This will also run `mypy` type checking, although not benchmark.
 
 `pytest` also runs, as part of `test_subprocess`, TeX engines (all 3) on the file `tex/test/test_pythonimmediate.tex`.
-One may also run this manually.
+One may also run this manually. To run only this test in `pytest`, do `pytest -k test_subprocess`.
 
-To create a `zip` file locally (for uploading to Overleaf), run `python setup.py sdist --format=zip`.
+Run with `-n0 --exitfirst` for faster exit.
+
+As documented at the start of `pytotex.py`, setting environment variable `pythonimmediatedebugextraargs='--debug-log-communication=/tmp/a.diff --debug=5' pdflatex test.tex` makes `pythonimmediate` print out full communication logs.
+
+~~To create a `zip` file locally (for uploading to Overleaf), run `python setup.py sdist --format=zip`.~~~
+
+PyPI no longer allow uploading `zip` files. Importing from `whl` files without extraction remains possible.
+Run `rm dist/*; python setup.py bdist_wheel` to generate the `dist/pythonimmediate_tex-0.7.3-py3-none-any.whl` file.
 
 To test on Overleaf, follow the instructions in the TeX package documentation and compile `tex/test/test_pythonimmediate.tex`.
+Note that one test `test_preserve_unicode_chars` is expected to fail.
 
 `tex/` folder contains TeX-related files. The source code of the package is in `tex/pythonimmediate.sty`.
 
