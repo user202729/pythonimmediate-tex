@@ -628,7 +628,7 @@ def exec_or_eval_with_linecache(code: str, globals: dict, mode: str)->Any:
 
 	compiled_code=compile(code, sourcename, mode)
 	if mode=="exec": exec(compiled_code, globals)
-	else: eval(compiled_code, globals)
+	else: return eval(compiled_code, globals)
 
 	#del linecache.cache[sourcename]
 	# we never delete the cache, in case some function is defined here then later are called...
