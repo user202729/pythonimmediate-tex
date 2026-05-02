@@ -95,16 +95,23 @@ class Test:
 	@pytest.mark.parametrize("engine_name", engine_names)
 	@pytest.mark.parametrize("communication_method", ["unnamed-pipe", "multiprocessing-network"])
 	@pytest.mark.parametrize("use_8bit", [True, False])
-	def test_subprocess(self, engine_name: EngineName, communication_method: str, use_8bit: bool)->None:
-		tex_file=str(Path(tempfile.gettempdir())/"test_pythonimmediate.tex").replace("\\", "/")
+	@pytest.mark.parametrize("filename", ["test_pythonimmediate.tex", "test_pythonimmediate_pyerror.tex"])
+	def test_subprocess(self, filename: str, engine_name: EngineName, communication_method: str, use_8bit: bool)->None:
+		tex_file=str(Path(tempfile.gettempdir())/filename).replace("\\", "/")
+		expect_error: bool = filename == "test_pythonimmediate_pyerror.tex"
 		assert re.fullmatch(r"[A-Za-z0-9_./]*", tex_file)
-		subprocess.run(
-				[engine_name_to_latex_executable[engine_name], "-shell-escape", *(
-					["-8bit"] if use_8bit else []
-					), r"\def\specifymode{"+communication_method+r"}\input{"+tex_file+"}"],
-				check=True,
-				cwd=tempfile.gettempdir(),
-				)
+		try:
+			subprocess.run(
+					[engine_name_to_latex_executable[engine_name], "-shell-escape", *(
+						["-8bit"] if use_8bit else []
+						), r"\def\specifymode{"+communication_method+r"}\input{"+tex_file+"}"],
+					check=True,
+					cwd=tempfile.gettempdir(),
+					)
+		except subprocess.CalledProcessError:
+			if not expect_error: raise
+		else:
+			if expect_error: raise RuntimeError("expecting an error")
 
 	@pytest.mark.parametrize("engine_name", engine_names)
 	def test_wlog_atexit(self, engine_name: EngineName, tmp_path: Path)->None:

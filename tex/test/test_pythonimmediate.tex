@@ -136,7 +136,8 @@ class Test(unittest.TestCase):
 
 suite = unittest.defaultTestLoader.loadTestsFromTestCase(Test)
 result = unittest.TextTestRunner(failfast=True).run(suite)
-assert not result.errors
+assert not result.errors, result.errors
+assert not result.failures, result.failures
 
 
 x=y=z=1
